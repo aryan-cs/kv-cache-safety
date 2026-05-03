@@ -12,7 +12,6 @@ from cache_safety_erasure.evals.io import write_prompt_suite
 from cache_safety_erasure.evals.prompt_record import PromptRecord
 from cache_safety_erasure.evals.seed_suites import BUILTIN_SUITES, load_builtin_suite
 
-
 OPEN_DATASET_PRESETS = {
     # These are optional ingestion presets. They are not used by smoke tests.
     "advbench": {

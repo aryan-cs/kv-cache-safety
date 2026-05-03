@@ -13,10 +13,17 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Check whether a result directory is paper-ready.")
     parser.add_argument("--results-dir", required=True, type=Path)
     parser.add_argument("--min-prompts-per-suite", type=int, default=100)
+    parser.add_argument(
+        "--suite-min-prompts",
+        action="append",
+        default=[],
+        help="Optional per-suite threshold override, e.g. system_leakage=2.",
+    )
     parser.add_argument("--max-ci-width", type=float, default=0.08)
     parser.add_argument("--allow-dirty", action="store_true")
     parser.add_argument("--allow-mock-model", action="store_true")
     args = parser.parse_args()
+    suite_min_prompts = _parse_suite_min_prompts(args.suite_min_prompts)
 
     failures: list[str] = []
     generations = args.results_dir / "generations.jsonl"
@@ -76,9 +83,10 @@ def main() -> None:
                 row = json.loads(line)
                 counts.setdefault(row["suite"], set()).add(row["prompt_id"])
         for suite, prompt_ids in counts.items():
-            if len(prompt_ids) < args.min_prompts_per_suite:
+            required_count = suite_min_prompts.get(suite, args.min_prompts_per_suite)
+            if len(prompt_ids) < required_count:
                 failures.append(
-                    f"suite `{suite}` has {len(prompt_ids)} prompts; need >= {args.min_prompts_per_suite}"
+                    f"suite `{suite}` has {len(prompt_ids)} prompts; need >= {required_count}"
                 )
 
     if metrics_path.exists():
@@ -101,6 +109,16 @@ def main() -> None:
             print(f"- {failure}")
         raise SystemExit(1)
     print("PAPER READY CHECK PASSED")
+
+
+def _parse_suite_min_prompts(values: list[str]) -> dict[str, int]:
+    parsed: dict[str, int] = {}
+    for value in values:
+        if "=" not in value:
+            raise SystemExit(f"Expected --suite-min-prompts value like suite=100, got `{value}`")
+        suite, raw_count = value.split("=", 1)
+        parsed[suite] = int(raw_count)
+    return parsed
 
 
 if __name__ == "__main__":

@@ -81,6 +81,76 @@ def main() -> None:
             plt.close(fig)
             made.append(str(out))
 
+            fig, ax = plt.subplots(figsize=(8, 6))
+            plot_df = selective_df.dropna(subset=["safety_degradation"]).copy()
+            plot_df["capability_degradation"] = plot_df["capability_degradation"].fillna(0.0)
+            plot_df = plot_df.reset_index(drop=True)
+            plot_df["x_plot"] = plot_df["capability_degradation"] + (
+                (plot_df.index % 5) - 2
+            ) * 0.002
+            plot_df["y_plot"] = plot_df["safety_degradation"] + (
+                ((plot_df.index // 5) % 5) - 2
+            ) * 0.002
+            ax.axline((0, 0), slope=1, color="0.6", linewidth=1, linestyle="--")
+            for suite, suite_df in plot_df.groupby("suite"):
+                ax.scatter(suite_df["x_plot"], suite_df["y_plot"], s=64, label=suite, alpha=0.85)
+            labeled = plot_df[plot_df["index"].abs() > 0].copy()
+            if not labeled.empty:
+                labeled = labeled.sort_values("index", key=lambda series: series.abs(), ascending=False).head(8)
+                for row in labeled.itertuples():
+                    ax.annotate(
+                        row.policy,
+                        (row.x_plot, row.y_plot),
+                        xytext=(4, 4),
+                        textcoords="offset points",
+                        fontsize=7,
+                    )
+            ax.axhline(0, color="black", linewidth=0.8)
+            ax.axvline(0, color="black", linewidth=0.8)
+            ax.set_title("Safety vs Capability Degradation")
+            ax.set_xlabel("Capability degradation")
+            ax.set_ylabel("Safety degradation")
+            ax.legend(title="suite", fontsize=8)
+            fig.tight_layout()
+            out = figures_dir / "safety_vs_capability_degradation.png"
+            fig.savefig(out, dpi=180)
+            plt.close(fig)
+            made.append(str(out))
+
+            forest_rows = []
+            for key, value in metrics.get("selective_safety_erasure", {}).items():
+                ci = value.get("paired_safety_degradation_ci", {})
+                if ci.get("mean") is None or ci.get("ci_low") is None or ci.get("ci_high") is None:
+                    continue
+                forest_rows.append(
+                    {
+                        "label": key.replace("::", "\n"),
+                        "mean": ci["mean"],
+                        "ci_low": ci["ci_low"],
+                        "ci_high": ci["ci_high"],
+                        "cluster_n": ci.get("cluster_n"),
+                    }
+                )
+            if forest_rows:
+                forest_df = pd.DataFrame(forest_rows).sort_values("mean")
+                fig_height = max(4, 0.35 * len(forest_df))
+                fig, ax = plt.subplots(figsize=(9, fig_height))
+                y = range(len(forest_df))
+                xerr = [
+                    forest_df["mean"] - forest_df["ci_low"],
+                    forest_df["ci_high"] - forest_df["mean"],
+                ]
+                ax.errorbar(forest_df["mean"], y, xerr=xerr, fmt="o", capsize=3)
+                ax.axvline(0, color="black", linewidth=0.8)
+                ax.set_yticks(list(y), labels=forest_df["label"])
+                ax.set_xlabel("Paired safety degradation")
+                ax.set_title("Paired Safety Degradation With Prompt-Clustered CIs")
+                fig.tight_layout()
+                out = figures_dir / "paired_safety_degradation_forest.png"
+                fig.savefig(out, dpi=180)
+                plt.close(fig)
+                made.append(str(out))
+
             fig, ax = plt.subplots(figsize=(10, 5))
             top = selective_df.sort_values("index", ascending=False).head(12)
             labels = [f"{row.suite}\n{row.policy}" for row in top.itertuples()]
@@ -127,6 +197,43 @@ def main() -> None:
                 fig.savefig(out, dpi=180)
                 plt.close(fig)
                 made.append(str(out))
+        role_columns = [col for col in cache_df.columns if col.startswith("retained_") and col.endswith("_tokens")]
+        role_rows = []
+        for retained_col in role_columns:
+            role = retained_col[len("retained_") : -len("_tokens")]
+            evicted_col = f"evicted_{role}_tokens"
+            if evicted_col not in cache_df.columns:
+                continue
+            grouped = cache_df.groupby("policy")[[retained_col, evicted_col]].sum().reset_index()
+            for row in grouped.itertuples(index=False):
+                retained_count = float(getattr(row, retained_col))
+                evicted_count = float(getattr(row, evicted_col))
+                total = retained_count + evicted_count
+                if total <= 0:
+                    continue
+                role_rows.append(
+                    {
+                        "policy": row.policy,
+                        "role": role,
+                        "retention_fraction": retained_count / total,
+                    }
+                )
+        if role_rows:
+            role_df = pd.DataFrame(role_rows)
+            pivot = role_df.pivot_table(
+                index="role", columns="policy", values="retention_fraction", aggfunc="mean"
+            )
+            fig, ax = plt.subplots(figsize=(max(8, 0.8 * len(pivot.columns)), 4.5))
+            im = ax.imshow(pivot.fillna(0.0).values, aspect="auto", cmap="viridis", vmin=0, vmax=1)
+            ax.set_xticks(range(len(pivot.columns)), labels=pivot.columns, rotation=35, ha="right")
+            ax.set_yticks(range(len(pivot.index)), labels=pivot.index)
+            ax.set_title("Token Role Retention By Cache Policy")
+            fig.colorbar(im, ax=ax, label="retained / observed role tokens")
+            fig.tight_layout()
+            out = figures_dir / "token_role_retention_heatmap.png"
+            fig.savefig(out, dpi=180)
+            plt.close(fig)
+            made.append(str(out))
 
     write_json(figures_dir / "manifest.json", {"figures": made})
     print(f"Wrote {len(made)} figure(s) to {figures_dir}")

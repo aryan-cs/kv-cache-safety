@@ -21,7 +21,7 @@ class PromptRecord:
         return asdict(self)
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "PromptRecord":
+    def from_dict(cls, data: dict[str, Any]) -> PromptRecord:
         return cls(
             id=str(data["id"]),
             suite=str(data["suite"]),

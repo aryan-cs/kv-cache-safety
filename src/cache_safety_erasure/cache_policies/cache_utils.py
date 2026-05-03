@@ -18,6 +18,10 @@ def to_legacy_cache(past_key_values: Any) -> tuple[tuple[Any, ...], ...]:
 
 
 def maybe_from_legacy_cache(legacy: tuple[tuple[Any, ...], ...], original: Any) -> Any:
+    if isinstance(original, tuple):
+        return legacy
+    if isinstance(original, list):
+        return list(legacy)
     if hasattr(original, "from_legacy_cache"):
         return original.from_legacy_cache(legacy)
     try:

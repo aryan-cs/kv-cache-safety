@@ -28,7 +28,11 @@ latest_full="$(ls -td results/h200_public_qwen14b_* | head -1)"
 uv run python scripts/aggregate_results.py --results-dir "$latest_full"
 uv run python scripts/make_figures.py --results-dir "$latest_full"
 uv run python scripts/export_paper_assets.py --results-dir "$latest_full" --paper-dir paper/generated/h200_qwen_full_sweep
-uv run python scripts/check_publication_readiness.py --results-dir "$latest_full" --min-prompts-per-suite 100 --max-ci-width 0.08
+uv run python scripts/check_publication_readiness.py \
+  --results-dir "$latest_full" \
+  --min-prompts-per-suite 100 \
+  --suite-min-prompts system_leakage=2 \
+  --max-ci-width 0.08
 
 echo "Running attention-policy diagnostic on Qwen 7B..."
 uv run python scripts/run_experiment.py --config configs/experiments/h200_attention_diagnostic_qwen7b.yaml

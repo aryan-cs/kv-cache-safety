@@ -6,8 +6,8 @@ from typing import Any
 
 from cache_safety_erasure.cache_policies.base import CachePolicyDecision
 from cache_safety_erasure.cache_policies.cache_utils import (
-    cache_layer_count,
     cache_l2_norm,
+    cache_layer_count,
     cache_seq_len,
     evicted_from_retained,
     maybe_from_legacy_cache,

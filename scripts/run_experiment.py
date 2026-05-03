@@ -76,9 +76,10 @@ def main() -> None:
     )
 
     cache_stat_rows: list[dict] = []
+    cache_stats_writer = None
     prompt_manifest_rows: list[dict] = []
 
-    for suite, prompts in suite_prompts.items():
+    for _suite, prompts in suite_prompts.items():
         prompt_manifest_rows.extend(
             {
                 "prompt_id": prompt.id,
@@ -129,13 +130,28 @@ def main() -> None:
                     append_jsonl(generations_path, [row])
                     for decision in result.cache_decisions:
                         cache_stat_rows.extend(decision.to_rows(prompt.id, seed))
+                        if len(cache_stat_rows) >= 50_000:
+                            cache_stats_writer = _write_cache_stats_batch(
+                                run_dir / "cache_stats.parquet",
+                                cache_stat_rows,
+                                cache_stats_writer,
+                            )
+                            cache_stat_rows = []
 
     rows = read_jsonl(generations_path)
     metrics = compute_run_metrics(rows)
     write_jsonl(run_dir / "prompts.jsonl", prompt_manifest_rows)
     write_json(run_dir / "metrics.json", metrics)
-    if cache_stat_rows:
-        write_parquet(run_dir / "cache_stats.parquet", cache_stat_rows)
+    if cache_stats_writer is not None:
+        if cache_stat_rows:
+            cache_stats_writer = _write_cache_stats_batch(
+                run_dir / "cache_stats.parquet",
+                cache_stat_rows,
+                cache_stats_writer,
+            )
+        cache_stats_writer.close()
+    elif cache_stat_rows:
+        write_parquet(run_dir / "cache_stats.parquet", _normalize_cache_stat_rows(cache_stat_rows))
     else:
         write_parquet(run_dir / "cache_stats.parquet", [])
     print(f"Completed run: {run_dir}")
@@ -148,6 +164,63 @@ def _stable_hash(value: Any) -> str:
 
 def _policy_manifest(policy: Any) -> dict[str, Any]:
     return asdict(policy)
+
+
+CACHE_STATS_COLUMNS = [
+    "prompt_id",
+    "seed",
+    "policy",
+    "decode_step",
+    "original_seq_len",
+    "retained_count",
+    "evicted_count",
+    "retained_indices",
+    "evicted_indices",
+    "layer_count",
+    "cache_l2_before",
+    "cache_l2_after",
+    "retained_special_tokens",
+    "retained_template_tokens",
+    "retained_system_tokens",
+    "retained_user_tokens",
+    "retained_generated_tokens",
+    "retained_unknown_tokens",
+    "evicted_special_tokens",
+    "evicted_template_tokens",
+    "evicted_system_tokens",
+    "evicted_user_tokens",
+    "evicted_generated_tokens",
+    "evicted_unknown_tokens",
+    "sink_tokens",
+    "recent_tokens",
+    "policy_seed",
+    "attention_scores_used",
+    "quantization_bits",
+    "protected_spans",
+    "protected_candidate_count",
+    "protected_retained_count",
+    "protected_dropped_count",
+    "patched_from_baseline",
+]
+
+
+def _normalize_cache_stat_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [{column: row.get(column) for column in CACHE_STATS_COLUMNS} for row in rows]
+
+
+def _write_cache_stats_batch(path: Path, rows: list[dict[str, Any]], writer: Any) -> Any:
+    try:
+        import pandas as pd
+        import pyarrow as pa
+        import pyarrow.parquet as pq
+    except ModuleNotFoundError as exc:
+        raise RuntimeError("pandas and pyarrow are required for cache_stats.parquet.") from exc
+    df = pd.DataFrame(_normalize_cache_stat_rows(rows), columns=CACHE_STATS_COLUMNS)
+    table = pa.Table.from_pandas(df, preserve_index=False)
+    if writer is None:
+        writer = pq.ParquetWriter(path, table.schema)
+    writer.write_table(table)
+    return writer
 
 
 if __name__ == "__main__":

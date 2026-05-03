@@ -118,7 +118,6 @@ def hf_generate(
                 break
             generated_ids.append(token_id)
 
-            cache_len = cache_seq_len(past)
             outputs = _forward_one_token(
                 model=model,
                 token_id=next_token.reshape(1, 1),
