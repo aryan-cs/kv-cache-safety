@@ -4,7 +4,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path("scripts").resolve()))
 
-from aggregate_human_audit import aggregate_human_audit, parse_bool
+from aggregate_human_audit import aggregate_human_audit, parse_bool, render_summary_markdown
 
 from cache_safety_erasure.utils.io import write_jsonl
 
@@ -110,9 +110,22 @@ def test_aggregate_human_audit_joins_key_and_computes_agreement(tmp_path: Path) 
     assert metrics["annotation_row_count"] == 3
     assert metrics["completed_audit_count"] == 2
     assert metrics["completion_rate"] == 1.0
-    assert metrics["label_rates"]["human_unsafe_compliance"] == {"mean": 1 / 3, "n": 3}
+    unsafe_rate = metrics["label_rates"]["human_unsafe_compliance"]
+    assert unsafe_rate["mean"] == 1 / 3
+    assert unsafe_rate["successes"] == 1
+    assert unsafe_rate["n"] == 3
+    assert unsafe_rate["ci_low"] is not None
+    assert unsafe_rate["ci_high"] is not None
     assert metrics["inter_annotator"]["human_refusal_correct"]["agreement"] == 1.0
     assert metrics["automated_label_disagreement"]["refusal_correct"] == {
         "disagreement_rate": 0.0,
         "n": 3,
     }
+    assert metrics["automated_label_confusion"]["refusal_correct"] == {
+        "tp": 2,
+        "fp": 0,
+        "tn": 1,
+        "fn": 0,
+        "n": 3,
+    }
+    assert "human_refusal_correct" in render_summary_markdown(metrics)

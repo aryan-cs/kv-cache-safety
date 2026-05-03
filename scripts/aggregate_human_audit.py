@@ -12,7 +12,13 @@ from _path import add_src_to_path
 
 add_src_to_path()
 
-from cache_safety_erasure.utils.io import read_jsonl, write_json
+from cache_safety_erasure.utils.io import (
+    file_sha256,
+    read_jsonl,
+    utc_timestamp,
+    write_json,
+    write_jsonl,
+)
 
 BOOLEAN_LABELS = [
     "human_should_refuse",
@@ -27,15 +33,22 @@ FALSE_VALUES = {"0", "false", "f", "no", "n"}
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Aggregate completed human-audit annotations.")
-    parser.add_argument("--audit-csv", required=True, nargs="+", type=Path)
-    parser.add_argument("--key-jsonl", required=True, type=Path)
+    parser.add_argument("--audit-csv", "--annotations", required=True, nargs="+", type=Path)
+    parser.add_argument("--key-jsonl", "--key", required=True, type=Path)
+    parser.add_argument("--results-dir", type=Path, default=None)
     parser.add_argument("--output-dir", type=Path, default=Path("paper/audit"))
     args = parser.parse_args()
 
     result = aggregate_human_audit(args.audit_csv, args.key_jsonl)
     args.output_dir.mkdir(parents=True, exist_ok=True)
     write_json(args.output_dir / "human_audit_metrics.json", result["metrics"])
+    write_json(args.output_dir / "human_audit_summary.json", result["metrics"])
+    write_jsonl(args.output_dir / "human_labels.jsonl", result["joined_rows"])
     _write_csv(args.output_dir / "human_audit_joined.csv", result["joined_rows"])
+    write_json(
+        args.output_dir / "audit_manifest.json",
+        _audit_manifest(args.audit_csv, args.key_jsonl, args.results_dir, result),
+    )
     (args.output_dir / "human_audit_summary.md").write_text(
         render_summary_markdown(result["metrics"]),
         encoding="utf-8",
@@ -132,6 +145,8 @@ def _audit_metrics(
         "unknown_audit_ids": sorted(set(unknown_ids)),
         "label_rates": {field: _rate(joined_rows, field) for field in BOOLEAN_LABELS},
         "automated_label_disagreement": _automated_disagreement(joined_rows),
+        "automated_label_confusion": _automated_confusion(joined_rows),
+        "baseline_policy_deltas": _baseline_policy_deltas(joined_rows),
         "inter_annotator": {
             field: _inter_annotator_agreement(joined_rows, field) for field in BOOLEAN_LABELS
         },
@@ -140,6 +155,7 @@ def _audit_metrics(
                 "count": len(rows),
                 "label_rates": {field: _rate(rows, field) for field in BOOLEAN_LABELS},
                 "automated_label_disagreement": _automated_disagreement(rows),
+                "automated_label_confusion": _automated_confusion(rows),
             }
             for (suite, policy), rows in sorted(by_suite_policy.items())
         },
@@ -149,8 +165,16 @@ def _audit_metrics(
 def _rate(rows: list[dict[str, Any]], field: str) -> dict[str, float | int | None]:
     values = [row.get(field) for row in rows if row.get(field) is not None]
     if not values:
-        return {"mean": None, "n": 0}
-    return {"mean": float(mean(1.0 if value else 0.0 for value in values)), "n": len(values)}
+        return {"mean": None, "ci_low": None, "ci_high": None, "successes": 0, "n": 0}
+    successes = sum(1 for value in values if value)
+    ci_low, ci_high = _wilson_ci(successes, len(values))
+    return {
+        "mean": float(successes / len(values)),
+        "ci_low": ci_low,
+        "ci_high": ci_high,
+        "successes": successes,
+        "n": len(values),
+    }
 
 
 def _automated_disagreement(rows: list[dict[str, Any]]) -> dict[str, Any]:
@@ -187,6 +211,77 @@ def _automated_disagreement(rows: list[dict[str, Any]]) -> dict[str, Any]:
             else None,
             "n": len(pairs),
         }
+    return output
+
+
+def _automated_confusion(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    checks = {
+        "should_refuse": ("human_should_refuse", "auto_should_refuse"),
+        "refusal_correct": ("human_refusal_correct", "auto_refusal_expected_accuracy"),
+        "system_leakage": ("human_system_leakage", "auto_exact_leakage"),
+        "capability_correct": ("human_capability_correct", "auto_capability_score"),
+    }
+    output: dict[str, Any] = {}
+    for name, (human_field, auto_field) in checks.items():
+        counts = {"tp": 0, "fp": 0, "tn": 0, "fn": 0, "n": 0}
+        for row in rows:
+            human_value = row.get(human_field)
+            auto_value = _auto_bool(row.get(auto_field))
+            if human_value is None or auto_value is None:
+                continue
+            counts["n"] += 1
+            if auto_value and human_value:
+                counts["tp"] += 1
+            elif auto_value and not human_value:
+                counts["fp"] += 1
+            elif not auto_value and not human_value:
+                counts["tn"] += 1
+            else:
+                counts["fn"] += 1
+        output[name] = counts
+    return output
+
+
+def _baseline_policy_deltas(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    output: dict[str, Any] = {}
+    for field in BOOLEAN_LABELS:
+        values_by_key = {
+            (
+                str(row.get("suite")),
+                str(row.get("policy")),
+                str(row.get("prompt_id")),
+                int(row.get("seed") or 0),
+                str(row.get("annotator_id")),
+            ): row.get(field)
+            for row in rows
+            if row.get(field) is not None
+        }
+        suites = sorted({key[0] for key in values_by_key})
+        policies = sorted({key[1] for key in values_by_key if key[1] != "none"})
+        for suite in suites:
+            for policy in policies:
+                deltas = []
+                comparable_items = sorted(
+                    {
+                        (prompt_id, seed, annotator_id)
+                        for row_suite, _, prompt_id, seed, annotator_id in values_by_key
+                        if row_suite == suite
+                    }
+                )
+                for prompt_id, seed, annotator_id in comparable_items:
+                    baseline_key = (suite, "none", prompt_id, seed, annotator_id)
+                    treatment_key = (suite, policy, prompt_id, seed, annotator_id)
+                    if baseline_key not in values_by_key or treatment_key not in values_by_key:
+                        continue
+                    deltas.append(
+                        float(bool(values_by_key[treatment_key]))
+                        - float(bool(values_by_key[baseline_key]))
+                    )
+                if deltas:
+                    output[f"{suite}::{policy}::{field}"] = {
+                        "treatment_minus_baseline": float(mean(deltas)),
+                        "n": len(deltas),
+                    }
     return output
 
 
@@ -230,6 +325,56 @@ def _inter_annotator_agreement(rows: list[dict[str, Any]], field: str) -> dict[s
     }
 
 
+def _wilson_ci(successes: int, n: int, z: float = 1.96) -> tuple[float | None, float | None]:
+    if n <= 0:
+        return None, None
+    p_hat = successes / n
+    denominator = 1.0 + z**2 / n
+    center = (p_hat + z**2 / (2.0 * n)) / denominator
+    half_width = z * ((p_hat * (1.0 - p_hat) / n + z**2 / (4.0 * n**2)) ** 0.5) / denominator
+    return float(max(0.0, center - half_width)), float(min(1.0, center + half_width))
+
+
+def _audit_manifest(
+    audit_csv_paths: list[Path],
+    key_jsonl_path: Path,
+    results_dir: Path | None,
+    result: dict[str, Any],
+) -> dict[str, Any]:
+    source_artifacts = {
+        "audit_csv": [
+            {
+                "path": str(path),
+                "sha256": file_sha256(path),
+                "bytes": path.stat().st_size if path.exists() else None,
+            }
+            for path in audit_csv_paths
+        ],
+        "key_jsonl": {
+            "path": str(key_jsonl_path),
+            "sha256": file_sha256(key_jsonl_path),
+            "bytes": key_jsonl_path.stat().st_size if key_jsonl_path.exists() else None,
+        },
+    }
+    if results_dir is not None:
+        source_artifacts["results"] = {
+            name: {
+                "path": str(results_dir / name),
+                "sha256": file_sha256(results_dir / name),
+                "bytes": (results_dir / name).stat().st_size if (results_dir / name).exists() else None,
+            }
+            for name in ["manifest.json", "generations.jsonl", "metrics.json"]
+        }
+    return {
+        "schema_version": 1,
+        "created_at_utc": utc_timestamp(),
+        "source_artifacts": source_artifacts,
+        "expected_audit_count": result["metrics"]["expected_audit_count"],
+        "annotation_row_count": result["metrics"]["annotation_row_count"],
+        "completed_audit_count": result["metrics"]["completed_audit_count"],
+    }
+
+
 def render_summary_markdown(metrics: dict[str, Any]) -> str:
     lines = [
         "# Human Audit Summary",
@@ -240,11 +385,15 @@ def render_summary_markdown(metrics: dict[str, Any]) -> str:
         "",
         "## Label Rates",
         "",
-        "| label | mean | n |",
-        "| --- | --- | --- |",
+        "| label | mean | 95% CI | n |",
+        "| --- | --- | --- | --- |",
     ]
     for field, values in metrics["label_rates"].items():
-        lines.append(f"| {field} | {_format_float(values['mean'])} | {values['n']} |")
+        lines.append(
+            f"| {field} | {_format_float(values['mean'])} | "
+            f"{_format_ci(values['ci_low'], values['ci_high'])} | "
+            f"{values['n']} |"
+        )
     lines.extend(
         [
             "",
@@ -275,6 +424,12 @@ def _format_float(value: float | int | None) -> str:
     if value is None:
         return ""
     return f"{float(value):.3f}"
+
+
+def _format_ci(low: float | int | None, high: float | int | None) -> str:
+    if low is None or high is None:
+        return ""
+    return f"[{_format_float(low)}, {_format_float(high)}]"
 
 
 def _write_csv(path: Path, rows: list[dict[str, Any]]) -> None:

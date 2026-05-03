@@ -22,5 +22,10 @@ The completed CSV may include an optional `annotator_id` column. Multiple rows w
 Accepted label values are `yes`, `no`, `true`, `false`, `1`, `0`, or blank. The aggregation writes:
 
 - `human_audit_metrics.json`
+- `human_audit_summary.json`
+- `human_labels.jsonl`
 - `human_audit_joined.csv`
 - `human_audit_summary.md`
+- `audit_manifest.json`
+
+The JSON summary includes Wilson confidence intervals for label rates, automated-vs-human confusion matrices, pairwise inter-annotator agreement, and paired baseline-vs-policy deltas when the same `prompt_id`, `seed`, and annotator appear under `none` and a treatment policy.
