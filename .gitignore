@@ -6,6 +6,8 @@ __pycache__/
 .pytest_cache/
 .ruff_cache/
 .vscode/
+.locks/
+logs/
 
 # Local model and dataset caches
 .cache/

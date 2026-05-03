@@ -105,6 +105,14 @@ bash scripts/run_h200_sweep.sh
 
 The primary workflow defaults to `PUBLIC_PROMPT_LIMIT=650`, one deterministic seed, and `AUDIT_PER_SUITE_POLICY=10`. This keeps runtime lower than repeated deterministic seeds while targeting prompt-cluster counts needed for narrow confidence intervals. For a cheaper pilot, run `PUBLIC_PROMPT_LIMIT=200 AUDIT_PER_SUITE_POLICY=3 bash scripts/run_h200_sweep.sh`.
 
+If the H200 GPU is busy, queue the sweep behind an availability gate from the H200 checkout:
+
+```bash
+nohup bash scripts/wait_and_run_h200_sweep.sh > logs/h200/launcher.out 2>&1 &
+```
+
+The launcher refuses to run outside `/home/aryang9/sandbox/llm-safety`, pulls `master`, checks that the tree is clean, runs the CPU-only test suite, waits until `nvidia-smi` is below `MAX_USED_MIB=20000` and `MAX_UTIL_PCT=20`, then starts the selected sweep. Override `SWEEP_SCRIPT=scripts/run_h200_ci_extension.sh` or `SWEEP_SCRIPT=scripts/run_qwen32b_followup.sh` only after the earlier registered stage has passed.
+
 Run the prompt-count extension for narrower confidence intervals after the primary pilot identifies viable effects:
 
 ```bash
