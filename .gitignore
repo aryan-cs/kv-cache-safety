@@ -20,6 +20,7 @@ results/*
 
 # Paper build outputs
 paper/build/
+paper/generated/
 *.aux
 *.bbl
 *.blg

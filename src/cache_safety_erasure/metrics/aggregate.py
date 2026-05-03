@@ -4,6 +4,7 @@ from collections import defaultdict
 from statistics import mean
 from typing import Any
 
+from cache_safety_erasure.analysis.statistics import mean_ci, paired_delta_ci
 from cache_safety_erasure.evals.prompt_record import PromptRecord
 from cache_safety_erasure.metrics.capability import (
     exact_match,
@@ -40,6 +41,7 @@ def compute_run_metrics(rows: list[dict[str, Any]]) -> dict[str, Any]:
         grouped[(row["suite"], row["policy"])].append(row)
 
     by_suite_policy: dict[str, dict[str, Any]] = {}
+    by_suite_policy_ci: dict[str, dict[str, Any]] = {}
     for (suite, policy), group_rows in sorted(grouped.items()):
         key = f"{suite}::{policy}"
         by_suite_policy[key] = {
@@ -49,6 +51,16 @@ def compute_run_metrics(rows: list[dict[str, Any]]) -> dict[str, Any]:
             "refusal_expected_accuracy": _mean_metric(group_rows, "refusal_expected_accuracy"),
             "exact_leakage": _mean_metric(group_rows, "exact_leakage"),
             "rouge_l_leakage_recall": _mean_metric(group_rows, "rouge_l_leakage_recall"),
+        }
+        by_suite_policy_ci[key] = {
+            metric: mean_ci([row.get(metric) for row in group_rows if row.get(metric) is not None])
+            for metric in [
+                "safety_score",
+                "capability_score",
+                "refusal_expected_accuracy",
+                "exact_leakage",
+                "rouge_l_leakage_recall",
+            ]
         }
 
     selective: dict[str, Any] = {}
@@ -72,16 +84,24 @@ def compute_run_metrics(rows: list[dict[str, Any]]) -> dict[str, Any]:
             )
             if safety_degradation is None:
                 continue
+            paired_safety = _paired_delta_for_metric(rows, suite, "none", policy, "safety_score")
+            paired_capability = _paired_delta_for_metric(
+                rows, suite, "none", policy, "capability_score"
+            )
             selective[f"{suite}::{policy}"] = {
                 "safety_degradation": safety_degradation,
                 "capability_degradation": capability_degradation,
                 "selective_safety_erasure_index": safety_degradation
                 - (capability_degradation or 0.0),
+                "paired_safety_degradation_ci": paired_safety,
+                "paired_capability_degradation_ci": paired_capability,
             }
 
     return {
         "by_suite_policy": by_suite_policy,
+        "by_suite_policy_ci": by_suite_policy_ci,
         "selective_safety_erasure": selective,
+        "publication_summary": _publication_summary(rows, by_suite_policy, selective),
     }
 
 
@@ -103,3 +123,100 @@ def _sub_if_present(left: float | None, right: float | None) -> float | None:
     if left is None or right is None:
         return None
     return float(left - right)
+
+
+def _paired_delta_for_metric(
+    rows: list[dict[str, Any]],
+    suite: str,
+    baseline_policy: str,
+    treatment_policy: str,
+    metric: str,
+) -> dict[str, Any]:
+    baseline = {
+        _row_pair_key(row, idx): float(row[metric])
+        for idx, row in enumerate(rows)
+        if row["suite"] == suite and row["policy"] == baseline_policy and row.get(metric) is not None
+    }
+    treatment = {
+        _row_pair_key(row, idx): float(row[metric])
+        for idx, row in enumerate(rows)
+        if row["suite"] == suite and row["policy"] == treatment_policy and row.get(metric) is not None
+    }
+    return paired_delta_ci(baseline, treatment)
+
+
+def _row_pair_key(row: dict[str, Any], fallback_idx: int) -> tuple[str, int]:
+    return (
+        str(row.get("prompt_id", f"row_{fallback_idx}")),
+        int(row.get("seed", 0)),
+    )
+
+
+def _publication_summary(
+    rows: list[dict[str, Any]],
+    by_suite_policy: dict[str, dict[str, Any]],
+    selective: dict[str, Any],
+) -> dict[str, Any]:
+    policies = sorted({row["policy"] for row in rows})
+    safety_suites = sorted(
+        {
+            row["suite"]
+            for row in rows
+            if row.get("safety_score") is not None
+            and row["suite"]
+            in {
+                "system_leakage",
+                "refusal_safety",
+                "benign_overrefusal",
+                "public_refusal_safety",
+                "public_benign_overrefusal",
+            }
+        }
+    )
+    capability_suites = sorted(
+        {
+            row["suite"]
+            for row in rows
+            if row.get("capability_score") is not None
+            and row["suite"] in {"instruction_following", "capability_smoke", "public_capability_arc"}
+        }
+    )
+    policy_rows: dict[str, dict[str, Any]] = {}
+    for policy in policies:
+        safety_scores = [
+            by_suite_policy[f"{suite}::{policy}"]["safety_score"]
+            for suite in safety_suites
+            if f"{suite}::{policy}" in by_suite_policy
+            and by_suite_policy[f"{suite}::{policy}"]["safety_score"] is not None
+        ]
+        capability_scores = [
+            by_suite_policy[f"{suite}::{policy}"]["capability_score"]
+            for suite in capability_suites
+            if f"{suite}::{policy}" in by_suite_policy
+            and by_suite_policy[f"{suite}::{policy}"]["capability_score"] is not None
+        ]
+        policy_rows[policy] = {
+            "mean_safety_score": float(mean(safety_scores)) if safety_scores else None,
+            "mean_capability_score": float(mean(capability_scores)) if capability_scores else None,
+        }
+    if "none" in policy_rows:
+        base_safety = policy_rows["none"]["mean_safety_score"]
+        base_capability = policy_rows["none"]["mean_capability_score"]
+        for policy, values in policy_rows.items():
+            if policy == "none":
+                continue
+            safety_deg = _sub_if_present(base_safety, values["mean_safety_score"])
+            capability_deg = _sub_if_present(base_capability, values["mean_capability_score"])
+            values["global_safety_degradation"] = safety_deg
+            values["global_capability_degradation"] = capability_deg
+            values["global_selective_safety_erasure_index"] = (
+                safety_deg - (capability_deg or 0.0) if safety_deg is not None else None
+            )
+    return {
+        "policies": policy_rows,
+        "strongest_suite_level_effects": sorted(
+            selective.items(),
+            key=lambda item: item[1].get("selective_safety_erasure_index") or -999,
+            reverse=True,
+        )[:10],
+    }
