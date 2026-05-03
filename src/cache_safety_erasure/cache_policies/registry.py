@@ -41,9 +41,9 @@ def build_cache_policy(config: CachePolicyConfig, seed: int) -> object:
             name=label,
         )
     if name == "kv_int8_sim":
-        return QuantizedCachePolicy(bits=8, name=name)
+        return QuantizedCachePolicy(bits=8, name=label)
     if name == "kv_int4_sim":
-        return QuantizedCachePolicy(bits=4, name=name)
+        return QuantizedCachePolicy(bits=4, name=label)
     if name == "policy_pinned":
         return PolicyPinnedPolicy(
             budget=_require_budget(config),
@@ -66,4 +66,6 @@ def cache_policy_label(config: CachePolicyConfig) -> str:
         parts.append(f"recent{config.recent_tokens}")
     if config.name == "random_matched" and config.seed is not None:
         parts.append(f"seed{config.seed}")
+    if config.patch_from_baseline:
+        parts.append("patched")
     return "__".join(parts)

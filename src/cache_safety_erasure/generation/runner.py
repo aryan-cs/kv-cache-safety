@@ -12,6 +12,7 @@ def generate_one(
     prompt: PromptRecord,
     policy: object,
     generation_config: GenerationConfig,
+    patch_from_baseline: dict | None = None,
 ) -> GenerationResult:
     if isinstance(model_bundle, MockModelBundle):
         text = mock_generate(prompt, getattr(policy, "name", "none"))
@@ -22,4 +23,5 @@ def generate_one(
         prompt=prompt,
         policy=policy,
         generation_config=generation_config,
+        patch_from_baseline=patch_from_baseline,
     )

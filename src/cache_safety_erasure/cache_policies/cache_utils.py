@@ -77,6 +77,15 @@ def quantize_dequantize_cache(past_key_values: Any, bits: int) -> tuple[tuple[An
     )
 
 
+def cache_l2_norm(past_key_values: Any) -> float:
+    torch = _torch()
+    total = torch.tensor(0.0)
+    for key, value in to_legacy_cache(past_key_values):
+        total = total + key.detach().float().pow(2).sum().cpu()
+        total = total + value.detach().float().pow(2).sum().cpu()
+    return float(total.sqrt().item())
+
+
 def indices_for_budget(seq_len: int, budget: int | None) -> list[int]:
     if budget is None or budget >= seq_len:
         return list(range(seq_len))

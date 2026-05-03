@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import platform
+import subprocess
 import sys
 from datetime import datetime, timezone
 from importlib.metadata import PackageNotFoundError, version
@@ -67,6 +68,7 @@ def environment_snapshot() -> dict[str, Any]:
     snapshot: dict[str, Any] = {
         "python": sys.version,
         "platform": platform.platform(),
+        "git_commit": git_commit(),
         "packages": package_versions(
             ["torch", "transformers", "accelerate", "datasets", "numpy", "pandas", "pyarrow"]
         ),
@@ -89,6 +91,19 @@ def environment_snapshot() -> dict[str, Any]:
     except ModuleNotFoundError:
         snapshot["torch_available"] = False
     return snapshot
+
+
+def git_commit() -> str | None:
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        return result.stdout.strip()
+    except Exception:
+        return None
 
 
 def write_parquet(path: Path, rows: list[dict[str, Any]]) -> None:

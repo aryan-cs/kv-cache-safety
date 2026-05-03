@@ -89,6 +89,8 @@ Every run writes:
 
 - `config.resolved.yaml`: fully resolved config
 - `environment.json`: Python/platform/package/device metadata
+- `manifest.json`: run metadata, git commit, model id, suites, policies, seeds
+- `prompts.jsonl`: prompt ids, labels, metadata, and raw character spans
 - `generations.jsonl`: raw prompt metadata, generated text, and per-example metrics
 - `metrics.json`: aggregate suite/policy metrics
 - `cache_stats.parquet`: retained/evicted cache-token stats by policy application

@@ -7,6 +7,7 @@ from cache_safety_erasure.cache_policies.base import CachePolicyDecision
 from cache_safety_erasure.cache_policies.cache_utils import cache_layer_count, cache_seq_len
 from cache_safety_erasure.config import GenerationConfig
 from cache_safety_erasure.evals.prompt_record import PromptRecord
+from cache_safety_erasure.generation.cache_patching import patch_cache_from_baseline
 
 
 @dataclass
@@ -50,6 +51,7 @@ def hf_generate(
     prompt: PromptRecord,
     policy: Any,
     generation_config: GenerationConfig,
+    patch_from_baseline: dict[str, Any] | None = None,
 ) -> GenerationResult:
     try:
         import torch
@@ -77,6 +79,7 @@ def hf_generate(
             output_attentions=generation_config.capture_attentions,
             return_dict=True,
         )
+        baseline_prefill_past = outputs.past_key_values
         past = outputs.past_key_values
         past, decision = policy.apply(
             past,
@@ -84,6 +87,15 @@ def hf_generate(
             token_roles=token_roles,
             attention_scores=getattr(outputs, "attentions", None),
         )
+        if patch_from_baseline:
+            past = patch_cache_from_baseline(
+                past,
+                baseline_prefill_past,
+                layers=patch_from_baseline.get("layers"),
+                heads=patch_from_baseline.get("heads"),
+                token_indices=patch_from_baseline.get("token_indices"),
+            )
+            decision.metadata["patched_from_baseline"] = True
         cache_decisions.append(decision)
         next_token = _sample_next_token(outputs.logits[:, -1, :], generation_config)
 

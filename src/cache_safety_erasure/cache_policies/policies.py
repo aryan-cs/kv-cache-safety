@@ -6,6 +6,7 @@ from typing import Any
 
 from cache_safety_erasure.cache_policies.base import CachePolicyDecision
 from cache_safety_erasure.cache_policies.cache_utils import (
+    cache_l2_norm,
     cache_seq_len,
     evicted_from_retained,
     quantize_dequantize_cache,
@@ -27,7 +28,15 @@ class NonePolicy:
     ) -> tuple[Any, CachePolicyDecision]:
         seq_len = cache_seq_len(past_key_values)
         retained = tuple(range(seq_len))
-        return past_key_values, CachePolicyDecision(self.name, step, seq_len, retained, tuple())
+        norm = cache_l2_norm(past_key_values) if seq_len else 0.0
+        return past_key_values, CachePolicyDecision(
+            self.name,
+            step,
+            seq_len,
+            retained,
+            tuple(),
+            {"cache_l2_before": norm, "cache_l2_after": norm},
+        )
 
 
 @dataclass
@@ -44,10 +53,17 @@ class SlidingWindowPolicy:
         attention_scores: Any | None = None,
     ) -> tuple[Any, CachePolicyDecision]:
         seq_len = cache_seq_len(past_key_values)
+        before_norm = cache_l2_norm(past_key_values) if seq_len else 0.0
         retained = tuple(range(max(0, seq_len - self.budget), seq_len))
         sliced = slice_legacy_cache(past_key_values, retained)
+        after_norm = cache_l2_norm(sliced) if retained else 0.0
         return sliced, CachePolicyDecision(
-            self.name, step, seq_len, retained, evicted_from_retained(seq_len, retained)
+            self.name,
+            step,
+            seq_len,
+            retained,
+            evicted_from_retained(seq_len, retained),
+            {"cache_l2_before": before_norm, "cache_l2_after": after_norm},
         )
 
 
@@ -66,6 +82,7 @@ class SinkRecentPolicy:
         attention_scores: Any | None = None,
     ) -> tuple[Any, CachePolicyDecision]:
         seq_len = cache_seq_len(past_key_values)
+        before_norm = cache_l2_norm(past_key_values) if seq_len else 0.0
         if self.budget >= seq_len:
             retained = tuple(range(seq_len))
         else:
@@ -75,13 +92,18 @@ class SinkRecentPolicy:
             retained_set.update(range(max(sink_count, seq_len - recent_count), seq_len))
             retained = tuple(sorted(retained_set))
         sliced = slice_legacy_cache(past_key_values, retained)
+        after_norm = cache_l2_norm(sliced) if retained else 0.0
         return sliced, CachePolicyDecision(
             self.name,
             step,
             seq_len,
             retained,
             evicted_from_retained(seq_len, retained),
-            {"sink_tokens": self.sink_tokens},
+            {
+                "sink_tokens": self.sink_tokens,
+                "cache_l2_before": before_norm,
+                "cache_l2_after": after_norm,
+            },
         )
 
 
@@ -100,19 +122,25 @@ class RandomMatchedPolicy:
         attention_scores: Any | None = None,
     ) -> tuple[Any, CachePolicyDecision]:
         seq_len = cache_seq_len(past_key_values)
+        before_norm = cache_l2_norm(past_key_values) if seq_len else 0.0
         if self.budget >= seq_len:
             retained = tuple(range(seq_len))
         else:
             rng = random.Random((self.seed * 1_000_003) + step)
             retained = tuple(sorted(rng.sample(range(seq_len), k=max(0, self.budget))))
         sliced = slice_legacy_cache(past_key_values, retained)
+        after_norm = cache_l2_norm(sliced) if retained else 0.0
         return sliced, CachePolicyDecision(
             self.name,
             step,
             seq_len,
             retained,
             evicted_from_retained(seq_len, retained),
-            {"policy_seed": self.seed},
+            {
+                "policy_seed": self.seed,
+                "cache_l2_before": before_norm,
+                "cache_l2_after": after_norm,
+            },
         )
 
 
@@ -132,6 +160,7 @@ class AttentionH2OPolicy:
         attention_scores: Any | None = None,
     ) -> tuple[Any, CachePolicyDecision]:
         seq_len = cache_seq_len(past_key_values)
+        before_norm = cache_l2_norm(past_key_values) if seq_len else 0.0
         if self.budget >= seq_len:
             retained = tuple(range(seq_len))
         else:
@@ -147,13 +176,19 @@ class AttentionH2OPolicy:
             retained_set.update(candidates[:remaining_budget])
             retained = tuple(sorted(retained_set))
         sliced = slice_legacy_cache(past_key_values, retained)
+        after_norm = cache_l2_norm(sliced) if retained else 0.0
         return sliced, CachePolicyDecision(
             self.name,
             step,
             seq_len,
             retained,
             evicted_from_retained(seq_len, retained),
-            {"sink_tokens": self.sink_tokens, "recent_tokens": self.recent_tokens},
+            {
+                "sink_tokens": self.sink_tokens,
+                "recent_tokens": self.recent_tokens,
+                "cache_l2_before": before_norm,
+                "cache_l2_after": after_norm,
+            },
         )
 
 
@@ -192,14 +227,20 @@ class QuantizedCachePolicy:
     ) -> tuple[Any, CachePolicyDecision]:
         seq_len = cache_seq_len(past_key_values)
         retained = tuple(range(seq_len))
+        before_norm = cache_l2_norm(past_key_values) if seq_len else 0.0
         quantized = quantize_dequantize_cache(past_key_values, self.bits)
+        after_norm = cache_l2_norm(quantized) if seq_len else 0.0
         return quantized, CachePolicyDecision(
             self.name,
             step,
             seq_len,
             retained,
             tuple(),
-            {"quantization_bits": self.bits},
+            {
+                "quantization_bits": self.bits,
+                "cache_l2_before": before_norm,
+                "cache_l2_after": after_norm,
+            },
         )
 
 
@@ -219,6 +260,7 @@ class PolicyPinnedPolicy:
         attention_scores: Any | None = None,
     ) -> tuple[Any, CachePolicyDecision]:
         seq_len = cache_seq_len(past_key_values)
+        before_norm = cache_l2_norm(past_key_values) if seq_len else 0.0
         if self.budget >= seq_len:
             retained = tuple(range(seq_len))
         else:
@@ -248,11 +290,17 @@ class PolicyPinnedPolicy:
                     retained_set.update(recent_candidates[: self.budget - len(retained_set)])
             retained = tuple(sorted(retained_set))
         sliced = slice_legacy_cache(past_key_values, retained)
+        after_norm = cache_l2_norm(sliced) if retained else 0.0
         return sliced, CachePolicyDecision(
             self.name,
             step,
             seq_len,
             retained,
             evicted_from_retained(seq_len, retained),
-            {"protected_spans": ",".join(self.protected_spans), "sink_tokens": self.sink_tokens},
+            {
+                "protected_spans": ",".join(self.protected_spans),
+                "sink_tokens": self.sink_tokens,
+                "cache_l2_before": before_norm,
+                "cache_l2_after": after_norm,
+            },
         )
