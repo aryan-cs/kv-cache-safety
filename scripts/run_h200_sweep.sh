@@ -30,4 +30,12 @@ uv run python scripts/make_figures.py --results-dir "$latest_full"
 uv run python scripts/export_paper_assets.py --results-dir "$latest_full" --paper-dir paper/generated/h200_qwen_full_sweep
 uv run python scripts/check_publication_readiness.py --results-dir "$latest_full" --min-prompts-per-suite 100 --max-ci-width 0.08
 
+echo "Running attention-policy diagnostic on Qwen 7B..."
+uv run python scripts/run_experiment.py --config configs/experiments/h200_attention_diagnostic_qwen7b.yaml
+
+latest_attention="$(ls -td results/h200_attention_diagnostic_qwen7b_* | head -1)"
+uv run python scripts/aggregate_results.py --results-dir "$latest_attention"
+uv run python scripts/make_figures.py --results-dir "$latest_attention"
+uv run python scripts/export_paper_assets.py --results-dir "$latest_attention" --paper-dir paper/generated/h200_attention_diagnostic_qwen7b
+
 echo "Primary sweep complete: $latest_full"

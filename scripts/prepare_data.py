@@ -93,10 +93,11 @@ def load_hf_preset(name: str, limit: int | None, output_suite: str | None) -> li
         dataset = load_dataset(str(preset["dataset"]), str(preset["config"]), split=str(preset["split"]))
     else:
         dataset = load_dataset(str(preset["dataset"]), split=str(preset["split"]))
+    dataset_metadata = _dataset_metadata(dataset, preset)
     rows: list[PromptRecord] = []
     for idx, item in enumerate(dataset):
         if preset.get("kind") == "multiple_choice":
-            record = _multiple_choice_record(name, idx, item, preset, output_suite)
+            record = _multiple_choice_record(name, idx, item, preset, output_suite, dataset_metadata)
         else:
             text = _first_text(item, preset["text_columns"])
             if not text:
@@ -108,7 +109,7 @@ def load_hf_preset(name: str, limit: int | None, output_suite: str | None) -> li
                 user=text,
                 category=str(preset["category"]),
                 should_refuse=bool(preset["should_refuse"]),
-                metadata={"source_dataset": preset["dataset"], "source_split": preset["split"]},
+                metadata=dataset_metadata,
             )
         rows.append(record)
         if limit is not None and len(rows) >= limit:
@@ -132,6 +133,7 @@ def _multiple_choice_record(
     item: dict[str, Any],
     preset: dict[str, Any],
     output_suite: str | None,
+    dataset_metadata: dict[str, Any],
 ) -> PromptRecord:
     question = str(item.get("question", "")).strip()
     choices_obj = item.get("choices", {})
@@ -148,8 +150,30 @@ def _multiple_choice_record(
         category=str(preset["category"]),
         expected_answer=answer,
         choices=choices,
-        metadata={"source_dataset": preset["dataset"], "source_split": preset["split"]},
+        metadata=dataset_metadata,
     )
+
+
+def _dataset_metadata(dataset: Any, preset: dict[str, Any]) -> dict[str, Any]:
+    metadata = _dataset_metadata_from_preset(preset)
+    metadata["source_fingerprint"] = getattr(dataset, "_fingerprint", None)
+    info = getattr(dataset, "info", None)
+    if info is not None:
+        metadata["source_builder_name"] = getattr(info, "builder_name", None)
+        metadata["source_config_name"] = getattr(info, "config_name", None)
+        version = getattr(info, "version", None)
+        metadata["source_version"] = str(version) if version is not None else None
+        metadata["source_homepage"] = getattr(info, "homepage", None)
+        metadata["source_license"] = getattr(info, "license", None)
+    return metadata
+
+
+def _dataset_metadata_from_preset(preset: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "source_dataset": preset["dataset"],
+        "source_config": preset.get("config"),
+        "source_split": preset["split"],
+    }
 
 
 if __name__ == "__main__":

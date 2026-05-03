@@ -69,6 +69,8 @@ def environment_snapshot() -> dict[str, Any]:
         "python": sys.version,
         "platform": platform.platform(),
         "git_commit": git_commit(),
+        "git_dirty": git_dirty(),
+        "git_status_short": git_status_short(),
         "packages": package_versions(
             ["torch", "transformers", "accelerate", "datasets", "numpy", "pandas", "pyarrow"]
         ),
@@ -97,6 +99,26 @@ def git_commit() -> str | None:
     try:
         result = subprocess.run(
             ["git", "rev-parse", "HEAD"],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        return result.stdout.strip()
+    except Exception:
+        return None
+
+
+def git_dirty() -> bool | None:
+    status = git_status_short()
+    if status is None:
+        return None
+    return bool(status.strip())
+
+
+def git_status_short() -> str | None:
+    try:
+        result = subprocess.run(
+            ["git", "status", "--short"],
             check=True,
             capture_output=True,
             text=True,

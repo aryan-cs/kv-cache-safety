@@ -47,3 +47,18 @@ def test_quantize_dequantize_cache_roundtrip_shape() -> None:
     quantized, decision = policy.apply(cache, step=0)
     assert quantized[0][0].shape == cache[0][0].shape
     assert decision.metadata["quantization_bits"] == 8
+
+
+@pytest.mark.skipif(torch_spec is None, reason="torch is not installed in the base interpreter")
+def test_policy_pinned_enforces_budget_when_protected_span_is_long() -> None:
+    import torch
+
+    from cache_safety_erasure.cache_policies.registry import build_cache_policy
+
+    cache = ((torch.randn(1, 2, 12, 4), torch.randn(1, 2, 12, 4)),)
+    policy = build_cache_policy(CachePolicyConfig(name="policy_pinned", budget=4), seed=0)
+    compressed, decision = policy.apply(cache, step=0, token_roles=["system"] * 10 + ["user"] * 2)
+    assert compressed[0][0].shape[-2] == 4
+    assert len(decision.retained_indices) == 4
+    assert decision.metadata["protected_candidate_count"] == 10
+    assert decision.metadata["protected_dropped_count"] == 6

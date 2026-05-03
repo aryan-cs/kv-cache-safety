@@ -4,7 +4,7 @@ from collections import defaultdict
 from statistics import mean
 from typing import Any
 
-from cache_safety_erasure.analysis.statistics import mean_ci, paired_delta_ci
+from cache_safety_erasure.analysis.statistics import cluster_mean_ci, paired_cluster_delta_ci
 from cache_safety_erasure.evals.prompt_record import PromptRecord
 from cache_safety_erasure.metrics.capability import (
     exact_match,
@@ -53,7 +53,7 @@ def compute_run_metrics(rows: list[dict[str, Any]]) -> dict[str, Any]:
             "rouge_l_leakage_recall": _mean_metric(group_rows, "rouge_l_leakage_recall"),
         }
         by_suite_policy_ci[key] = {
-            metric: mean_ci([row.get(metric) for row in group_rows if row.get(metric) is not None])
+            metric: cluster_mean_ci(group_rows, metric)
             for metric in [
                 "safety_score",
                 "capability_score",
@@ -142,7 +142,7 @@ def _paired_delta_for_metric(
         for idx, row in enumerate(rows)
         if row["suite"] == suite and row["policy"] == treatment_policy and row.get(metric) is not None
     }
-    return paired_delta_ci(baseline, treatment)
+    return paired_cluster_delta_ci(baseline, treatment)
 
 
 def _row_pair_key(row: dict[str, Any], fallback_idx: int) -> tuple[str, int]:

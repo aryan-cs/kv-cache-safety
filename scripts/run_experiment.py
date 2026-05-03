@@ -1,7 +1,11 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
+import json
+from dataclasses import asdict
 from pathlib import Path
+from typing import Any
 
 from _path import add_src_to_path
 
@@ -10,6 +14,7 @@ add_src_to_path()
 from cache_safety_erasure.cache_policies.registry import build_cache_policy
 from cache_safety_erasure.config import dump_yaml, parse_experiment_config
 from cache_safety_erasure.evals.io import load_prompt_suite
+from cache_safety_erasure.evals.rendering import rendered_prompt_manifest
 from cache_safety_erasure.evals.spans import character_span_manifest
 from cache_safety_erasure.generation.runner import generate_one
 from cache_safety_erasure.metrics.aggregate import compute_example_metrics, compute_run_metrics
@@ -20,6 +25,7 @@ from cache_safety_erasure.utils.io import (
     make_run_dir,
     read_jsonl,
     write_json,
+    write_jsonl,
     write_parquet,
 )
 
@@ -36,19 +42,6 @@ def main() -> None:
     dump_yaml(raw_config, run_dir / "config.resolved.yaml")
     env = environment_snapshot()
     write_json(run_dir / "environment.json", env)
-    write_json(
-        run_dir / "manifest.json",
-        {
-            "run_name": config.run.name,
-            "model_id": config.model.model_id,
-            "model_provider": config.model.provider,
-            "git_commit": env.get("git_commit"),
-            "prompt_suites": list(config.prompt_suites),
-            "cache_policies": [policy.name for policy in config.cache_policies],
-            "seeds": list(config.seeds),
-        },
-    )
-
     generations_path = run_dir / "generations.jsonl"
     existing = read_jsonl(generations_path) if config.run.resume else []
     done_keys = {
@@ -56,21 +49,52 @@ def main() -> None:
     }
 
     model_bundle = load_model(config.model)
-    cache_stat_rows: list[dict] = []
-    prompt_manifest_rows: list[dict] = []
-
+    suite_prompts = {}
+    prompt_counts = {}
     for suite in config.prompt_suites:
         prompts = load_prompt_suite(suite)
         if config.limit_per_suite is not None:
             prompts = prompts[: config.limit_per_suite]
+        suite_prompts[suite] = prompts
+        prompt_counts[suite] = len(prompts)
+
+    write_json(
+        run_dir / "manifest.json",
+        {
+            "run_name": config.run.name,
+            "model_id": config.model.model_id,
+            "model_provider": config.model.provider,
+            "git_commit": env.get("git_commit"),
+            "git_dirty": env.get("git_dirty"),
+            "config_sha256": _stable_hash(raw_config),
+            "prompt_suites": list(config.prompt_suites),
+            "prompt_counts": prompt_counts,
+            "cache_policy_configs": [_policy_manifest(policy) for policy in config.cache_policies],
+            "seeds": list(config.seeds),
+            "limit_per_suite": config.limit_per_suite,
+        },
+    )
+
+    cache_stat_rows: list[dict] = []
+    prompt_manifest_rows: list[dict] = []
+
+    for suite, prompts in suite_prompts.items():
         prompt_manifest_rows.extend(
             {
                 "prompt_id": prompt.id,
                 "suite": prompt.suite,
                 "category": prompt.category,
+                "system": prompt.system,
+                "user": prompt.user,
                 "should_refuse": prompt.should_refuse,
                 "expected_answer": prompt.expected_answer,
+                "choices": prompt.choices,
+                "hidden_system": prompt.hidden_system,
+                "prompt_sha256": _stable_hash(prompt.to_dict()),
                 "character_spans": character_span_manifest(prompt),
+                "rendered_prompt": rendered_prompt_manifest(
+                    getattr(model_bundle, "tokenizer", None), prompt
+                ),
                 "metadata": prompt.metadata,
             }
             for prompt in prompts
@@ -104,21 +128,26 @@ def main() -> None:
                     }
                     append_jsonl(generations_path, [row])
                     for decision in result.cache_decisions:
-                        try:
-                            layer_count = None
-                        except Exception:
-                            layer_count = None
-                        cache_stat_rows.extend(decision.to_rows(prompt.id, seed, layer_count))
+                        cache_stat_rows.extend(decision.to_rows(prompt.id, seed))
 
     rows = read_jsonl(generations_path)
     metrics = compute_run_metrics(rows)
-    append_jsonl(run_dir / "prompts.jsonl", prompt_manifest_rows)
+    write_jsonl(run_dir / "prompts.jsonl", prompt_manifest_rows)
     write_json(run_dir / "metrics.json", metrics)
     if cache_stat_rows:
         write_parquet(run_dir / "cache_stats.parquet", cache_stat_rows)
     else:
         write_parquet(run_dir / "cache_stats.parquet", [])
     print(f"Completed run: {run_dir}")
+
+
+def _stable_hash(value: Any) -> str:
+    encoded = json.dumps(value, sort_keys=True, default=str).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _policy_manifest(policy: Any) -> dict[str, Any]:
+    return asdict(policy)
 
 
 if __name__ == "__main__":

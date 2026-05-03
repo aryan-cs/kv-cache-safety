@@ -14,11 +14,15 @@ def main() -> None:
     parser.add_argument("--results-dir", required=True, type=Path)
     parser.add_argument("--min-prompts-per-suite", type=int, default=100)
     parser.add_argument("--max-ci-width", type=float, default=0.08)
+    parser.add_argument("--allow-dirty", action="store_true")
+    parser.add_argument("--allow-mock-model", action="store_true")
     args = parser.parse_args()
 
     failures: list[str] = []
     generations = args.results_dir / "generations.jsonl"
     metrics_path = args.results_dir / "metrics.json"
+    manifest_path = args.results_dir / "manifest.json"
+    prompts_path = args.results_dir / "prompts.jsonl"
     for required in [
         "config.resolved.yaml",
         "environment.json",
@@ -30,6 +34,38 @@ def main() -> None:
     ]:
         if not (args.results_dir / required).exists():
             failures.append(f"missing artifact: {required}")
+
+    manifest = {}
+    if manifest_path.exists():
+        with manifest_path.open("r", encoding="utf-8") as f:
+            manifest = json.load(f)
+        if manifest.get("git_dirty") and not args.allow_dirty:
+            failures.append("run was produced from a dirty git working tree")
+        if manifest.get("model_provider") == "mock" and not args.allow_mock_model:
+            failures.append("mock model runs are not paper evidence")
+        if not manifest.get("cache_policy_configs"):
+            failures.append("manifest lacks full cache policy configs")
+        if not manifest.get("prompt_counts"):
+            failures.append("manifest lacks prompt counts")
+
+    if prompts_path.exists():
+        token_span_failures = 0
+        with prompts_path.open("r", encoding="utf-8") as f:
+            for line in f:
+                if not line.strip():
+                    continue
+                row = json.loads(line)
+                rendered = row.get("rendered_prompt", {})
+                if manifest.get("model_provider") != "mock" and (
+                    rendered.get("token_count") is None or not rendered.get("token_role_spans")
+                ):
+                    token_span_failures += 1
+        if token_span_failures:
+            failures.append(f"{token_span_failures} prompts lack tokenizer token-role spans")
+
+    figure_dir = args.results_dir / "figures"
+    if not figure_dir.exists() or not list(figure_dir.glob("*.png")):
+        failures.append("missing generated PNG figures")
 
     if generations.exists():
         counts: dict[str, set[str]] = {}

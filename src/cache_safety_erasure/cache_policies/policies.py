@@ -6,6 +6,7 @@ from typing import Any
 
 from cache_safety_erasure.cache_policies.base import CachePolicyDecision
 from cache_safety_erasure.cache_policies.cache_utils import (
+    cache_layer_count,
     cache_l2_norm,
     cache_seq_len,
     evicted_from_retained,
@@ -31,13 +32,14 @@ class NonePolicy:
         seq_len = cache_seq_len(past_key_values)
         retained = tuple(range(seq_len))
         norm = cache_l2_norm(past_key_values) if seq_len else 0.0
+        evicted = tuple()
         return maybe_from_legacy_cache(to_legacy_cache(past_key_values), past_key_values), CachePolicyDecision(
             self.name,
             step,
             seq_len,
             retained,
-            tuple(),
-            {"cache_l2_before": norm, "cache_l2_after": norm},
+            evicted,
+            _decision_metadata(past_key_values, norm, norm, retained, evicted, token_roles),
         )
 
 
@@ -59,13 +61,14 @@ class SlidingWindowPolicy:
         retained = tuple(range(max(0, seq_len - self.budget), seq_len))
         sliced = slice_legacy_cache(past_key_values, retained)
         after_norm = cache_l2_norm(sliced) if retained else 0.0
+        evicted = evicted_from_retained(seq_len, retained)
         return maybe_from_legacy_cache(sliced, past_key_values), CachePolicyDecision(
             self.name,
             step,
             seq_len,
             retained,
-            evicted_from_retained(seq_len, retained),
-            {"cache_l2_before": before_norm, "cache_l2_after": after_norm},
+            evicted,
+            _decision_metadata(past_key_values, before_norm, after_norm, retained, evicted, token_roles),
         )
 
 
@@ -95,17 +98,22 @@ class SinkRecentPolicy:
             retained = tuple(sorted(retained_set))
         sliced = slice_legacy_cache(past_key_values, retained)
         after_norm = cache_l2_norm(sliced) if retained else 0.0
+        evicted = evicted_from_retained(seq_len, retained)
         return maybe_from_legacy_cache(sliced, past_key_values), CachePolicyDecision(
             self.name,
             step,
             seq_len,
             retained,
-            evicted_from_retained(seq_len, retained),
-            {
-                "sink_tokens": self.sink_tokens,
-                "cache_l2_before": before_norm,
-                "cache_l2_after": after_norm,
-            },
+            evicted,
+            _decision_metadata(
+                past_key_values,
+                before_norm,
+                after_norm,
+                retained,
+                evicted,
+                token_roles,
+                sink_tokens=self.sink_tokens,
+            ),
         )
 
 
@@ -132,17 +140,22 @@ class RandomMatchedPolicy:
             retained = tuple(sorted(rng.sample(range(seq_len), k=max(0, self.budget))))
         sliced = slice_legacy_cache(past_key_values, retained)
         after_norm = cache_l2_norm(sliced) if retained else 0.0
+        evicted = evicted_from_retained(seq_len, retained)
         return maybe_from_legacy_cache(sliced, past_key_values), CachePolicyDecision(
             self.name,
             step,
             seq_len,
             retained,
-            evicted_from_retained(seq_len, retained),
-            {
-                "policy_seed": self.seed,
-                "cache_l2_before": before_norm,
-                "cache_l2_after": after_norm,
-            },
+            evicted,
+            _decision_metadata(
+                past_key_values,
+                before_norm,
+                after_norm,
+                retained,
+                evicted,
+                token_roles,
+                policy_seed=self.seed,
+            ),
         )
 
 
@@ -179,18 +192,24 @@ class AttentionH2OPolicy:
             retained = tuple(sorted(retained_set))
         sliced = slice_legacy_cache(past_key_values, retained)
         after_norm = cache_l2_norm(sliced) if retained else 0.0
+        evicted = evicted_from_retained(seq_len, retained)
         return maybe_from_legacy_cache(sliced, past_key_values), CachePolicyDecision(
             self.name,
             step,
             seq_len,
             retained,
-            evicted_from_retained(seq_len, retained),
-            {
-                "sink_tokens": self.sink_tokens,
-                "recent_tokens": self.recent_tokens,
-                "cache_l2_before": before_norm,
-                "cache_l2_after": after_norm,
-            },
+            evicted,
+            _decision_metadata(
+                past_key_values,
+                before_norm,
+                after_norm,
+                retained,
+                evicted,
+                token_roles,
+                sink_tokens=self.sink_tokens,
+                recent_tokens=self.recent_tokens,
+                attention_scores_used=attention_scores is not None,
+            ),
         )
 
 
@@ -232,17 +251,22 @@ class QuantizedCachePolicy:
         before_norm = cache_l2_norm(past_key_values) if seq_len else 0.0
         quantized = quantize_dequantize_cache(past_key_values, self.bits)
         after_norm = cache_l2_norm(quantized) if seq_len else 0.0
+        evicted = tuple()
         return maybe_from_legacy_cache(quantized, past_key_values), CachePolicyDecision(
             self.name,
             step,
             seq_len,
             retained,
-            tuple(),
-            {
-                "quantization_bits": self.bits,
-                "cache_l2_before": before_norm,
-                "cache_l2_after": after_norm,
-            },
+            evicted,
+            _decision_metadata(
+                past_key_values,
+                before_norm,
+                after_norm,
+                retained,
+                evicted,
+                token_roles,
+                quantization_bits=self.bits,
+            ),
         )
 
 
@@ -263,46 +287,83 @@ class PolicyPinnedPolicy:
     ) -> tuple[Any, CachePolicyDecision]:
         seq_len = cache_seq_len(past_key_values)
         before_norm = cache_l2_norm(past_key_values) if seq_len else 0.0
+        protected: set[int] = set()
+        if token_roles:
+            protected = {
+                idx
+                for idx, role in enumerate(token_roles[:seq_len])
+                if role in set(self.protected_spans)
+            }
         if self.budget >= seq_len:
             retained = tuple(range(seq_len))
         else:
-            protected = set()
-            if token_roles:
-                protected = {
-                    idx
-                    for idx, role in enumerate(token_roles[:seq_len])
-                    if role in set(self.protected_spans)
-                }
-            retained_set = set(range(min(self.sink_tokens, seq_len)))
-            retained_set.update(protected)
+            retained_set = set(sorted(protected)[: self.budget])
+            if len(retained_set) < self.budget:
+                retained_set.update(range(min(self.sink_tokens, seq_len)))
             for idx in range(seq_len - 1, -1, -1):
                 if len(retained_set) >= self.budget:
                     break
                 retained_set.add(idx)
             if len(retained_set) > self.budget:
-                protected_or_sink = {
-                    idx for idx in retained_set if idx < self.sink_tokens or idx in protected
-                }
-                if len(protected_or_sink) <= self.budget:
-                    recent_candidates = sorted(
-                        (idx for idx in retained_set if idx not in protected_or_sink),
-                        reverse=True,
-                    )
-                    retained_set = set(protected_or_sink)
-                    retained_set.update(recent_candidates[: self.budget - len(retained_set)])
+                priority = sorted(
+                    retained_set,
+                    key=lambda idx: (idx not in protected, idx if idx in protected else -idx),
+                )
+                retained_set = set(priority[: self.budget])
             retained = tuple(sorted(retained_set))
         sliced = slice_legacy_cache(past_key_values, retained)
         after_norm = cache_l2_norm(sliced) if retained else 0.0
+        evicted = evicted_from_retained(seq_len, retained)
         return maybe_from_legacy_cache(sliced, past_key_values), CachePolicyDecision(
             self.name,
             step,
             seq_len,
             retained,
-            evicted_from_retained(seq_len, retained),
-            {
-                "protected_spans": ",".join(self.protected_spans),
-                "sink_tokens": self.sink_tokens,
-                "cache_l2_before": before_norm,
-                "cache_l2_after": after_norm,
-            },
+            evicted,
+            _decision_metadata(
+                past_key_values,
+                before_norm,
+                after_norm,
+                retained,
+                evicted,
+                token_roles,
+                protected_spans=",".join(self.protected_spans),
+                sink_tokens=self.sink_tokens,
+                protected_candidate_count=len(protected),
+                protected_retained_count=len(set(retained).intersection(protected)),
+                protected_dropped_count=len(protected.difference(retained)),
+            ),
         )
+
+
+def _decision_metadata(
+    past_key_values: Any,
+    before_norm: float,
+    after_norm: float,
+    retained: tuple[int, ...],
+    evicted: tuple[int, ...],
+    token_roles: list[str] | None,
+    **extra: Any,
+) -> dict[str, Any]:
+    metadata: dict[str, Any] = {
+        "layer_count": cache_layer_count(past_key_values),
+        "cache_l2_before": before_norm,
+        "cache_l2_after": after_norm,
+    }
+    metadata.update(_role_count_metadata("retained", retained, token_roles))
+    metadata.update(_role_count_metadata("evicted", evicted, token_roles))
+    metadata.update({key: value for key, value in extra.items() if value is not None})
+    return metadata
+
+
+def _role_count_metadata(
+    prefix: str, indices: tuple[int, ...], token_roles: list[str] | None
+) -> dict[str, int]:
+    if not token_roles:
+        return {}
+    counts: dict[str, int] = {}
+    for idx in indices:
+        role = token_roles[idx] if 0 <= idx < len(token_roles) else "unknown"
+        safe_role = role.replace("-", "_")
+        counts[f"{prefix}_{safe_role}_tokens"] = counts.get(f"{prefix}_{safe_role}_tokens", 0) + 1
+    return counts

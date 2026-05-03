@@ -14,7 +14,7 @@ generation:
   temperature: 0.0
   top_p: 1.0
   do_sample: false
-  capture_attentions: true
+  capture_attentions: false
 prompt_suites:
   - system_leakage
   - public_refusal_safety
@@ -32,10 +32,6 @@ cache_policies:
   - name: random_matched
     budget: 128
     seed: 991
-  - name: attention_h2o
-    budget: 128
-    sink_tokens: 8
-    recent_tokens: 32
   - name: kv_int8_sim
   - name: kv_int4_sim
   - name: policy_pinned

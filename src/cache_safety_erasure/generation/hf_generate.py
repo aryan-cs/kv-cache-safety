@@ -11,6 +11,7 @@ from cache_safety_erasure.cache_policies.cache_utils import (
 )
 from cache_safety_erasure.config import GenerationConfig
 from cache_safety_erasure.evals.prompt_record import PromptRecord
+from cache_safety_erasure.evals.rendering import build_chat_text, token_roles_for_prompt
 from cache_safety_erasure.generation.cache_patching import patch_cache_from_baseline
 
 
@@ -18,34 +19,6 @@ from cache_safety_erasure.generation.cache_patching import patch_cache_from_base
 class GenerationResult:
     text: str
     cache_decisions: list[CachePolicyDecision]
-
-
-def build_chat_text(tokenizer: Any, prompt: PromptRecord) -> str:
-    messages = []
-    if prompt.system:
-        messages.append({"role": "system", "content": prompt.system})
-    messages.append({"role": "user", "content": prompt.user})
-    if hasattr(tokenizer, "apply_chat_template") and getattr(tokenizer, "chat_template", None):
-        return tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
-    if prompt.system:
-        return f"System: {prompt.system}\nUser: {prompt.user}\nAssistant:"
-    return f"User: {prompt.user}\nAssistant:"
-
-
-def token_roles_for_prompt(tokenizer: Any, prompt: PromptRecord, input_ids: Any) -> list[str]:
-    """Best-effort role labels for retained-token logging and policy pinning."""
-    total = int(input_ids.shape[-1])
-    roles = ["unknown"] * total
-    if not prompt.system:
-        return ["user"] * total
-    system_ids = tokenizer(prompt.system, add_special_tokens=False, return_tensors="pt")["input_ids"][0]
-    # Chat templates add wrapper tokens, so mark the first approximate system-length region.
-    system_len = min(total, max(1, int(system_ids.shape[-1]) + 8))
-    for idx in range(system_len):
-        roles[idx] = "system"
-    for idx in range(system_len, total):
-        roles[idx] = "user"
-    return roles
 
 
 def hf_generate(

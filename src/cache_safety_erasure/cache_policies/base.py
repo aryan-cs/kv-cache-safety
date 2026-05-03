@@ -22,6 +22,11 @@ class CachePolicyDecision:
         return len(self.evicted_indices)
 
     def to_rows(self, prompt_id: str, seed: int, layer_count: int | None = None) -> list[dict[str, Any]]:
+        if layer_count is None and self.metadata.get("layer_count") is not None:
+            try:
+                layer_count = int(self.metadata["layer_count"])
+            except (TypeError, ValueError):
+                layer_count = None
         base = {
             "prompt_id": prompt_id,
             "seed": seed,
