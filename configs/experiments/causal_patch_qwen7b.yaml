@@ -18,12 +18,21 @@ prompt_suites:
   - refusal_safety
 cache_policies:
   - name: none
-  - name: sliding_window
-    budget: 128
-  - name: kv_int8_sim
-  - name: kv_int8_sim
+  - name: kv_int4_sim
+  - name: kv_int4_sim
     patch_from_baseline:
       token_indices: [0, 1, 2, 3, 4, 5, 6, 7]
+      components: [key, value]
+  - name: kv_int4_sim
+    patch_from_baseline:
+      token_indices: [0, 1, 2, 3, 4, 5, 6, 7]
+      components: [key]
+  - name: kv_int4_sim
+    patch_from_baseline:
+      token_indices: [0, 1, 2, 3, 4, 5, 6, 7]
+      components: [value]
+  - name: sliding_window
+    budget: 128
   - name: policy_pinned
     budget: 128
     sink_tokens: 8

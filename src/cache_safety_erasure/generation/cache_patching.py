@@ -12,6 +12,7 @@ def patch_cache_from_baseline(
     layers: list[int] | None = None,
     heads: list[int] | None = None,
     token_indices: list[int] | None = None,
+    components: list[str] | None = None,
 ) -> tuple[tuple[Any, Any], ...]:
     """Patch selected K/V slices from an uncompressed baseline cache into target cache.
 
@@ -22,6 +23,10 @@ def patch_cache_from_baseline(
     target = to_legacy_cache(target_cache)
     baseline = to_legacy_cache(baseline_cache)
     layer_set = set(layers if layers is not None else range(len(target)))
+    component_set = set(components or ["key", "value"])
+    unknown_components = component_set.difference({"key", "value"})
+    if unknown_components:
+        raise ValueError(f"Unknown cache patch components: {sorted(unknown_components)}")
     patched = []
     for layer_idx, (target_layer, base_layer) in enumerate(zip(target, baseline, strict=False)):
         target_k, target_v, *target_rest = target_layer
@@ -41,7 +46,9 @@ def patch_cache_from_baseline(
             for token_idx in token_set:
                 if token_idx >= target_seq or token_idx >= base_seq:
                     continue
-                new_k[:, head, token_idx, :] = base_k[:, head, token_idx, :]
-                new_v[:, head, token_idx, :] = base_v[:, head, token_idx, :]
+                if "key" in component_set:
+                    new_k[:, head, token_idx, :] = base_k[:, head, token_idx, :]
+                if "value" in component_set:
+                    new_v[:, head, token_idx, :] = base_v[:, head, token_idx, :]
         patched.append((new_k, new_v, *target_rest))
     return tuple(patched)

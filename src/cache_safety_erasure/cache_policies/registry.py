@@ -67,5 +67,16 @@ def cache_policy_label(config: CachePolicyConfig) -> str:
     if config.name == "random_matched" and config.seed is not None:
         parts.append(f"seed{config.seed}")
     if config.patch_from_baseline:
-        parts.append("patched")
+        patch = config.patch_from_baseline
+        components = patch.get("components") or ["key", "value"]
+        parts.append("patch" + "-".join(str(component) for component in components))
+        if patch.get("token_indices"):
+            indices = list(patch["token_indices"])
+            parts.append(f"tok{indices[0]}to{indices[-1]}")
+        if patch.get("layers"):
+            layers = list(patch["layers"])
+            parts.append(f"layer{layers[0]}to{layers[-1]}")
+        if patch.get("heads"):
+            heads = list(patch["heads"])
+            parts.append(f"head{heads[0]}to{heads[-1]}")
     return "__".join(parts)

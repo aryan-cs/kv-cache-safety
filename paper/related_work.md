@@ -26,7 +26,9 @@ Those papers are memorable because they identify surprising mechanisms. Cache-Me
 ## Closest Adjacent Work
 
 - The Pitfalls of KV Cache Compression: shows instruction classes degrade unevenly and system prompt leakage can increase under compression.
+- Understanding the Physics of Key-Value Cache Compression: frames cache compression as a routing/accessibility perturbation rather than simple token storage.
+- MiKV / No Token Left Behind: reports that exhaustive eviction can create safety breaches, hallucinations, and context loss, and that low-precision retention of evicted information can recover degradation.
 - CachePrune: edits KV-cache state to reduce indirect prompt injection.
 - How Alignment Routes: identifies sparse routing mechanisms for refusal/alignment behavior.
 
-The planned novelty is the causal bridge: KV-cache optimization may selectively erase alignment-routing state while preserving general capability.
+The planned novelty is falsifiable: claim novelty only if patching or pinning specific policy-token cache slices restores safety more than matched non-policy slices. Otherwise, frame the project as a careful open-model replication and extension of KV-compression pitfall work.

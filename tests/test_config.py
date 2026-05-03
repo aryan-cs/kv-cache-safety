@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from cache_safety_erasure.config import parse_experiment_config
+from cache_safety_erasure.config import CachePolicyConfig, parse_experiment_config
 
 
 @pytest.mark.skipif(
@@ -15,3 +15,15 @@ def test_parse_smoke_config() -> None:
     assert config.model.provider == "mock"
     assert config.cache_policies[0].name == "none"
     assert "system_leakage" in config.prompt_suites
+
+
+def test_patch_policy_label_includes_components() -> None:
+    from cache_safety_erasure.cache_policies.registry import cache_policy_label
+
+    label = cache_policy_label(
+        CachePolicyConfig(
+            name="kv_int4_sim",
+            patch_from_baseline={"components": ["key"], "token_indices": [0, 1, 2]},
+        )
+    )
+    assert label == "kv_int4_sim__patchkey__tok0to2"

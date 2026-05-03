@@ -154,6 +154,7 @@ def patch_from_baseline_cache(past: Any, baseline_prefill_past: Any, patch_from_
         layers=patch_from_baseline.get("layers"),
         heads=patch_from_baseline.get("heads"),
         token_indices=patch_from_baseline.get("token_indices"),
+        components=patch_from_baseline.get("components"),
     )
     return maybe_from_legacy_cache(patched, baseline_prefill_past)
 

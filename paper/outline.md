@@ -1,15 +1,15 @@
-# Paper Outline: Cache-Mediated Safety Erasure
+# Paper Outline: Testing Cache-Mediated Safety Erasure
 
 ## Working Thesis
 
-Safety/refusal behavior in aligned LLMs is partly implemented through fragile cache-resident routing state. Common inference-time KV-cache optimizations can erase this state, causing safety failures that are not predicted by ordinary capability degradation.
+Safety/refusal behavior in aligned LLMs may depend on fragile cache-resident routing state. The paper earns the name "Cache-Mediated Safety Erasure" only if targeted cache preservation or restoration recovers refusal behavior more than matched non-policy controls.
 
 ## Target Contributions
 
-1. Demonstrate selective safety degradation under KV-cache eviction/quantization at compression levels where benign capability remains comparatively stable.
-2. Localize degradation by token span, layer, and head where possible.
-3. Show causal restoration: patching or preserving specific cache slices restores refusal behavior.
-4. Propose and test `policy_pinned` cache retention as an alignment-preserving mitigation.
+1. Demonstrate or falsify selective safety degradation under cache eviction/quantization at compression levels where benign capability remains comparatively stable.
+2. Localize degradation by token role and, where feasible, by layer/head.
+3. Show causal restoration for length-preserving perturbations and policy-pinned mitigation for eviction perturbations.
+4. Define matched negative controls so the effect is not just "more cache helps."
 
 ## Key Figures
 
@@ -21,7 +21,8 @@ Safety/refusal behavior in aligned LLMs is partly implemented through fragile ca
 
 ## Acceptance Criteria For A Paper Claim
 
-- Effects reproduce on at least two open model families or two sizes within one family.
+- Effects reproduce on at least two open model families, or the claim is limited to the tested model family.
 - Safety/refusal degradation is meaningfully larger than ordinary capability degradation.
-- At least one causal patching experiment restores a safety metric without globally restoring the full cache.
+- At least one causal patching experiment restores a safety metric without globally restoring the full cache and beats matched non-policy patch controls.
+- Policy-pinned mitigation preserves safety at similar cache budgets more than naive sink/recent retention.
 - All runs are reproducible from committed configs and scripts.
