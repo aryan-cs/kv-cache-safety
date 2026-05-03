@@ -23,9 +23,11 @@ def patch_cache_from_baseline(
     baseline = to_legacy_cache(baseline_cache)
     layer_set = set(layers if layers is not None else range(len(target)))
     patched = []
-    for layer_idx, ((target_k, target_v), (base_k, base_v)) in enumerate(zip(target, baseline, strict=False)):
+    for layer_idx, (target_layer, base_layer) in enumerate(zip(target, baseline, strict=False)):
+        target_k, target_v, *target_rest = target_layer
+        base_k, base_v = base_layer[0], base_layer[1]
         if layer_idx not in layer_set:
-            patched.append((target_k, target_v))
+            patched.append(target_layer)
             continue
         new_k = target_k.clone()
         new_v = target_v.clone()
@@ -41,5 +43,5 @@ def patch_cache_from_baseline(
                     continue
                 new_k[:, head, token_idx, :] = base_k[:, head, token_idx, :]
                 new_v[:, head, token_idx, :] = base_v[:, head, token_idx, :]
-        patched.append((new_k, new_v))
+        patched.append((new_k, new_v, *target_rest))
     return tuple(patched)

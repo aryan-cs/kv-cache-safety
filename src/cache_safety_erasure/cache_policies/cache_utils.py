@@ -11,20 +11,21 @@ def _torch():
     return torch
 
 
-def to_legacy_cache(past_key_values: Any) -> tuple[tuple[Any, Any], ...]:
+def to_legacy_cache(past_key_values: Any) -> tuple[tuple[Any, ...], ...]:
     if hasattr(past_key_values, "to_legacy_cache"):
         return tuple(past_key_values.to_legacy_cache())
     return tuple(past_key_values)
 
 
-def maybe_from_legacy_cache(legacy: tuple[tuple[Any, Any], ...], original: Any) -> Any:
+def maybe_from_legacy_cache(legacy: tuple[tuple[Any, ...], ...], original: Any) -> Any:
     if hasattr(original, "from_legacy_cache"):
         return original.from_legacy_cache(legacy)
     try:
         from transformers.cache_utils import DynamicCache
 
-        if isinstance(original, DynamicCache):
+        if hasattr(DynamicCache, "from_legacy_cache"):
             return DynamicCache.from_legacy_cache(legacy)
+        return DynamicCache(legacy)
     except Exception:
         pass
     return legacy
@@ -44,7 +45,7 @@ def cache_layer_count(past_key_values: Any) -> int:
 
 def slice_legacy_cache(
     past_key_values: Any, retained_indices: list[int] | tuple[int, ...]
-) -> tuple[tuple[Any, Any], ...]:
+) -> tuple[tuple[Any, ...], ...]:
     torch = _torch()
     legacy = to_legacy_cache(past_key_values)
     if not legacy:
@@ -52,8 +53,9 @@ def slice_legacy_cache(
     device = legacy[0][0].device
     index = torch.tensor(list(retained_indices), dtype=torch.long, device=device)
     sliced = []
-    for key, value in legacy:
-        sliced.append((key.index_select(-2, index), value.index_select(-2, index)))
+    for layer in legacy:
+        key, value, *rest = layer
+        sliced.append((key.index_select(-2, index), value.index_select(-2, index), *rest))
     return tuple(sliced)
 
 
@@ -69,18 +71,23 @@ def quantize_dequantize_tensor(tensor: Any, bits: int) -> Any:
     return (quantized * scale).to(dtype=tensor.dtype)
 
 
-def quantize_dequantize_cache(past_key_values: Any, bits: int) -> tuple[tuple[Any, Any], ...]:
+def quantize_dequantize_cache(past_key_values: Any, bits: int) -> tuple[tuple[Any, ...], ...]:
     legacy = to_legacy_cache(past_key_values)
     return tuple(
-        (quantize_dequantize_tensor(key, bits), quantize_dequantize_tensor(value, bits))
-        for key, value in legacy
+        (
+            quantize_dequantize_tensor(layer[0], bits),
+            quantize_dequantize_tensor(layer[1], bits),
+            *layer[2:],
+        )
+        for layer in legacy
     )
 
 
 def cache_l2_norm(past_key_values: Any) -> float:
     torch = _torch()
     total = torch.tensor(0.0)
-    for key, value in to_legacy_cache(past_key_values):
+    for layer in to_legacy_cache(past_key_values):
+        key, value = layer[0], layer[1]
         total = total + key.detach().float().pow(2).sum().cpu()
         total = total + value.detach().float().pow(2).sum().cpu()
     return float(total.sqrt().item())

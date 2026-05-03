@@ -9,8 +9,10 @@ from cache_safety_erasure.cache_policies.cache_utils import (
     cache_l2_norm,
     cache_seq_len,
     evicted_from_retained,
+    maybe_from_legacy_cache,
     quantize_dequantize_cache,
     slice_legacy_cache,
+    to_legacy_cache,
 )
 
 
@@ -29,7 +31,7 @@ class NonePolicy:
         seq_len = cache_seq_len(past_key_values)
         retained = tuple(range(seq_len))
         norm = cache_l2_norm(past_key_values) if seq_len else 0.0
-        return past_key_values, CachePolicyDecision(
+        return maybe_from_legacy_cache(to_legacy_cache(past_key_values), past_key_values), CachePolicyDecision(
             self.name,
             step,
             seq_len,
@@ -57,7 +59,7 @@ class SlidingWindowPolicy:
         retained = tuple(range(max(0, seq_len - self.budget), seq_len))
         sliced = slice_legacy_cache(past_key_values, retained)
         after_norm = cache_l2_norm(sliced) if retained else 0.0
-        return sliced, CachePolicyDecision(
+        return maybe_from_legacy_cache(sliced, past_key_values), CachePolicyDecision(
             self.name,
             step,
             seq_len,
@@ -93,7 +95,7 @@ class SinkRecentPolicy:
             retained = tuple(sorted(retained_set))
         sliced = slice_legacy_cache(past_key_values, retained)
         after_norm = cache_l2_norm(sliced) if retained else 0.0
-        return sliced, CachePolicyDecision(
+        return maybe_from_legacy_cache(sliced, past_key_values), CachePolicyDecision(
             self.name,
             step,
             seq_len,
@@ -130,7 +132,7 @@ class RandomMatchedPolicy:
             retained = tuple(sorted(rng.sample(range(seq_len), k=max(0, self.budget))))
         sliced = slice_legacy_cache(past_key_values, retained)
         after_norm = cache_l2_norm(sliced) if retained else 0.0
-        return sliced, CachePolicyDecision(
+        return maybe_from_legacy_cache(sliced, past_key_values), CachePolicyDecision(
             self.name,
             step,
             seq_len,
@@ -177,7 +179,7 @@ class AttentionH2OPolicy:
             retained = tuple(sorted(retained_set))
         sliced = slice_legacy_cache(past_key_values, retained)
         after_norm = cache_l2_norm(sliced) if retained else 0.0
-        return sliced, CachePolicyDecision(
+        return maybe_from_legacy_cache(sliced, past_key_values), CachePolicyDecision(
             self.name,
             step,
             seq_len,
@@ -230,7 +232,7 @@ class QuantizedCachePolicy:
         before_norm = cache_l2_norm(past_key_values) if seq_len else 0.0
         quantized = quantize_dequantize_cache(past_key_values, self.bits)
         after_norm = cache_l2_norm(quantized) if seq_len else 0.0
-        return quantized, CachePolicyDecision(
+        return maybe_from_legacy_cache(quantized, past_key_values), CachePolicyDecision(
             self.name,
             step,
             seq_len,
@@ -291,7 +293,7 @@ class PolicyPinnedPolicy:
             retained = tuple(sorted(retained_set))
         sliced = slice_legacy_cache(past_key_values, retained)
         after_norm = cache_l2_norm(sliced) if retained else 0.0
-        return sliced, CachePolicyDecision(
+        return maybe_from_legacy_cache(sliced, past_key_values), CachePolicyDecision(
             self.name,
             step,
             seq_len,
