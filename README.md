@@ -138,6 +138,12 @@ Build the current LaTeX paper draft as a readable PDF:
 bash scripts/build_paper_pdf.sh
 ```
 
+Package arXiv-style source files:
+
+```bash
+uv run python scripts/package_arxiv_submission.py
+```
+
 Export paper tables:
 
 ```bash

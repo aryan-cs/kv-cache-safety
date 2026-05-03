@@ -25,11 +25,13 @@ The paper should not rely only on scatterplots and bar charts. The visual goal i
    - Embed prompt-condition metric vectors or open local text embeddings into 2D.
    - Draw paired edges from baseline to compressed generations for the same prompt.
    - Intended pattern: families of safety prompts move coherently under compression, while capability controls remain tighter.
+   - Implemented as `prompt_effect_constellation.*` from paired per-prompt metric deltas.
 
 5. **Safety-state atlas**
    - Small multiples over model, policy, and budget.
    - Each cell combines token-role retention and SSEI intensity.
    - Intended pattern: model/policy regimes where safety erasure is localized versus diffuse.
+   - Implemented as `safety_state_atlas.*`, with SSEI as cell color and system/user cache loss as overlaid glyph size.
 
 ## Implementation Notes
 

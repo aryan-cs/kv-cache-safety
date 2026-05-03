@@ -6,7 +6,13 @@ import pytest
 sys.path.insert(0, str(Path("scripts").resolve()))
 
 from check_publication_readiness import _check_figure_manifest
-from make_figures import _phase_portrait_rows, _stream_cache_fingerprint, _stream_cache_summaries
+from make_figures import (
+    _phase_portrait_rows,
+    _prompt_effect_constellation_rows,
+    _safety_state_atlas_rows,
+    _stream_cache_fingerprint,
+    _stream_cache_summaries,
+)
 
 
 @pytest.mark.skipif(
@@ -139,6 +145,84 @@ def test_phase_portrait_rows_parse_policy_budgets() -> None:
             "safety_degradation": 0.3,
             "capability_degradation": 0.1,
             "selective_safety_erasure_index": 0.2,
+        }
+    ]
+
+
+def test_prompt_effect_constellation_rows_pair_against_baseline() -> None:
+    import pandas as pd
+
+    rows = _prompt_effect_constellation_rows(
+        pd.DataFrame(
+            [
+                {
+                    "suite": "public_refusal_safety",
+                    "prompt_id": "p1",
+                    "seed": 0,
+                    "policy": "none",
+                    "safety_score": 1.0,
+                    "capability_score": None,
+                    "refusal_expected_accuracy": 1.0,
+                    "leakage_avoidance_score": None,
+                    "generated_word_count": 10.0,
+                },
+                {
+                    "suite": "public_refusal_safety",
+                    "prompt_id": "p1",
+                    "seed": 0,
+                    "policy": "kv_int4_sim",
+                    "safety_score": 0.25,
+                    "capability_score": None,
+                    "refusal_expected_accuracy": 0.0,
+                    "leakage_avoidance_score": None,
+                    "generated_word_count": 20.0,
+                },
+            ]
+        )
+    )
+
+    assert len(rows) == 1
+    assert rows[0]["safety_score_delta"] == 0.75
+    assert rows[0]["refusal_expected_accuracy_delta"] == 1.0
+    assert rows[0]["effect_magnitude"] == 1.0
+
+
+def test_safety_state_atlas_combines_ssei_and_role_retention() -> None:
+    rows = _safety_state_atlas_rows(
+        [
+            {
+                "suite": "public_refusal_safety",
+                "policy": "sliding_window__budget64",
+                "index": 0.4,
+                "safety_degradation": 0.5,
+                "capability_degradation": 0.1,
+            }
+        ],
+        [
+            {
+                "policy": "sliding_window__budget64",
+                "role": "system",
+                "retention_fraction": 0.25,
+            },
+            {
+                "policy": "sliding_window__budget64",
+                "role": "user",
+                "retention_fraction": 0.75,
+            },
+        ],
+    )
+
+    assert rows == [
+        {
+            "suite": "public_refusal_safety",
+            "policy": "sliding_window__budget64",
+            "selective_safety_erasure_index": 0.4,
+            "safety_degradation": 0.5,
+            "capability_degradation": 0.1,
+            "system_retention_fraction": 0.25,
+            "user_retention_fraction": 0.75,
+            "template_retention_fraction": None,
+            "generated_retention_fraction": None,
         }
     ]
 

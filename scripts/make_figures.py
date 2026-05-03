@@ -48,6 +48,62 @@ def main() -> None:
     figures_dir.mkdir(exist_ok=True)
 
     made: list[dict[str, Any]] = []
+    constellation_rows = _prompt_effect_constellation_rows(df)
+    if constellation_rows:
+        constellation_df = pd.DataFrame(constellation_rows)
+        fig, ax = plt.subplots(figsize=(9, 7))
+        cmap = plt.get_cmap("tab10")
+        for color_idx, (suite, suite_df) in enumerate(constellation_df.groupby("suite")):
+            color = cmap(color_idx % 10)
+            for row in suite_df.itertuples():
+                ax.annotate(
+                    "",
+                    xy=(row.x, row.y),
+                    xytext=(0, 0),
+                    arrowprops={
+                        "arrowstyle": "->",
+                        "color": color,
+                        "alpha": min(0.85, 0.25 + row.effect_magnitude),
+                        "lw": 0.8 + 2.5 * min(row.effect_magnitude, 1.0),
+                        "shrinkA": 0,
+                        "shrinkB": 0,
+                    },
+                )
+            ax.scatter(
+                suite_df["x"],
+                suite_df["y"],
+                s=36 + 90 * suite_df["effect_magnitude"].clip(upper=1.0),
+                color=color,
+                edgecolor="white",
+                linewidth=0.7,
+                alpha=0.9,
+                label=suite,
+            )
+        strongest = constellation_df.sort_values("effect_magnitude", ascending=False).head(8)
+        for row in strongest.itertuples():
+            ax.annotate(
+                _short_policy_label(row.policy),
+                (row.x, row.y),
+                xytext=(4, 4),
+                textcoords="offset points",
+                fontsize=7,
+            )
+        ax.axhline(0, color="0.25", linewidth=0.8)
+        ax.axvline(0, color="0.25", linewidth=0.8)
+        ax.set_title("Prompt-Level Effect Constellation")
+        ax.set_xlabel("Effect direction 1")
+        ax.set_ylabel("Effect direction 2")
+        ax.legend(title="suite", fontsize=8)
+        fig.tight_layout()
+        _save_figure(
+            fig,
+            figures_dir,
+            "prompt_effect_constellation",
+            made,
+            data_rows=constellation_rows,
+        )
+        plt.close(fig)
+
     for metric in ["safety_score", "capability_score", "rouge_l_leakage_recall"]:
         if metric not in df or df[metric].dropna().empty:
             continue
@@ -71,6 +127,7 @@ def main() -> None:
         plt.close(fig)
 
     metrics_path = args.results_dir / "metrics.json"
+    selective_rows_for_atlas: list[dict[str, Any]] = []
     if metrics_path.exists():
         with metrics_path.open("r", encoding="utf-8") as f:
             metrics = json.load(f)
@@ -86,6 +143,7 @@ def main() -> None:
             for key, value in metrics.get("selective_safety_erasure", {}).items()
             if value.get("selective_safety_erasure_index") is not None
         ]
+        selective_rows_for_atlas = selective_rows
         if selective_rows:
             selective_df = pd.DataFrame(selective_rows)
             pivot = selective_df.pivot_table(
@@ -414,6 +472,67 @@ def main() -> None:
                 data_rows=role_rows,
             )
             plt.close(fig)
+            atlas_rows = _safety_state_atlas_rows(selective_rows_for_atlas, role_rows)
+            if atlas_rows:
+                atlas_df = pd.DataFrame(atlas_rows)
+                pivot = atlas_df.pivot_table(
+                    index="suite",
+                    columns="policy",
+                    values="selective_safety_erasure_index",
+                    aggfunc="mean",
+                )
+                fig, ax = plt.subplots(figsize=(max(8, 0.95 * len(pivot.columns)), max(4.5, 0.55 * len(pivot.index))))
+                im = ax.imshow(pivot.fillna(0.0).values, aspect="auto", cmap="coolwarm", vmin=-1, vmax=1)
+                ax.set_xticks(range(len(pivot.columns)), labels=pivot.columns, rotation=35, ha="right")
+                ax.set_yticks(range(len(pivot.index)), labels=pivot.index)
+                ax.set_title("Safety-State Atlas")
+                ax.set_xlabel("Cache policy")
+                ax.set_ylabel("Prompt suite")
+                fig.colorbar(im, ax=ax, label="Selective Safety Erasure Index")
+                lookup = {
+                    (row.suite, row.policy): row for row in atlas_df.itertuples()
+                }
+                for y, suite in enumerate(pivot.index):
+                    for x, policy in enumerate(pivot.columns):
+                        row = lookup.get((suite, policy))
+                        if row is None:
+                            continue
+                        system_loss = 1.0 - (row.system_retention_fraction or 0.0)
+                        user_loss = 1.0 - (row.user_retention_fraction or 0.0)
+                        ax.scatter(
+                            [x - 0.16],
+                            [y],
+                            s=30 + 170 * max(0.0, system_loss),
+                            facecolors="none",
+                            edgecolors="black",
+                            linewidths=1.0,
+                        )
+                        ax.scatter(
+                            [x + 0.16],
+                            [y],
+                            s=30 + 170 * max(0.0, user_loss),
+                            facecolors="none",
+                            edgecolors="white",
+                            linewidths=1.0,
+                        )
+                ax.text(
+                    0.99,
+                    -0.18,
+                    "circle area: token-role cache loss; black=system, white=user",
+                    transform=ax.transAxes,
+                    ha="right",
+                    va="top",
+                    fontsize=8,
+                )
+                fig.tight_layout()
+                _save_figure(
+                    fig,
+                    figures_dir,
+                    "safety_state_atlas",
+                    made,
+                    data_rows=atlas_rows,
+                )
+                plt.close(fig)
         fingerprint_rows = _stream_cache_fingerprint(
             cache_path,
             args.results_dir / "prompts.jsonl",
@@ -552,6 +671,122 @@ def _phase_portrait_rows(selective_df: Any) -> Any:
             }
         )
     return pd.DataFrame(rows)
+
+
+def _prompt_effect_constellation_rows(df: Any) -> list[dict[str, Any]]:
+    import numpy as np
+
+    rows = []
+    baseline: dict[tuple[str, str, int], dict[str, Any]] = {}
+    for row in df.to_dict(orient="records"):
+        if row.get("policy") == "none":
+            baseline[
+                (
+                    str(row.get("suite")),
+                    str(row.get("prompt_id")),
+                    int(row.get("seed", 0)),
+                )
+            ] = row
+    metric_names = [
+        "safety_score",
+        "capability_score",
+        "refusal_expected_accuracy",
+        "leakage_avoidance_score",
+        "generated_word_count",
+    ]
+    vectors = []
+    for row in df.to_dict(orient="records"):
+        policy = str(row.get("policy"))
+        if policy == "none":
+            continue
+        key = (str(row.get("suite")), str(row.get("prompt_id")), int(row.get("seed", 0)))
+        base = baseline.get(key)
+        if base is None:
+            continue
+        vector = []
+        raw: dict[str, float | None] = {}
+        for metric in metric_names:
+            base_value = _finite_float(base.get(metric))
+            current_value = _finite_float(row.get(metric))
+            if base_value is None or current_value is None:
+                delta = None
+                vector.append(0.0)
+            elif metric == "generated_word_count":
+                denominator = max(1.0, abs(base_value))
+                delta = (current_value - base_value) / denominator
+                vector.append(delta)
+            else:
+                delta = base_value - current_value
+                vector.append(delta)
+            raw[f"{metric}_delta"] = delta
+        if not any(abs(value) > 1e-12 for value in vector):
+            continue
+        vectors.append(vector)
+        rows.append(
+            {
+                "suite": key[0],
+                "prompt_id": key[1],
+                "seed": key[2],
+                "policy": policy,
+                **raw,
+            }
+        )
+    if not rows:
+        return []
+    matrix = np.asarray(vectors, dtype=float)
+    coords = _project_effect_vectors(matrix)
+    magnitudes = np.linalg.norm(matrix, axis=1)
+    max_magnitude = max(float(magnitudes.max()), 1e-12)
+    for row, coord, magnitude in zip(rows, coords, magnitudes, strict=False):
+        row["x"] = float(coord[0])
+        row["y"] = float(coord[1])
+        row["effect_magnitude"] = float(magnitude / max_magnitude)
+    return rows
+
+
+def _project_effect_vectors(matrix: Any) -> Any:
+    import numpy as np
+
+    if matrix.shape[0] == 1:
+        return np.asarray([[matrix[0, 0], matrix[0, 1] if matrix.shape[1] > 1 else 0.0]])
+    centered = matrix - matrix.mean(axis=0, keepdims=True)
+    if not np.any(np.abs(centered) > 1e-12):
+        return matrix[:, :2] if matrix.shape[1] >= 2 else np.c_[matrix[:, 0], np.zeros(matrix.shape[0])]
+    _, _, vt = np.linalg.svd(centered, full_matrices=False)
+    basis = vt[:2].T
+    if basis.shape[1] < 2:
+        return np.c_[centered @ basis[:, 0], np.zeros(centered.shape[0])]
+    return centered @ basis
+
+
+def _safety_state_atlas_rows(
+    selective_rows: list[dict[str, Any]], role_rows: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    if not selective_rows or not role_rows:
+        return []
+    role_lookup = {
+        (str(row["policy"]), str(row["role"])): _finite_float(row.get("retention_fraction"))
+        for row in role_rows
+    }
+    rows = []
+    for row in selective_rows:
+        policy = str(row.get("policy"))
+        rows.append(
+            {
+                "suite": row.get("suite"),
+                "policy": policy,
+                "selective_safety_erasure_index": row.get("index")
+                if row.get("index") is not None
+                else row.get("selective_safety_erasure_index"),
+                "safety_degradation": row.get("safety_degradation"),
+                "capability_degradation": row.get("capability_degradation"),
+                "system_retention_fraction": role_lookup.get((policy, "system")),
+                "user_retention_fraction": role_lookup.get((policy, "user")),
+                "template_retention_fraction": role_lookup.get((policy, "template")),
+                "generated_retention_fraction": role_lookup.get((policy, "generated")),
+            }
+        )
+    return rows
 
 
 def _policy_shape(policy: str) -> tuple[str, float, str]:

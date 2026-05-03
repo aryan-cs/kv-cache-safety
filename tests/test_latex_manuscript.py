@@ -1,4 +1,9 @@
+import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path("scripts").resolve()))
+
+from package_arxiv_submission import _rewrite_main_tex_for_arxiv
 
 
 def test_latex_manuscript_is_arxiv_friendly_pre_results_draft() -> None:
@@ -26,3 +31,18 @@ def test_latex_references_cover_primary_model_and_cache_work() -> None:
         "zhang2026anydepth",
     ]:
         assert f"{{{key}," in bib
+
+
+def test_arxiv_rewrite_uses_local_bibliography_and_figures() -> None:
+    source = (
+        r"\maybeincludegraphic{../../results/h200_qwen_full_sweep/figures/"
+        r"safety_capability_phase_portrait.pdf}{0.9\linewidth}{pending}"
+        "\n"
+        r"\bibliography{../references}"
+    )
+
+    rewritten = _rewrite_main_tex_for_arxiv(source)
+
+    assert r"\bibliography{references}" in rewritten
+    assert "figures/safety_capability_phase_portrait.pdf" in rewritten
+    assert "../../results" not in rewritten
