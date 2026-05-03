@@ -168,6 +168,14 @@ Export a small blinded human-audit sheet:
 uv run python scripts/export_human_audit_sample.py --results-dir results/<run_id>
 ```
 
+Aggregate completed human-audit labels:
+
+```bash
+uv run python scripts/aggregate_human_audit.py \
+  --audit-csv paper/audit/<run_id>_audit_blinded.csv \
+  --key-jsonl paper/audit/<run_id>_audit_key.jsonl
+```
+
 Run the optional Qwen 32B public-suite follow-up after the primary 14B/7B workflow passes:
 
 ```bash
