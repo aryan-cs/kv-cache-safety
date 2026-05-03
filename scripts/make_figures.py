@@ -23,6 +23,9 @@ def main() -> None:
         import pandas as pd
     except ModuleNotFoundError as exc:
         raise SystemExit("Install dependencies with `uv sync --extra dev` to make figures.") from exc
+    plt.rcParams["svg.fonttype"] = "none"
+    plt.rcParams["svg.hashsalt"] = "cache-safety-erasure"
+    plt.rcParams["pdf.fonttype"] = 42
 
     generations_path = args.results_dir / "generations.jsonl"
     if not generations_path.exists():
@@ -187,6 +190,43 @@ def main() -> None:
             )
             plt.close(fig)
 
+        restoration_rows = [
+            {
+                "suite_policy": key,
+                "suite": key.split("::", 1)[0],
+                "policy": key.split("::", 1)[1],
+                "compressed_policy": value.get("compressed_policy"),
+                "safety_restoration_fraction": value.get("safety_restoration_fraction"),
+                "refusal_restoration_fraction": value.get("refusal_restoration_fraction"),
+                "leakage_avoidance_restoration_fraction": value.get(
+                    "leakage_avoidance_restoration_fraction"
+                ),
+            }
+            for key, value in metrics.get("causal_restoration", {}).items()
+        ]
+        if restoration_rows:
+            restoration_df = pd.DataFrame(restoration_rows)
+            plot_df = restoration_df.dropna(subset=["safety_restoration_fraction"]).copy()
+            if not plot_df.empty:
+                plot_df = plot_df.sort_values("safety_restoration_fraction")
+                fig_height = max(4, 0.35 * len(plot_df))
+                fig, ax = plt.subplots(figsize=(10, fig_height))
+                labels = [f"{row.suite}\n{row.policy}" for row in plot_df.itertuples()]
+                ax.barh(labels, plot_df["safety_restoration_fraction"])
+                ax.axvline(0, color="black", linewidth=0.8)
+                ax.axvline(1, color="0.6", linewidth=1, linestyle="--")
+                ax.set_xlabel("(patched - compressed) / (baseline - compressed)")
+                ax.set_title("Causal Restoration Fraction")
+                fig.tight_layout()
+                _save_figure(
+                    fig,
+                    figures_dir,
+                    "causal_restoration_fraction",
+                    made,
+                    data_rows=restoration_rows,
+                )
+                plt.close(fig)
+
     cache_path = args.results_dir / "cache_stats.parquet"
     if cache_path.exists():
         cache_summaries = _stream_cache_summaries(cache_path)
@@ -238,7 +278,14 @@ def main() -> None:
             )
             plt.close(fig)
 
-    write_json(figures_dir / "manifest.json", {"figures": made})
+    write_json(
+        figures_dir / "manifest.json",
+        {
+            "schema_version": 1,
+            "source_artifacts": _source_artifacts(args.results_dir),
+            "figures": made,
+        },
+    )
     print(f"Wrote {len(made)} figure(s) to {figures_dir}")
 
 
@@ -252,15 +299,19 @@ def _save_figure(
 ) -> None:
     png_path = figures_dir / f"{stem}.png"
     svg_path = figures_dir / f"{stem}.svg"
+    pdf_path = figures_dir / f"{stem}.pdf"
     data_path = figures_dir / f"{stem}.csv"
     fig.savefig(png_path, dpi=180)
     fig.savefig(svg_path)
+    fig.savefig(pdf_path)
     entry: dict[str, Any] = {
         "name": stem,
         "png": str(png_path),
         "png_sha256": file_sha256(png_path),
         "svg": str(svg_path),
         "svg_sha256": file_sha256(svg_path),
+        "pdf": str(pdf_path),
+        "pdf_sha256": file_sha256(pdf_path),
     }
     if data_rows is not None:
         _write_csv(data_path, data_rows)
@@ -268,6 +319,18 @@ def _save_figure(
         entry["data_csv_sha256"] = file_sha256(data_path)
         entry["data_row_count"] = len(data_rows)
     made.append(entry)
+
+
+def _source_artifacts(results_dir: Path) -> dict[str, dict[str, Any]]:
+    artifacts = {}
+    for name in ["manifest.json", "generations.jsonl", "metrics.json", "cache_stats.parquet"]:
+        path = results_dir / name
+        artifacts[name] = {
+            "path": str(path),
+            "sha256": file_sha256(path),
+            "bytes": path.stat().st_size if path.exists() else None,
+        }
+    return artifacts
 
 
 def _write_csv(path: Path, rows: list[dict[str, Any]]) -> None:

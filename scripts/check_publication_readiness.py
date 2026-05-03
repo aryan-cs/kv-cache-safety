@@ -8,6 +8,8 @@ from _path import add_src_to_path
 
 add_src_to_path()
 
+from cache_safety_erasure.utils.io import file_sha256
+
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Check whether a result directory is paper-ready.")
@@ -133,7 +135,7 @@ def main() -> None:
     figure_dir = args.results_dir / "figures"
     if not figure_dir.exists() or not list(figure_dir.glob("*.png")):
         failures.append("missing generated PNG figures")
-    _check_figure_manifest(figure_dir, failures)
+    _check_figure_manifest(figure_dir, args.results_dir, failures, args.require_causal_patch)
     if not args.allow_inactive_compression and (args.results_dir / "cache_stats.parquet").exists():
         _check_active_compression(args.results_dir / "cache_stats.parquet", manifest, failures)
     if args.require_causal_patch and (args.results_dir / "cache_stats.parquet").exists():
@@ -207,7 +209,12 @@ def _parse_suite_min_prompts(values: list[str]) -> dict[str, int]:
     return parsed
 
 
-def _check_figure_manifest(figure_dir: Path, failures: list[str]) -> None:
+def _check_figure_manifest(
+    figure_dir: Path,
+    results_dir: Path,
+    failures: list[str],
+    require_causal_patch: bool,
+) -> None:
     manifest_path = figure_dir / "manifest.json"
     if not manifest_path.exists():
         failures.append("missing figures/manifest.json")
@@ -221,18 +228,53 @@ def _check_figure_manifest(figure_dir: Path, failures: list[str]) -> None:
     if not isinstance(figures, list) or not figures:
         failures.append("figures manifest has no figure entries")
         return
+    source_artifacts = manifest.get("source_artifacts") or {}
+    for name in ["manifest.json", "generations.jsonl", "metrics.json", "cache_stats.parquet"]:
+        source = source_artifacts.get(name)
+        if not isinstance(source, dict):
+            failures.append(f"figures manifest lacks source artifact `{name}`")
+            continue
+        expected_sha = source.get("sha256")
+        actual_sha = file_sha256(results_dir / name)
+        if expected_sha != actual_sha:
+            failures.append(f"figures manifest source hash mismatch for `{name}`")
+
+    figure_names = set()
     for figure in figures:
         if not isinstance(figure, dict):
             failures.append("figures manifest contains non-object entry")
             continue
         name = figure.get("name", "<unnamed>")
-        for key in ["png", "png_sha256", "svg", "svg_sha256", "data_csv", "data_csv_sha256"]:
+        figure_names.add(str(name))
+        for key in [
+            "png",
+            "png_sha256",
+            "svg",
+            "svg_sha256",
+            "pdf",
+            "pdf_sha256",
+            "data_csv",
+            "data_csv_sha256",
+        ]:
             if not figure.get(key):
                 failures.append(f"figure `{name}` lacks `{key}`")
-        for path_key in ["png", "svg", "data_csv"]:
+        for path_key, hash_key in [
+            ("png", "png_sha256"),
+            ("svg", "svg_sha256"),
+            ("pdf", "pdf_sha256"),
+            ("data_csv", "data_csv_sha256"),
+        ]:
             raw_path = figure.get(path_key)
-            if raw_path and not Path(str(raw_path)).exists():
+            if not raw_path:
+                continue
+            path = Path(str(raw_path))
+            if not path.exists():
                 failures.append(f"figure `{name}` references missing {path_key}: {raw_path}")
+                continue
+            if figure.get(hash_key) != file_sha256(path):
+                failures.append(f"figure `{name}` has stale {path_key} hash")
+    if require_causal_patch and "causal_restoration_fraction" not in figure_names:
+        failures.append("causal patch runs require causal_restoration_fraction figure")
 
 
 def _check_causal_patch_config(policy_configs: list[dict], failures: list[str]) -> None:
