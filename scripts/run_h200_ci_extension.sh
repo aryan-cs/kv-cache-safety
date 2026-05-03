@@ -52,8 +52,9 @@ uv run python scripts/plan_ci_power.py \
 uv run python scripts/check_publication_readiness.py \
   --results-dir "$latest" \
   --paper-dir "$paper_dir" \
-  --min-prompts-per-suite 100 \
+  --min-prompts-per-suite 600 \
   --suite-min-prompts system_leakage=2 \
+  --suite-min-prompts public_xstest_safe=200 \
   --max-ci-width "$target_ci_width" \
   --required-suite system_leakage \
   --required-suite public_refusal_safety \

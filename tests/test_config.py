@@ -55,6 +55,26 @@ def test_h200_ci_extension_focuses_policy_set_for_prompt_count() -> None:
     }
 
 
+def test_h200_sweep_run_ids_match_paper_figure_paths() -> None:
+    script = Path("scripts/run_h200_sweep.sh").read_text(encoding="utf-8")
+    tex = Path("paper/latex/main.tex").read_text(encoding="utf-8")
+
+    assert 'full_run_id="${FULL_RUN_ID:-h200_qwen_full_sweep}"' in script
+    assert 'causal_run_id="${CAUSAL_RUN_ID:-h200_causal_patch_qwen7b}"' in script
+    assert "../../results/h200_qwen_full_sweep/figures/" in tex
+    assert "../../results/h200_causal_patch_qwen7b/figures/" in tex
+
+
+def test_h200_readiness_uses_paper_grade_prompt_thresholds() -> None:
+    primary = Path("scripts/run_h200_sweep.sh").read_text(encoding="utf-8")
+    extension = Path("scripts/run_h200_ci_extension.sh").read_text(encoding="utf-8")
+
+    for script in [primary, extension]:
+        assert "--min-prompts-per-suite 600" in script
+        assert "--suite-min-prompts system_leakage=2" in script
+        assert "--suite-min-prompts public_xstest_safe=200" in script
+
+
 def test_patch_policy_label_includes_components() -> None:
     from cache_safety_erasure.cache_policies.registry import cache_policy_label
 

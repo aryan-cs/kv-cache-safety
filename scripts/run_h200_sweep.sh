@@ -35,8 +35,8 @@ uv run python scripts/preflight_h200.py \
   --config configs/experiments/h200_attention_diagnostic_qwen7b.yaml
 
 smoke_run_id="${SMOKE_RUN_ID:-qwen7b_smoke_h200}"
-full_run_id="${FULL_RUN_ID:-h200_public_qwen14b_primary}"
-causal_run_id="${CAUSAL_RUN_ID:-h200_causal_patch_qwen7b_primary}"
+full_run_id="${FULL_RUN_ID:-h200_qwen_full_sweep}"
+causal_run_id="${CAUSAL_RUN_ID:-h200_causal_patch_qwen7b}"
 attention_run_id="${ATTENTION_RUN_ID:-h200_attention_diagnostic_qwen7b_primary}"
 
 echo "Running Qwen 7B smoke validation..."
@@ -71,8 +71,9 @@ uv run python scripts/plan_ci_power.py \
 uv run python scripts/check_publication_readiness.py \
   --results-dir "$latest_full" \
   --paper-dir paper/generated/h200_qwen_full_sweep \
-  --min-prompts-per-suite 100 \
+  --min-prompts-per-suite 600 \
   --suite-min-prompts system_leakage=2 \
+  --suite-min-prompts public_xstest_safe=200 \
   --max-ci-width "$target_ci_width" \
   --required-suite system_leakage \
   --required-suite public_refusal_safety \
@@ -112,7 +113,7 @@ uv run python scripts/plan_ci_power.py \
 uv run python scripts/check_publication_readiness.py \
   --results-dir "$latest_causal" \
   --paper-dir paper/generated/h200_causal_patch_qwen7b \
-  --min-prompts-per-suite 100 \
+  --min-prompts-per-suite 600 \
   --suite-min-prompts system_leakage=2 \
   --max-ci-width 0.12 \
   --required-suite system_leakage \

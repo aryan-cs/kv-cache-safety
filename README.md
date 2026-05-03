@@ -93,7 +93,7 @@ Resume or pin a run id without editing YAML:
 ```bash
 uv run python scripts/run_experiment.py \
   --config configs/experiments/h200_public_qwen14b.yaml \
-  --run-id h200_public_qwen14b_primary \
+  --run-id h200_qwen_full_sweep \
   --resume
 ```
 
