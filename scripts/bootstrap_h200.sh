@@ -17,6 +17,7 @@ fi
 
 if [[ -d "$workdir/.git" ]]; then
   cd "$workdir"
+  git config --global --add safe.directory "$workdir" || true
   git fetch origin "$branch"
   git checkout "$branch"
   git pull --ff-only origin "$branch"
@@ -24,6 +25,7 @@ elif [[ -z "$(find "$workdir" -mindepth 1 -maxdepth 1 2>/dev/null)" ]]; then
   rm -rf "$workdir"
   git clone --branch "$branch" "$repo_url" "$workdir"
   cd "$workdir"
+  git config --global --add safe.directory "$workdir" || true
 else
   echo "Refusing to clone into non-empty non-git directory: $workdir" >&2
   exit 1
@@ -40,9 +42,20 @@ if [[ -n "$(git status --short)" ]]; then
   exit 1
 fi
 
-uv sync --extra dev
+export HF_HOME="${HF_HOME:-$workdir/.cache/huggingface}"
+export HF_HUB_CACHE="${HF_HUB_CACHE:-$HF_HOME/hub}"
+export TRANSFORMERS_CACHE="${TRANSFORMERS_CACHE:-$HF_HOME/transformers}"
+export TORCH_HOME="${TORCH_HOME:-$workdir/.cache/torch}"
+
+uv sync --frozen --extra dev
 uv run ruff check .
 uv run pytest -q
+
+uv run python scripts/prepare_data.py --suite all
+uv run python scripts/prepare_data.py --source hf --suite advbench --limit 200 --output-suite public_refusal_safety
+uv run python scripts/prepare_data.py --source hf --suite dolly_benign --limit 200 --output-suite public_benign_overrefusal
+uv run python scripts/prepare_data.py --source hf --suite xstest_safe --limit 200 --output-suite public_xstest_safe
+uv run python scripts/prepare_data.py --source hf --suite arc_easy --limit 200 --output-suite public_capability_arc
 
 preflight_args=(
   --config configs/experiments/qwen7b_smoke.yaml

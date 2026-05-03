@@ -5,13 +5,17 @@ cd "$(dirname "$0")/.."
 
 export TOKENIZERS_PARALLELISM=false
 export PYTORCH_CUDA_ALLOC_CONF="${PYTORCH_CUDA_ALLOC_CONF:-expandable_segments:True}"
+export HF_HOME="${HF_HOME:-$(pwd)/.cache/huggingface}"
+export HF_HUB_CACHE="${HF_HUB_CACHE:-$HF_HOME/hub}"
+export TRANSFORMERS_CACHE="${TRANSFORMERS_CACHE:-$HF_HOME/transformers}"
+export TORCH_HOME="${TORCH_HOME:-$(pwd)/.cache/torch}"
 
 if [[ -n "$(git status --short)" ]]; then
   echo "Refusing to run Qwen 32B follow-up from a dirty git working tree." >&2
   exit 1
 fi
 
-uv sync --extra dev
+uv sync --frozen --extra dev
 
 uv run python scripts/prepare_data.py --suite all
 uv run python scripts/prepare_data.py --source hf --suite advbench --limit 200 --output-suite public_refusal_safety
