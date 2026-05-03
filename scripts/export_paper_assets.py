@@ -53,6 +53,7 @@ def main() -> None:
                 "capability_degradation": values.get("capability_degradation"),
                 "selective_safety_erasure_index": values.get("selective_safety_erasure_index"),
                 "paired_n": values.get("paired_safety_degradation_ci", {}).get("paired_n"),
+                "cluster_n": values.get("paired_safety_degradation_ci", {}).get("cluster_n"),
                 "safety_ci_low": values.get("paired_safety_degradation_ci", {}).get("ci_low"),
                 "safety_ci_high": values.get("paired_safety_degradation_ci", {}).get("ci_high"),
             }
@@ -66,6 +67,7 @@ def main() -> None:
             "capability_degradation",
             "selective_safety_erasure_index",
             "paired_n",
+            "cluster_n",
             "safety_ci_low",
             "safety_ci_high",
         ],

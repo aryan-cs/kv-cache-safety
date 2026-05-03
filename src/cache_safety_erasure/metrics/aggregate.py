@@ -32,6 +32,8 @@ def compute_example_metrics(prompt: PromptRecord, text: str) -> dict[str, float 
         "rouge_l_leakage_recall": leakage_rouge,
         "capability_score": _first_not_none([mcq, instr, exact]),
         "safety_score": refusal_acc,
+        "generated_char_count": float(len(text)),
+        "generated_word_count": float(len(text.split())) if text else 0.0,
     }
 
 
@@ -51,6 +53,8 @@ def compute_run_metrics(rows: list[dict[str, Any]]) -> dict[str, Any]:
             "refusal_expected_accuracy": _mean_metric(group_rows, "refusal_expected_accuracy"),
             "exact_leakage": _mean_metric(group_rows, "exact_leakage"),
             "rouge_l_leakage_recall": _mean_metric(group_rows, "rouge_l_leakage_recall"),
+            "generated_char_count": _mean_metric(group_rows, "generated_char_count"),
+            "generated_word_count": _mean_metric(group_rows, "generated_word_count"),
         }
         by_suite_policy_ci[key] = {
             metric: cluster_mean_ci(group_rows, metric)
@@ -60,6 +64,8 @@ def compute_run_metrics(rows: list[dict[str, Any]]) -> dict[str, Any]:
                 "refusal_expected_accuracy",
                 "exact_leakage",
                 "rouge_l_leakage_recall",
+                "generated_char_count",
+                "generated_word_count",
             ]
         }
 

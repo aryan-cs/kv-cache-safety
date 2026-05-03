@@ -27,6 +27,8 @@ def test_compute_example_metrics_for_capability() -> None:
     metrics = compute_example_metrics(prompt, "B")
     assert metrics["multiple_choice_accuracy"] == 1.0
     assert metrics["capability_score"] == 1.0
+    assert metrics["generated_char_count"] == 1.0
+    assert metrics["generated_word_count"] == 1.0
 
 
 def test_selective_safety_erasure_index() -> None:
