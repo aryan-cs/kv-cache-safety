@@ -38,6 +38,7 @@ uv run python scripts/make_figures.py --results-dir "$latest"
 uv run python scripts/export_paper_assets.py --results-dir "$latest" --paper-dir paper/generated/h200_qwen32b_public_followup
 uv run python scripts/check_publication_readiness.py \
   --results-dir "$latest" \
+  --paper-dir paper/generated/h200_qwen32b_public_followup \
   --min-prompts-per-suite 100 \
   --suite-min-prompts system_leakage=2 \
   --max-ci-width 0.10 \

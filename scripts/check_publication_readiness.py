@@ -14,6 +14,7 @@ from cache_safety_erasure.utils.io import file_sha256
 def main() -> None:
     parser = argparse.ArgumentParser(description="Check whether a result directory is paper-ready.")
     parser.add_argument("--results-dir", required=True, type=Path)
+    parser.add_argument("--paper-dir", type=Path, default=None)
     parser.add_argument("--min-prompts-per-suite", type=int, default=100)
     parser.add_argument(
         "--suite-min-prompts",
@@ -190,6 +191,8 @@ def main() -> None:
                 failures.append(
                     f"{key}: paired safety CI width {width:.3f}; target <= {args.max_ci_width:.3f}"
                 )
+    if args.paper_dir is not None:
+        _check_paper_assets(args.paper_dir, args.results_dir, failures)
 
     if failures:
         print("NOT PAPER READY")
@@ -275,6 +278,39 @@ def _check_figure_manifest(
                 failures.append(f"figure `{name}` has stale {path_key} hash")
     if require_causal_patch and "causal_restoration_fraction" not in figure_names:
         failures.append("causal patch runs require causal_restoration_fraction figure")
+
+
+def _check_paper_assets(paper_dir: Path, results_dir: Path, failures: list[str]) -> None:
+    manifest_path = paper_dir / "artifact_manifest.json"
+    if not manifest_path.exists():
+        failures.append(f"missing paper artifact manifest: {manifest_path}")
+        return
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        failures.append(f"invalid paper artifact manifest: {exc}")
+        return
+    for name, table in (manifest.get("tables") or {}).items():
+        if not isinstance(table, dict):
+            failures.append(f"paper artifact table entry `{name}` is malformed")
+            continue
+        path = Path(str(table.get("path", "")))
+        if not path.exists():
+            failures.append(f"paper artifact table `{name}` is missing")
+            continue
+        if table.get("sha256") != file_sha256(path):
+            failures.append(f"paper artifact table `{name}` hash is stale")
+    for name in ["manifest.json", "metrics.json", "figures/manifest.json"]:
+        source = (manifest.get("source_artifacts") or {}).get(name)
+        if not isinstance(source, dict):
+            failures.append(f"paper artifact manifest lacks source `{name}`")
+            continue
+        source_path = results_dir / name
+        if not source_path.exists():
+            failures.append(f"paper artifact source `{name}` is missing")
+            continue
+        if source.get("sha256") != file_sha256(source_path):
+            failures.append(f"paper artifact source `{name}` hash is stale")
 
 
 def _check_causal_patch_config(policy_configs: list[dict], failures: list[str]) -> None:

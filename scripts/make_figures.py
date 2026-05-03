@@ -3,6 +3,9 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import math
+import re
+from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
@@ -11,6 +14,16 @@ from _path import add_src_to_path
 add_src_to_path()
 
 from cache_safety_erasure.utils.io import file_sha256, write_json
+
+ROLE_ORDER = {
+    "system": 0,
+    "hidden_system": 1,
+    "template": 2,
+    "user": 3,
+    "generated": 4,
+    "special": 5,
+    "unknown": 6,
+}
 
 
 def main() -> None:
@@ -134,6 +147,82 @@ def main() -> None:
             )
             plt.close(fig)
 
+            phase_df = _phase_portrait_rows(selective_df)
+            if not phase_df.empty:
+                fig, ax = plt.subplots(figsize=(9, 7))
+                ax.axline((0, 0), slope=1, color="0.75", linewidth=1, linestyle="--", zorder=0)
+                ax.axhline(0, color="0.25", linewidth=0.8, zorder=0)
+                ax.axvline(0, color="0.25", linewidth=0.8, zorder=0)
+                cmap = plt.get_cmap("tab10")
+                for color_idx, ((suite, family), group) in enumerate(
+                    phase_df.groupby(["suite", "policy_family"], dropna=False)
+                ):
+                    group = group.sort_values(["budget_sort", "policy"])
+                    color = cmap(color_idx % 10)
+                    ax.plot(
+                        group["capability_degradation"],
+                        group["safety_degradation"],
+                        marker="o",
+                        linewidth=2.0,
+                        markersize=6,
+                        alpha=0.88,
+                        color=color,
+                        label=f"{suite} / {family}",
+                    )
+                    for start, end in zip(group.iloc[:-1].itertuples(), group.iloc[1:].itertuples(), strict=False):
+                        ax.annotate(
+                            "",
+                            xy=(end.capability_degradation, end.safety_degradation),
+                            xytext=(start.capability_degradation, start.safety_degradation),
+                            arrowprops={
+                                "arrowstyle": "->",
+                                "color": color,
+                                "lw": 1.5,
+                                "alpha": 0.72,
+                                "shrinkA": 6,
+                                "shrinkB": 6,
+                            },
+                        )
+                    for row in group.itertuples():
+                        if row.budget_label:
+                            ax.annotate(
+                                row.budget_label,
+                                (row.capability_degradation, row.safety_degradation),
+                                xytext=(4, 3),
+                                textcoords="offset points",
+                                fontsize=7,
+                                color=color,
+                            )
+                ax.fill_between(
+                    [-1, 1],
+                    [-1, 1],
+                    [1, 3],
+                    color="#d73027",
+                    alpha=0.06,
+                    label="selective safety-loss region",
+                )
+                ax.set_xlim(
+                    min(-0.05, phase_df["capability_degradation"].min() - 0.05),
+                    max(0.25, phase_df["capability_degradation"].max() + 0.05),
+                )
+                ax.set_ylim(
+                    min(-0.05, phase_df["safety_degradation"].min() - 0.05),
+                    max(0.25, phase_df["safety_degradation"].max() + 0.05),
+                )
+                ax.set_title("Safety-Capability Phase Portrait")
+                ax.set_xlabel("Capability degradation")
+                ax.set_ylabel("Safety degradation")
+                ax.legend(fontsize=7, ncols=2)
+                fig.tight_layout()
+                _save_figure(
+                    fig,
+                    figures_dir,
+                    "safety_capability_phase_portrait",
+                    made,
+                    data_rows=phase_df.to_dict(orient="records"),
+                )
+                plt.close(fig)
+
             forest_rows = []
             for key, value in metrics.get("selective_safety_erasure", {}).items():
                 ci = value.get("paired_safety_degradation_ci", {})
@@ -227,6 +316,54 @@ def main() -> None:
                 )
                 plt.close(fig)
 
+                flow_df = _restoration_flow_rows(plot_df)
+                if not flow_df.empty:
+                    fig_height = max(4.5, 0.42 * len(flow_df))
+                    fig, ax = plt.subplots(figsize=(10, fig_height))
+                    y_positions = list(range(len(flow_df)))
+                    ax.axvline(0, color="0.2", linewidth=1)
+                    ax.axvline(1, color="0.65", linewidth=1, linestyle="--")
+                    ax.text(0, len(flow_df) + 0.15, "compressed", ha="center", va="bottom", fontsize=9)
+                    ax.text(1, len(flow_df) + 0.15, "baseline", ha="center", va="bottom", fontsize=9)
+                    for y, row in zip(y_positions, flow_df.itertuples(), strict=False):
+                        color = _restoration_color(row.policy)
+                        ax.annotate(
+                            "",
+                            xy=(row.safety_restoration_fraction, y),
+                            xytext=(0, y),
+                            arrowprops={
+                                "arrowstyle": "-|>",
+                                "lw": 2.4,
+                                "color": color,
+                                "alpha": 0.82,
+                                "shrinkA": 0,
+                                "shrinkB": 0,
+                            },
+                        )
+                        ax.scatter(
+                            [row.safety_restoration_fraction],
+                            [y],
+                            s=90,
+                            color=color,
+                            edgecolor="white",
+                            linewidth=0.8,
+                            zorder=3,
+                        )
+                    ax.set_yticks(y_positions, labels=flow_df["label"])
+                    ax.set_xlim(-0.08, max(1.08, flow_df["safety_restoration_fraction"].max() + 0.08))
+                    ax.set_ylim(-0.8, len(flow_df) + 0.6)
+                    ax.set_xlabel("Restoration fraction: (patched - compressed) / (baseline - compressed)")
+                    ax.set_title("Causal Restoration Flow")
+                    fig.tight_layout()
+                    _save_figure(
+                        fig,
+                        figures_dir,
+                        "causal_restoration_flow",
+                        made,
+                        data_rows=flow_df.to_dict(orient="records"),
+                    )
+                    plt.close(fig)
+
     cache_path = args.results_dir / "cache_stats.parquet"
     if cache_path.exists():
         cache_summaries = _stream_cache_summaries(cache_path)
@@ -275,6 +412,50 @@ def main() -> None:
                 "token_role_retention_heatmap",
                 made,
                 data_rows=role_rows,
+            )
+            plt.close(fig)
+        fingerprint_rows = _stream_cache_fingerprint(
+            cache_path,
+            args.results_dir / "prompts.jsonl",
+            bin_count=48,
+        )
+        if fingerprint_rows:
+            fingerprint_df = pd.DataFrame(fingerprint_rows)
+            fingerprint_df["row_label"] = fingerprint_df["policy"] + " / " + fingerprint_df["role"]
+            row_order = (
+                fingerprint_df[["row_label", "policy", "role"]]
+                .drop_duplicates()
+                .sort_values(
+                    by=["policy", "role"],
+                    key=lambda series: series.map(lambda value: ROLE_ORDER.get(str(value), 99))
+                    if series.name == "role"
+                    else series,
+                )
+            )
+            pivot = fingerprint_df.pivot_table(
+                index="row_label",
+                columns="token_bin",
+                values="retention_fraction",
+                aggfunc="mean",
+            ).reindex(row_order["row_label"])
+            fig_height = max(5, 0.24 * len(pivot.index))
+            fig, ax = plt.subplots(figsize=(12, fig_height))
+            im = ax.imshow(pivot.fillna(0.0).values, aspect="auto", cmap="magma", vmin=0, vmax=1)
+            ax.set_xticks(
+                [0, max(0, pivot.shape[1] // 4), max(0, pivot.shape[1] // 2), max(0, 3 * pivot.shape[1] // 4), max(0, pivot.shape[1] - 1)],
+                labels=["start", "25%", "50%", "75%", "end"],
+            )
+            ax.set_yticks(range(len(pivot.index)), labels=pivot.index, fontsize=7)
+            ax.set_xlabel("Normalized prompt-cache position")
+            ax.set_title("Cache-State Fingerprint By Policy, Role, And Token Position")
+            fig.colorbar(im, ax=ax, label="retained fraction")
+            fig.tight_layout()
+            _save_figure(
+                fig,
+                figures_dir,
+                "cache_state_fingerprint",
+                made,
+                data_rows=fingerprint_rows,
             )
             plt.close(fig)
 
@@ -343,6 +524,195 @@ def _write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(rows)
+
+
+def _phase_portrait_rows(selective_df: Any) -> Any:
+    import pandas as pd
+
+    rows = []
+    for row in selective_df.to_dict(orient="records"):
+        safety = _finite_float(row.get("safety_degradation"))
+        capability = _finite_float(row.get("capability_degradation"))
+        if safety is None or capability is None:
+            continue
+        policy = str(row.get("policy"))
+        family, budget_sort, budget_label = _policy_shape(policy)
+        rows.append(
+            {
+                "suite": row.get("suite"),
+                "policy": policy,
+                "policy_family": family,
+                "budget_sort": budget_sort,
+                "budget_label": budget_label,
+                "safety_degradation": safety,
+                "capability_degradation": capability,
+                "selective_safety_erasure_index": _finite_float(
+                    row.get("selective_safety_erasure_index") or row.get("index")
+                ),
+            }
+        )
+    return pd.DataFrame(rows)
+
+
+def _policy_shape(policy: str) -> tuple[str, float, str]:
+    family = policy.split("__", 1)[0]
+    budget_match = re.search(r"__budget(\d+)", policy)
+    if budget_match:
+        budget = float(budget_match.group(1))
+        return family, budget, f"b={int(budget)}"
+    if "int4" in policy:
+        return family, 4.0, "4-bit"
+    if "int8" in policy:
+        return family, 8.0, "8-bit"
+    if policy == "none":
+        return family, 0.0, "base"
+    return family, 1_000_000.0, ""
+
+
+def _restoration_flow_rows(restoration_df: Any) -> Any:
+    import pandas as pd
+
+    rows = []
+    for row in restoration_df.itertuples():
+        fraction = _finite_float(row.safety_restoration_fraction)
+        if fraction is None:
+            continue
+        rows.append(
+            {
+                "suite": row.suite,
+                "policy": row.policy,
+                "compressed_policy": row.compressed_policy,
+                "safety_restoration_fraction": fraction,
+                "label": f"{row.suite} / {_short_policy_label(row.policy)}",
+            }
+        )
+    return pd.DataFrame(rows).sort_values("safety_restoration_fraction") if rows else pd.DataFrame()
+
+
+def _short_policy_label(policy: str) -> str:
+    label = policy.replace("__", " / ")
+    label = label.replace("patchkey-value", "patch K,V")
+    label = label.replace("rolesystem", "system")
+    label = label.replace("roleuser", "user")
+    return label
+
+
+def _restoration_color(policy: str) -> str:
+    if "rolesystem" in policy or "system" in policy:
+        return "#1b9e77"
+    if "roleuser" in policy or "matchsystem" in policy:
+        return "#7570b3"
+    if "policy_pinned" in policy:
+        return "#d95f02"
+    return "#4d4d4d"
+
+
+def _stream_cache_fingerprint(
+    cache_path: Path,
+    prompts_path: Path,
+    *,
+    bin_count: int,
+) -> list[dict[str, Any]]:
+    try:
+        import pyarrow.parquet as pq
+    except ModuleNotFoundError as exc:
+        raise SystemExit("pyarrow is required to summarize cache_stats.parquet.") from exc
+    if not prompts_path.exists():
+        return []
+    prompt_roles = _load_prompt_roles(prompts_path)
+    parquet_file = pq.ParquetFile(cache_path)
+    required = {
+        "prompt_id",
+        "policy",
+        "decode_step",
+        "original_seq_len",
+        "retained_indices",
+        "evicted_indices",
+    }
+    if not required.issubset(set(parquet_file.schema.names)):
+        return []
+    counts: dict[tuple[str, str, int], list[float]] = defaultdict(lambda: [0.0, 0.0])
+    columns = sorted(required)
+    for batch in parquet_file.iter_batches(columns=columns, batch_size=50_000):
+        table = batch.to_pydict()
+        for idx, raw_policy in enumerate(table.get("policy", [])):
+            if int(_float_at(table, "decode_step", idx)) != 0:
+                continue
+            prompt_id = str(table["prompt_id"][idx])
+            policy = str(raw_policy)
+            seq_len = int(_float_at(table, "original_seq_len", idx))
+            if seq_len <= 0:
+                continue
+            roles = prompt_roles.get(prompt_id, [])
+            for token_idx in _parse_indices(table["retained_indices"][idx]):
+                role = _role_at(roles, token_idx)
+                token_bin = min(bin_count - 1, int((token_idx / seq_len) * bin_count))
+                counts[(policy, role, token_bin)][0] += 1.0
+            for token_idx in _parse_indices(table["evicted_indices"][idx]):
+                role = _role_at(roles, token_idx)
+                token_bin = min(bin_count - 1, int((token_idx / seq_len) * bin_count))
+                counts[(policy, role, token_bin)][1] += 1.0
+    rows = []
+    for (policy, role, token_bin), (retained, evicted) in sorted(
+        counts.items(), key=lambda item: (item[0][0], ROLE_ORDER.get(item[0][1], 99), item[0][2])
+    ):
+        total = retained + evicted
+        if total <= 0:
+            continue
+        rows.append(
+            {
+                "policy": policy,
+                "role": role,
+                "token_bin": token_bin,
+                "retained_count": retained,
+                "evicted_count": evicted,
+                "retention_fraction": retained / total,
+            }
+        )
+    return rows
+
+
+def _load_prompt_roles(prompts_path: Path) -> dict[str, list[str]]:
+    roles_by_prompt: dict[str, list[str]] = {}
+    with prompts_path.open("r", encoding="utf-8") as f:
+        for line in f:
+            if not line.strip():
+                continue
+            record = json.loads(line)
+            rendered = record.get("rendered_prompt") or {}
+            roles = rendered.get("token_roles") or []
+            if roles:
+                roles_by_prompt[str(record.get("prompt_id"))] = [str(role) for role in roles]
+    return roles_by_prompt
+
+
+def _parse_indices(value: Any) -> list[int]:
+    if value is None:
+        return []
+    if isinstance(value, list):
+        return [int(item) for item in value]
+    text = str(value).strip()
+    if not text:
+        return []
+    return [int(part) for part in text.split(",") if part.strip()]
+
+
+def _role_at(roles: list[str], idx: int) -> str:
+    if 0 <= idx < len(roles):
+        return roles[idx]
+    return "unknown"
+
+
+def _finite_float(value: Any) -> float | None:
+    if value is None:
+        return None
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    if math.isnan(number) or math.isinf(number):
+        return None
+    return number
 
 
 def _stream_cache_summaries(cache_path: Path) -> dict[str, list[dict[str, Any]]]:

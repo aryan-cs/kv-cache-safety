@@ -28,3 +28,24 @@ def test_cache_stats_sink_preserves_existing_rows_on_resume(tmp_path: Path) -> N
 
     df = pd.read_parquet(path)
     assert list(df["prompt_id"]) == ["p1", "p2"]
+
+
+def test_latex_table_export_escapes_policy_names(tmp_path: Path) -> None:
+    import sys
+
+    sys.path.insert(0, str(Path("scripts").resolve()))
+    from export_paper_assets import write_latex_table
+
+    table_path = tmp_path / "table.tex"
+    write_latex_table(
+        table_path,
+        ["policy", "policy_level_ssei"],
+        [{"policy": "sliding_window__budget64", "policy_level_ssei": 0.125}],
+        caption="Caption with SSEI.",
+        label="tab:test",
+    )
+
+    text = table_path.read_text(encoding="utf-8")
+    assert "sliding\\_window\\_\\_budget64" in text
+    assert "0.125" in text
+    assert "\\label{tab:test}" in text

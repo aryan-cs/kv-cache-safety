@@ -8,6 +8,17 @@ from _path import add_src_to_path
 
 add_src_to_path()
 
+from cache_safety_erasure.utils.io import file_sha256, write_json
+
+TABLE_FILES = [
+    "main_results_table.md",
+    "main_results_table.tex",
+    "suite_level_effects_table.md",
+    "suite_level_effects_table.tex",
+    "causal_restoration_table.md",
+    "causal_restoration_table.tex",
+]
+
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Export paper-ready result tables from a run.")
@@ -57,6 +68,20 @@ def main() -> None:
         ],
         summary_rows,
     )
+    write_latex_table(
+        args.paper_dir / "main_results_table.tex",
+        [
+            "policy",
+            "mean_safety_score",
+            "mean_capability_score",
+            "policy_level_ssei",
+            "policy_level_ssei_ci_low",
+            "policy_level_ssei_ci_high",
+        ],
+        summary_rows,
+        caption="Policy-level safety, capability, and selective safety erasure summary.",
+        label="tab:main-results",
+    )
 
     selective_rows = []
     for key, values in metrics.get("selective_safety_erasure", {}).items():
@@ -91,6 +116,21 @@ def main() -> None:
         ],
         selective_rows,
     )
+    write_latex_table(
+        args.paper_dir / "suite_level_effects_table.tex",
+        [
+            "suite",
+            "policy",
+            "safety_degradation",
+            "capability_degradation",
+            "within_suite_ssei_if_capability_available",
+            "paired_n",
+            "cluster_n",
+        ],
+        selective_rows,
+        caption="Suite-level degradation effects with paired prompt counts.",
+        label="tab:suite-effects",
+    )
     restoration_rows = []
     for key, values in metrics.get("causal_restoration", {}).items():
         suite, policy = key.split("::", 1)
@@ -118,7 +158,50 @@ def main() -> None:
         ],
         restoration_rows,
     )
+    write_latex_table(
+        args.paper_dir / "causal_restoration_table.tex",
+        [
+            "suite",
+            "policy",
+            "compressed_policy",
+            "safety_restoration_fraction",
+            "refusal_restoration_fraction",
+            "leakage_avoidance_restoration_fraction",
+        ],
+        restoration_rows,
+        caption="Causal restoration effects for patched and mitigation conditions.",
+        label="tab:causal-restoration",
+    )
+    _write_artifact_manifest(args.results_dir, args.paper_dir)
     print(f"Wrote paper tables to {args.paper_dir}")
+
+
+def _write_artifact_manifest(results_dir: Path, paper_dir: Path) -> None:
+    tables = {
+        name: {
+            "path": str(paper_dir / name),
+            "sha256": file_sha256(paper_dir / name),
+            "bytes": (paper_dir / name).stat().st_size if (paper_dir / name).exists() else None,
+        }
+        for name in TABLE_FILES
+    }
+    source_artifacts = {
+        name: {
+            "path": str(results_dir / name),
+            "sha256": file_sha256(results_dir / name),
+            "bytes": (results_dir / name).stat().st_size if (results_dir / name).exists() else None,
+        }
+        for name in ["manifest.json", "metrics.json", "figures/manifest.json"]
+    }
+    write_json(
+        paper_dir / "artifact_manifest.json",
+        {
+            "schema_version": 1,
+            "results_dir": str(results_dir),
+            "tables": tables,
+            "source_artifacts": source_artifacts,
+        },
+    )
 
 
 def write_markdown_table(path: Path, columns: list[str], rows: list[dict]) -> None:
@@ -126,6 +209,68 @@ def write_markdown_table(path: Path, columns: list[str], rows: list[dict]) -> No
     for row in rows:
         lines.append("| " + " | ".join(format_value(row.get(column)) for column in columns) + " |")
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def write_latex_table(
+    path: Path,
+    columns: list[str],
+    rows: list[dict],
+    *,
+    caption: str,
+    label: str,
+) -> None:
+    display_columns = [_latex_header(column) for column in columns]
+    lines = [
+        r"\begin{table}[t]",
+        r"\centering",
+        r"\small",
+        r"\setlength{\tabcolsep}{3pt}",
+        r"\begin{tabularx}{\linewidth}{@{}" + "l" + "X" * (len(columns) - 1) + r"@{}}",
+        r"\toprule",
+        " & ".join(display_columns) + r" \\",
+        r"\midrule",
+    ]
+    for row in rows:
+        lines.append(
+            " & ".join(_latex_escape(format_value(row.get(column))) for column in columns) + r" \\"
+        )
+    if not rows:
+        lines.append(
+            r"\multicolumn{"
+            + str(len(columns))
+            + r"}{c}{Results pending; no readiness-passing rows exported.} \\"
+        )
+    lines.extend(
+        [
+            r"\bottomrule",
+            r"\end{tabularx}",
+            r"\caption{" + _latex_escape(caption) + r"}",
+            r"\label{" + _latex_escape(label) + r"}",
+            r"\end{table}",
+            "",
+        ]
+    )
+    path.write_text("\n".join(lines), encoding="utf-8")
+
+
+def _latex_header(column: str) -> str:
+    return _latex_escape(column.replace("_", " "))
+
+
+def _latex_escape(value: str) -> str:
+    replacements = {
+        "\\": r"\textbackslash{}",
+        "&": r"\&",
+        "%": r"\%",
+        "$": r"\$",
+        "#": r"\#",
+        "_": r"\_",
+        "{": r"\{",
+        "}": r"\}",
+        "~": r"\textasciitilde{}",
+        "^": r"\textasciicircum{}",
+    }
+    return "".join(replacements.get(char, char) for char in value)
 
 
 def format_value(value: object) -> str:

@@ -58,6 +58,7 @@ uv run python scripts/make_figures.py --results-dir "$latest_full"
 uv run python scripts/export_paper_assets.py --results-dir "$latest_full" --paper-dir paper/generated/h200_qwen_full_sweep
 uv run python scripts/check_publication_readiness.py \
   --results-dir "$latest_full" \
+  --paper-dir paper/generated/h200_qwen_full_sweep \
   --min-prompts-per-suite 100 \
   --suite-min-prompts system_leakage=2 \
   --max-ci-width 0.08 \
@@ -88,6 +89,7 @@ uv run python scripts/make_figures.py --results-dir "$latest_causal"
 uv run python scripts/export_paper_assets.py --results-dir "$latest_causal" --paper-dir paper/generated/h200_causal_patch_qwen7b
 uv run python scripts/check_publication_readiness.py \
   --results-dir "$latest_causal" \
+  --paper-dir paper/generated/h200_causal_patch_qwen7b \
   --min-prompts-per-suite 100 \
   --suite-min-prompts system_leakage=2 \
   --max-ci-width 0.12 \
