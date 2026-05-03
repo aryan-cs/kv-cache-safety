@@ -103,6 +103,16 @@ Run the primary H200 workflow:
 bash scripts/run_h200_sweep.sh
 ```
 
+The primary workflow defaults to `PUBLIC_PROMPT_LIMIT=650`, one deterministic seed, and `AUDIT_PER_SUITE_POLICY=10`. This keeps runtime lower than repeated deterministic seeds while targeting prompt-cluster counts needed for narrow confidence intervals. For a cheaper pilot, run `PUBLIC_PROMPT_LIMIT=200 AUDIT_PER_SUITE_POLICY=3 bash scripts/run_h200_sweep.sh`.
+
+Run the prompt-count extension for narrower confidence intervals after the primary pilot identifies viable effects:
+
+```bash
+bash scripts/run_h200_ci_extension.sh
+```
+
+The CI extension uses `CI_PROMPT_LIMIT=650` by default and focuses on fewer policies so prompt-cluster counts, not repeated deterministic seeds, do the statistical work. Override with `CI_PROMPT_LIMIT=<n>` or `TARGET_CI_WIDTH=<width>` if needed.
+
 Initialize or update the H200 checkout under the authorized notebook folder:
 
 ```bash
@@ -116,6 +126,7 @@ Preflight the H200 configs without launching a sweep:
 ```bash
 uv run python scripts/preflight_h200.py \
   --config configs/experiments/h200_public_qwen14b.yaml \
+  --config configs/experiments/h200_qwen14b_ci_extension.yaml \
   --config configs/experiments/h200_causal_patch_qwen7b.yaml \
   --config configs/experiments/h200_attention_diagnostic_qwen7b.yaml
 ```

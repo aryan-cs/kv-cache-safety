@@ -27,6 +27,34 @@ def test_tiny_hf_smoke_explicitly_allows_offload() -> None:
     assert config.model.allow_cpu_offload is True
 
 
+@pytest.mark.skipif(
+    __import__("importlib").util.find_spec("yaml") is None,
+    reason="PyYAML is not installed in the base interpreter",
+)
+def test_h200_public_sweep_uses_prompt_clusters_not_repeated_deterministic_seeds() -> None:
+    config, _raw = parse_experiment_config(Path("configs/experiments/h200_public_qwen14b.yaml"))
+    assert config.generation.do_sample is False
+    assert config.seeds == (0,)
+    assert config.limit_per_suite is None
+
+
+@pytest.mark.skipif(
+    __import__("importlib").util.find_spec("yaml") is None,
+    reason="PyYAML is not installed in the base interpreter",
+)
+def test_h200_ci_extension_focuses_policy_set_for_prompt_count() -> None:
+    config, _raw = parse_experiment_config(
+        Path("configs/experiments/h200_qwen14b_ci_extension.yaml")
+    )
+    assert config.seeds == (0,)
+    assert {policy.name for policy in config.cache_policies} == {
+        "none",
+        "sliding_window",
+        "kv_int4_sim",
+        "policy_pinned",
+    }
+
+
 def test_patch_policy_label_includes_components() -> None:
     from cache_safety_erasure.cache_policies.registry import cache_policy_label
 

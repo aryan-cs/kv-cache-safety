@@ -29,5 +29,5 @@ cache_policies:
     budget: 128
     sink_tokens: 8
     protected_spans: [system, policy]
-seeds: [0, 1, 2]
+seeds: [0]
 limit_per_suite: null

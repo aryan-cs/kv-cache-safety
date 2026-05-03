@@ -18,11 +18,15 @@ fi
 
 uv sync --frozen --extra dev
 
+public_prompt_limit="${PUBLIC_PROMPT_LIMIT:-650}"
+target_ci_width="${TARGET_CI_WIDTH:-0.08}"
+audit_per_suite_policy="${AUDIT_PER_SUITE_POLICY:-10}"
+
 uv run python scripts/prepare_data.py --suite all
-uv run python scripts/prepare_data.py --source hf --suite advbench --limit 200 --output-suite public_refusal_safety
-uv run python scripts/prepare_data.py --source hf --suite dolly_benign --limit 200 --output-suite public_benign_overrefusal
-uv run python scripts/prepare_data.py --source hf --suite xstest_safe --limit 200 --output-suite public_xstest_safe
-uv run python scripts/prepare_data.py --source hf --suite arc_easy --limit 200 --output-suite public_capability_arc
+uv run python scripts/prepare_data.py --source hf --suite advbench --limit "$public_prompt_limit" --output-suite public_refusal_safety
+uv run python scripts/prepare_data.py --source hf --suite dolly_benign --limit "$public_prompt_limit" --output-suite public_benign_overrefusal
+uv run python scripts/prepare_data.py --source hf --suite xstest_safe --limit "$public_prompt_limit" --output-suite public_xstest_safe
+uv run python scripts/prepare_data.py --source hf --suite arc_easy --limit "$public_prompt_limit" --output-suite public_capability_arc
 
 uv run python scripts/preflight_h200.py \
   --config configs/experiments/qwen7b_smoke.yaml \
@@ -59,12 +63,17 @@ uv run python scripts/export_paper_assets.py \
   --results-dir "$latest_full" \
   --paper-dir paper/generated/h200_qwen_full_sweep \
   --macro-prefix Primary
+uv run python scripts/plan_ci_power.py \
+  --results-dir "$latest_full" \
+  --target-ci-width "$target_ci_width" \
+  --output-json "$latest_full/ci_power.json" \
+  --output-md paper/generated/h200_qwen_full_sweep/ci_power.md
 uv run python scripts/check_publication_readiness.py \
   --results-dir "$latest_full" \
   --paper-dir paper/generated/h200_qwen_full_sweep \
   --min-prompts-per-suite 100 \
   --suite-min-prompts system_leakage=2 \
-  --max-ci-width 0.08 \
+  --max-ci-width "$target_ci_width" \
   --required-suite system_leakage \
   --required-suite public_refusal_safety \
   --required-suite public_benign_overrefusal \
@@ -78,7 +87,9 @@ uv run python scripts/check_publication_readiness.py \
   --required-policy kv_int4_sim \
   --require-policy-pinned \
   --require-public-provenance
-uv run python scripts/export_human_audit_sample.py --results-dir "$latest_full" --per-suite-policy 3
+uv run python scripts/export_human_audit_sample.py \
+  --results-dir "$latest_full" \
+  --per-suite-policy "$audit_per_suite_policy"
 
 echo "Running causal patch diagnostic on Qwen 7B..."
 uv run python scripts/run_experiment.py \
@@ -93,6 +104,11 @@ uv run python scripts/export_paper_assets.py \
   --results-dir "$latest_causal" \
   --paper-dir paper/generated/h200_causal_patch_qwen7b \
   --macro-prefix Causal
+uv run python scripts/plan_ci_power.py \
+  --results-dir "$latest_causal" \
+  --target-ci-width 0.12 \
+  --output-json "$latest_causal/ci_power.json" \
+  --output-md paper/generated/h200_causal_patch_qwen7b/ci_power.md
 uv run python scripts/check_publication_readiness.py \
   --results-dir "$latest_causal" \
   --paper-dir paper/generated/h200_causal_patch_qwen7b \
@@ -106,7 +122,9 @@ uv run python scripts/check_publication_readiness.py \
   --require-causal-patch \
   --require-policy-pinned \
   --require-public-provenance
-uv run python scripts/export_human_audit_sample.py --results-dir "$latest_causal" --per-suite-policy 3
+uv run python scripts/export_human_audit_sample.py \
+  --results-dir "$latest_causal" \
+  --per-suite-policy "$audit_per_suite_policy"
 
 echo "Running attention-policy diagnostic on Qwen 7B..."
 uv run python scripts/run_experiment.py \

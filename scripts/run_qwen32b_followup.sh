@@ -17,11 +17,14 @@ fi
 
 uv sync --frozen --extra dev
 
+public_prompt_limit="${PUBLIC_PROMPT_LIMIT:-650}"
+audit_per_suite_policy="${AUDIT_PER_SUITE_POLICY:-10}"
+
 uv run python scripts/prepare_data.py --suite all
-uv run python scripts/prepare_data.py --source hf --suite advbench --limit 200 --output-suite public_refusal_safety
-uv run python scripts/prepare_data.py --source hf --suite dolly_benign --limit 200 --output-suite public_benign_overrefusal
-uv run python scripts/prepare_data.py --source hf --suite xstest_safe --limit 200 --output-suite public_xstest_safe
-uv run python scripts/prepare_data.py --source hf --suite arc_easy --limit 200 --output-suite public_capability_arc
+uv run python scripts/prepare_data.py --source hf --suite advbench --limit "$public_prompt_limit" --output-suite public_refusal_safety
+uv run python scripts/prepare_data.py --source hf --suite dolly_benign --limit "$public_prompt_limit" --output-suite public_benign_overrefusal
+uv run python scripts/prepare_data.py --source hf --suite xstest_safe --limit "$public_prompt_limit" --output-suite public_xstest_safe
+uv run python scripts/prepare_data.py --source hf --suite arc_easy --limit "$public_prompt_limit" --output-suite public_capability_arc
 
 uv run python scripts/preflight_h200.py \
   --config configs/experiments/h200_qwen32b_public_followup.yaml
@@ -56,6 +59,8 @@ uv run python scripts/check_publication_readiness.py \
   --required-policy kv_int4_sim \
   --require-policy-pinned \
   --require-public-provenance
-uv run python scripts/export_human_audit_sample.py --results-dir "$latest" --per-suite-policy 3
+uv run python scripts/export_human_audit_sample.py \
+  --results-dir "$latest" \
+  --per-suite-policy "$audit_per_suite_policy"
 
 echo "Qwen 32B follow-up complete: $latest"

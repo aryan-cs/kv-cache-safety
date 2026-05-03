@@ -1,5 +1,5 @@
 run:
-  name: h200_public_qwen14b
+  name: h200_qwen14b_ci_extension
   output_dir: results
   resume: false
 model:
@@ -26,15 +26,6 @@ cache_policies:
   - name: none
   - name: sliding_window
     budget: 64
-  - name: sliding_window
-    budget: 128
-  - name: sink_recent
-    budget: 128
-    sink_tokens: 8
-  - name: random_matched
-    budget: 128
-    seed: 991
-  - name: kv_int8_sim
   - name: kv_int4_sim
   - name: policy_pinned
     budget: 128
