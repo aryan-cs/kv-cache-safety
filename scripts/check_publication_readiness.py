@@ -22,6 +22,14 @@ def main() -> None:
     parser.add_argument("--max-ci-width", type=float, default=0.08)
     parser.add_argument("--allow-dirty", action="store_true")
     parser.add_argument("--allow-mock-model", action="store_true")
+    parser.add_argument("--allow-tiny-model", action="store_true")
+    parser.add_argument("--allow-smoke-run", action="store_true")
+    parser.add_argument("--min-policies", type=int, default=3)
+    parser.add_argument("--required-suite", action="append", default=[])
+    parser.add_argument("--required-policy", action="append", default=[])
+    parser.add_argument("--require-public-provenance", action="store_true")
+    parser.add_argument("--require-causal-patch", action="store_true")
+    parser.add_argument("--require-policy-pinned", action="store_true")
     args = parser.parse_args()
     suite_min_prompts = _parse_suite_min_prompts(args.suite_min_prompts)
 
@@ -50,13 +58,42 @@ def main() -> None:
             failures.append("run was produced from a dirty git working tree")
         if manifest.get("model_provider") == "mock" and not args.allow_mock_model:
             failures.append("mock model runs are not paper evidence")
+        model_id = str(manifest.get("model_id", ""))
+        if "tiny" in model_id.lower() and not args.allow_tiny_model:
+            failures.append(f"tiny model `{model_id}` is not paper evidence")
+        run_name = str(manifest.get("run_name", ""))
+        if "smoke" in run_name.lower() and not args.allow_smoke_run:
+            failures.append(f"smoke run `{run_name}` is not paper evidence")
         if not manifest.get("cache_policy_configs"):
             failures.append("manifest lacks full cache policy configs")
         if not manifest.get("prompt_counts"):
             failures.append("manifest lacks prompt counts")
+        policy_configs = manifest.get("cache_policy_configs") or []
+        if len(policy_configs) < args.min_policies:
+            failures.append(f"manifest has {len(policy_configs)} policies; need >= {args.min_policies}")
+        policy_names = {str(policy.get("name")) for policy in policy_configs if isinstance(policy, dict)}
+        for required_policy in args.required_policy:
+            if required_policy not in policy_names and not any(
+                str(policy.get("name", "")).startswith(required_policy)
+                for policy in policy_configs
+                if isinstance(policy, dict)
+            ):
+                failures.append(f"missing required policy `{required_policy}`")
+        if args.require_policy_pinned and "policy_pinned" not in policy_names:
+            failures.append("missing policy_pinned mitigation policy")
+        if args.require_causal_patch and not any(
+            isinstance(policy, dict) and policy.get("patch_from_baseline")
+            for policy in policy_configs
+        ):
+            failures.append("missing cache patch policy with patch_from_baseline")
+        prompt_counts = manifest.get("prompt_counts") or {}
+        for required_suite in args.required_suite:
+            if required_suite not in prompt_counts:
+                failures.append(f"missing required suite `{required_suite}`")
 
     if prompts_path.exists():
         token_span_failures = 0
+        public_without_provenance = 0
         with prompts_path.open("r", encoding="utf-8") as f:
             for line in f:
                 if not line.strip():
@@ -67,8 +104,14 @@ def main() -> None:
                     rendered.get("token_count") is None or not rendered.get("token_role_spans")
                 ):
                     token_span_failures += 1
+                if args.require_public_provenance and str(row.get("suite", "")).startswith("public_"):
+                    metadata = row.get("metadata", {})
+                    if not metadata.get("source_dataset") or not metadata.get("source_split"):
+                        public_without_provenance += 1
         if token_span_failures:
             failures.append(f"{token_span_failures} prompts lack tokenizer token-role spans")
+        if public_without_provenance:
+            failures.append(f"{public_without_provenance} public prompts lack dataset provenance")
 
     figure_dir = args.results_dir / "figures"
     if not figure_dir.exists() or not list(figure_dir.glob("*.png")):

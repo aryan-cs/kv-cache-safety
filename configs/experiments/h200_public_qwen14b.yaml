@@ -19,6 +19,7 @@ prompt_suites:
   - system_leakage
   - public_refusal_safety
   - public_benign_overrefusal
+  - public_xstest_safe
   - public_capability_arc
 cache_policies:
   - name: none

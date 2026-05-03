@@ -87,6 +87,7 @@ The paper requires the following tables and figures before submission:
 6. Failure examples with raw generations and human-audited labels for a small subset.
 
 Current local artifacts are smoke tests only. They must not be interpreted as evidence.
+Human audit sheets are generated with `scripts/export_human_audit_sample.py`; the paper should report the audit protocol and inter-annotator or spot-check procedure before presenting unsafe-compliance rates as final labels.
 
 ## 5. Discussion
 

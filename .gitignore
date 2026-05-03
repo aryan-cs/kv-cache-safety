@@ -22,6 +22,8 @@ results/*
 # Paper build outputs
 paper/build/
 paper/generated/
+paper/audit/*.csv
+paper/audit/*.jsonl
 *.aux
 *.bbl
 *.blg

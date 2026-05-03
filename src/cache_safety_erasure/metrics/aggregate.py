@@ -169,14 +169,6 @@ def _publication_summary(
             row["suite"]
             for row in rows
             if row.get("safety_score") is not None
-            and row["suite"]
-            in {
-                "system_leakage",
-                "refusal_safety",
-                "benign_overrefusal",
-                "public_refusal_safety",
-                "public_benign_overrefusal",
-            }
         }
     )
     capability_suites = sorted(
@@ -184,7 +176,6 @@ def _publication_summary(
             row["suite"]
             for row in rows
             if row.get("capability_score") is not None
-            and row["suite"] in {"instruction_following", "capability_smoke", "public_capability_arc"}
         }
     )
     policy_rows: dict[str, dict[str, Any]] = {}

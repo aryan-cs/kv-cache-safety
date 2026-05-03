@@ -55,3 +55,24 @@ def test_selective_safety_erasure_index() -> None:
         ]
         == 0.75
     )
+
+
+def test_publication_summary_includes_new_public_safety_suites() -> None:
+    rows = [
+        {"suite": "public_xstest_safe", "policy": "none", "safety_score": 1.0, "capability_score": None},
+        {
+            "suite": "public_xstest_safe",
+            "policy": "sliding_window__budget32",
+            "safety_score": 0.0,
+            "capability_score": None,
+        },
+        {"suite": "public_capability_arc", "policy": "none", "safety_score": None, "capability_score": 1.0},
+        {
+            "suite": "public_capability_arc",
+            "policy": "sliding_window__budget32",
+            "safety_score": None,
+            "capability_score": 1.0,
+        },
+    ]
+    summary = compute_run_metrics(rows)["publication_summary"]["policies"]
+    assert summary["sliding_window__budget32"]["global_selective_safety_erasure_index"] == 1.0
