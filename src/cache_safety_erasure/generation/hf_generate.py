@@ -73,62 +73,86 @@ def hf_generate(
     token_roles = token_roles_for_prompt(tokenizer, prompt, input_ids)
     cache_decisions: list[CachePolicyDecision] = []
     generated_ids: list[int] = []
-    absolute_position = int(input_ids.shape[-1])
 
     with torch.inference_mode():
-        outputs = model(
-            input_ids=input_ids,
-            attention_mask=attention_mask,
-            use_cache=True,
-            output_attentions=generation_config.capture_attentions,
-            return_dict=True,
-        )
-        baseline_prefill_past = outputs.past_key_values
-        past = outputs.past_key_values
-        past, decision = policy.apply(
-            past,
-            step=0,
-            token_roles=token_roles,
-            attention_scores=getattr(outputs, "attentions", None),
-        )
-        if patch_from_baseline:
-            past = patch_cache_from_baseline(
-                past,
-                baseline_prefill_past,
-                layers=patch_from_baseline.get("layers"),
-                heads=patch_from_baseline.get("heads"),
-                token_indices=patch_from_baseline.get("token_indices"),
+        if int(input_ids.shape[-1]) > 1:
+            prefill_ids = input_ids[:, :-1]
+            last_prompt_token = input_ids[:, -1:]
+            prefill_mask = attention_mask[:, :-1] if attention_mask is not None else None
+            outputs = model(
+                input_ids=prefill_ids,
+                attention_mask=prefill_mask,
+                use_cache=True,
+                output_attentions=generation_config.capture_attentions,
+                return_dict=True,
             )
-            past = maybe_from_legacy_cache(past, baseline_prefill_past)
-            decision.metadata["patched_from_baseline"] = True
-        cache_decisions.append(decision)
+            baseline_prefill_past = outputs.past_key_values
+            past = outputs.past_key_values
+            past, decision = policy.apply(
+                past,
+                step=0,
+                token_roles=token_roles[:-1],
+                attention_scores=getattr(outputs, "attentions", None),
+            )
+            if patch_from_baseline:
+                past = patch_from_baseline_cache(past, baseline_prefill_past, patch_from_baseline)
+                decision.metadata["patched_from_baseline"] = True
+            cache_decisions.append(decision)
+            outputs = _forward_one_token(
+                model=model,
+                token_id=last_prompt_token,
+                past=past,
+                absolute_position=int(input_ids.shape[-1]) - 1,
+                output_attentions=generation_config.capture_attentions,
+            )
+            past = outputs.past_key_values
+            past, decision = policy.apply(
+                past,
+                step=1,
+                token_roles=token_roles,
+                attention_scores=getattr(outputs, "attentions", None),
+            )
+            cache_decisions.append(decision)
+            absolute_position = int(input_ids.shape[-1])
+            decode_step_start = 2
+        else:
+            outputs = model(
+                input_ids=input_ids,
+                attention_mask=attention_mask,
+                use_cache=True,
+                output_attentions=generation_config.capture_attentions,
+                return_dict=True,
+            )
+            baseline_prefill_past = outputs.past_key_values
+            past = outputs.past_key_values
+            past, decision = policy.apply(
+                past,
+                step=0,
+                token_roles=token_roles,
+                attention_scores=getattr(outputs, "attentions", None),
+            )
+            if patch_from_baseline:
+                past = patch_from_baseline_cache(past, baseline_prefill_past, patch_from_baseline)
+                decision.metadata["patched_from_baseline"] = True
+            cache_decisions.append(decision)
+            absolute_position = int(input_ids.shape[-1])
+            decode_step_start = 1
         next_token = _sample_next_token(outputs.logits[:, -1, :], generation_config)
 
-        for step in range(1, generation_config.max_new_tokens + 1):
+        for step in range(decode_step_start, decode_step_start + generation_config.max_new_tokens):
             token_id = int(next_token.item())
             if token_id == tokenizer.eos_token_id:
                 break
             generated_ids.append(token_id)
 
             cache_len = cache_seq_len(past)
-            step_attention_mask = torch.ones((1, cache_len + 1), dtype=torch.long, device=device)
-            kwargs = {
-                "input_ids": next_token.reshape(1, 1),
-                "attention_mask": step_attention_mask,
-                "past_key_values": past,
-                "use_cache": True,
-                "output_attentions": generation_config.capture_attentions,
-                "return_dict": True,
-            }
-            # Most modern HF decoder models accept position_ids; some accept cache_position.
-            position_ids = torch.tensor([[absolute_position]], dtype=torch.long, device=device)
-            kwargs["position_ids"] = position_ids
-            try:
-                kwargs["cache_position"] = torch.tensor([absolute_position], dtype=torch.long, device=device)
-                outputs = model(**kwargs)
-            except TypeError:
-                kwargs.pop("cache_position", None)
-                outputs = model(**kwargs)
+            outputs = _forward_one_token(
+                model=model,
+                token_id=next_token.reshape(1, 1),
+                past=past,
+                absolute_position=absolute_position,
+                output_attentions=generation_config.capture_attentions,
+            )
             absolute_position += 1
 
             past = outputs.past_key_values
@@ -149,6 +173,49 @@ def hf_generate(
     decoded = tokenizer.decode(generated_ids, skip_special_tokens=True).strip()
     _ = cache_layer_count  # imported for downstream callers and import validation.
     return GenerationResult(text=decoded, cache_decisions=cache_decisions)
+
+
+def patch_from_baseline_cache(past: Any, baseline_prefill_past: Any, patch_from_baseline: dict[str, Any]) -> Any:
+    patched = patch_cache_from_baseline(
+        past,
+        baseline_prefill_past,
+        layers=patch_from_baseline.get("layers"),
+        heads=patch_from_baseline.get("heads"),
+        token_indices=patch_from_baseline.get("token_indices"),
+    )
+    return maybe_from_legacy_cache(patched, baseline_prefill_past)
+
+
+def _forward_one_token(
+    *,
+    model: Any,
+    token_id: Any,
+    past: Any,
+    absolute_position: int,
+    output_attentions: bool,
+) -> Any:
+    try:
+        import torch
+    except ModuleNotFoundError as exc:
+        raise RuntimeError("torch is required for Hugging Face generation.") from exc
+
+    device = token_id.device
+    cache_len = cache_seq_len(past)
+    kwargs = {
+        "input_ids": token_id,
+        "attention_mask": torch.ones((1, cache_len + 1), dtype=torch.long, device=device),
+        "past_key_values": past,
+        "use_cache": True,
+        "output_attentions": output_attentions,
+        "return_dict": True,
+        "position_ids": torch.tensor([[absolute_position]], dtype=torch.long, device=device),
+    }
+    try:
+        kwargs["cache_position"] = torch.tensor([absolute_position], dtype=torch.long, device=device)
+        return model(**kwargs)
+    except TypeError:
+        kwargs.pop("cache_position", None)
+        return model(**kwargs)
 
 
 def _model_device(model: Any) -> Any:
