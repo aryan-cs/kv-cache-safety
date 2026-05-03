@@ -23,7 +23,7 @@ The claims ladder is deliberately strict:
 
 1. cache policies change behavior;
 2. safety degrades more than ordinary capability;
-3. targeted policy-token cache preservation/restoration causally recovers safety more than matched non-policy controls.
+3. targeted system-role cache preservation/restoration causally recovers safety more than matched user-role controls.
 
 Only the third result justifies the stronger "safety erasure" language.
 
@@ -168,7 +168,7 @@ The core sweep varies:
 - prompt suite
 - cache policy
 - compression budget
-- prompt order
+- prompt-suite order, when configs explicitly vary it
 - seed
 
 Implemented cache policies:
@@ -180,7 +180,7 @@ Implemented cache policies:
 - `attention_h2o`: keep sink/recent tokens plus high-attention historical tokens when attention scores are available
 - `kv_int8_sim`: symmetric per-tensor int8 quantize/dequantize simulation
 - `kv_int4_sim`: symmetric per-tensor int4 quantize/dequantize simulation
-- `policy_pinned`: mitigation policy that protects system/policy spans while evicting other tokens
+- `policy_pinned`: mitigation policy that protects configured token roles, currently system-role spans, while evicting other tokens
 
 For causal diagnostics, `patch_from_baseline` supports role-derived token selection, for example patching `token_roles: [system]` and comparing it against `token_roles: [user]` with `match_token_count_to_roles: [system]`. Hard-coded token indices are kept only for low-level debugging.
 

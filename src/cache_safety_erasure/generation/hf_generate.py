@@ -5,6 +5,7 @@ from typing import Any
 
 from cache_safety_erasure.cache_policies.base import CachePolicyDecision
 from cache_safety_erasure.cache_policies.cache_utils import (
+    cache_l2_norm,
     cache_layer_count,
     cache_seq_len,
     maybe_from_legacy_cache,
@@ -211,6 +212,7 @@ def patch_from_baseline_cache(
         token_indices=resolved_patch.get("token_indices"),
         components=resolved_patch.get("components"),
     )
+    metadata["cache_l2_after_patch"] = cache_l2_norm(patched)
     return maybe_from_legacy_cache(patched, baseline_prefill_past), metadata
 
 

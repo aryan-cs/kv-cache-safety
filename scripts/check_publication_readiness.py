@@ -90,11 +90,8 @@ def main() -> None:
                 failures.append(f"missing required policy `{required_policy}`")
         if args.require_policy_pinned and "policy_pinned" not in policy_names:
             failures.append("missing policy_pinned mitigation policy")
-        if args.require_causal_patch and not any(
-            isinstance(policy, dict) and policy.get("patch_from_baseline")
-            for policy in policy_configs
-        ):
-            failures.append("missing cache patch policy with patch_from_baseline")
+        if args.require_causal_patch:
+            _check_causal_patch_config(policy_configs, failures)
         prompt_counts = manifest.get("prompt_counts") or {}
         for required_suite in args.required_suite:
             if required_suite not in prompt_counts:
@@ -129,6 +126,8 @@ def main() -> None:
         failures.append("missing generated PNG figures")
     if not args.allow_inactive_compression and (args.results_dir / "cache_stats.parquet").exists():
         _check_active_compression(args.results_dir / "cache_stats.parquet", manifest, failures)
+    if args.require_causal_patch and (args.results_dir / "cache_stats.parquet").exists():
+        _check_causal_patch_cache_stats(args.results_dir / "cache_stats.parquet", manifest, failures)
 
     generation_rows: list[dict] = []
     if generations.exists():
@@ -196,6 +195,53 @@ def _parse_suite_min_prompts(values: list[str]) -> dict[str, int]:
         suite, raw_count = value.split("=", 1)
         parsed[suite] = int(raw_count)
     return parsed
+
+
+def _check_causal_patch_config(policy_configs: list[dict], failures: list[str]) -> None:
+    patch_specs = [
+        policy.get("patch_from_baseline")
+        for policy in policy_configs
+        if isinstance(policy, dict) and policy.get("patch_from_baseline")
+    ]
+    if not patch_specs:
+        failures.append("missing cache patch policy with patch_from_baseline")
+        return
+    role_patches = [patch for patch in patch_specs if _patch_roles(patch)]
+    if not role_patches:
+        failures.append("causal patch policies must use role-derived token selection")
+    system_patches = [patch for patch in role_patches if "system" in _patch_roles(patch)]
+    if not system_patches:
+        failures.append("missing system-role cache patch")
+    matched_controls = [
+        patch
+        for patch in role_patches
+        if "user" in _patch_roles(patch)
+        and "system" in _patch_match_roles(patch)
+    ]
+    if not matched_controls:
+        failures.append("missing matched user-role cache patch control")
+
+
+def _patch_roles(patch: dict) -> set[str]:
+    return set(_as_string_list(patch.get("token_roles") or patch.get("roles") or patch.get("role")))
+
+
+def _patch_match_roles(patch: dict) -> set[str]:
+    return set(
+        _as_string_list(
+            patch.get("match_token_count_to_roles")
+            or patch.get("matched_token_roles")
+            or patch.get("match_roles")
+        )
+    )
+
+
+def _as_string_list(value: object) -> list[str]:
+    if value is None:
+        return []
+    if isinstance(value, (list, tuple, set)):
+        return [str(item) for item in value]
+    return [str(value)]
 
 
 def _check_generation_matrix(
@@ -277,8 +323,11 @@ def _check_active_compression(cache_stats_path: Path, manifest: dict, failures: 
     available_columns = set(parquet_file.schema.names)
     required_columns = {
         "policy",
+        "decode_step",
         "original_seq_len",
         "evicted_count",
+        "retained_system_tokens",
+        "evicted_system_tokens",
         "quantization_bits",
         "cache_l2_before",
         "cache_l2_after",
@@ -288,7 +337,15 @@ def _check_active_compression(cache_stats_path: Path, manifest: dict, failures: 
         failures.append("cache stats lack policy column for active-compression check")
         return
     stats: dict[str, dict[str, float]] = {
-        policy: {"rows": 0.0, "evicted": 0.0, "quantized": 0.0, "l2_delta": 0.0}
+        policy: {
+            "rows": 0.0,
+            "evicted": 0.0,
+            "quantized": 0.0,
+            "l2_delta": 0.0,
+            "pre_response_evicted": 0.0,
+            "pre_response_quantized": 0.0,
+            "pre_response_system_touched": 0.0,
+        }
         for policy in expected_policies
     }
     for batch in parquet_file.iter_batches(columns=columns, batch_size=100_000):
@@ -300,13 +357,24 @@ def _check_active_compression(cache_stats_path: Path, manifest: dict, failures: 
                 continue
             stats[policy]["rows"] += 1
             original_seq_len = _float_at(table, "original_seq_len", idx)
+            decode_step = _float_at(table, "decode_step", idx)
             evicted_count = _float_at(table, "evicted_count", idx)
+            retained_system = _float_at(table, "retained_system_tokens", idx)
+            evicted_system = _float_at(table, "evicted_system_tokens", idx)
             quantization_bits = table.get("quantization_bits", [None] * len(policies))[idx]
             before = _float_at(table, "cache_l2_before", idx)
             after = _float_at(table, "cache_l2_after", idx)
             stats[policy]["evicted"] += evicted_count
             if quantization_bits is not None and original_seq_len > 0:
                 stats[policy]["quantized"] += 1
+            if decode_step <= 1:
+                stats[policy]["pre_response_evicted"] += evicted_count
+                if quantization_bits is not None and original_seq_len > 0:
+                    stats[policy]["pre_response_quantized"] += 1
+                    if retained_system > 0:
+                        stats[policy]["pre_response_system_touched"] += 1
+                if evicted_system > 0:
+                    stats[policy]["pre_response_system_touched"] += evicted_system
             stats[policy]["l2_delta"] += abs(before - after)
     for policy, policy_stats in stats.items():
         if policy_stats["rows"] == 0:
@@ -316,6 +384,86 @@ def _check_active_compression(cache_stats_path: Path, manifest: dict, failures: 
             failures.append(
                 f"cache policy `{policy}` appears inactive: no evictions or quantization rows"
             )
+        if (
+            policy_stats["pre_response_evicted"] <= 0
+            and policy_stats["pre_response_quantized"] <= 0
+        ):
+            failures.append(
+                f"cache policy `{policy}` appears inactive before first generated token"
+            )
+        if policy_stats["pre_response_system_touched"] <= 0:
+            failures.append(
+                f"cache policy `{policy}` never touches system-role tokens before generation"
+            )
+
+
+def _check_causal_patch_cache_stats(
+    cache_stats_path: Path, manifest: dict, failures: list[str]
+) -> None:
+    expected_patch_policies = [
+        str(policy)
+        for policy in manifest.get("cache_policy_labels", [])
+        if "__patch" in str(policy)
+    ]
+    if not expected_patch_policies:
+        return
+    try:
+        import pyarrow.parquet as pq
+    except ModuleNotFoundError:
+        failures.append("pyarrow is required to validate causal patch metadata")
+        return
+    parquet_file = pq.ParquetFile(cache_stats_path)
+    columns = [
+        column
+        for column in [
+            "policy",
+            "patched_from_baseline",
+            "patched_token_count",
+            "patched_roles",
+            "patch_matched_roles",
+        ]
+        if column in set(parquet_file.schema.names)
+    ]
+    if "policy" not in columns:
+        failures.append("cache stats lack policy column for causal patch check")
+        return
+    stats: dict[str, dict[str, object]] = {
+        policy: {"rows": 0, "patched_rows": 0, "max_tokens": 0.0, "roles": set(), "match_roles": set()}
+        for policy in expected_patch_policies
+    }
+    for batch in parquet_file.iter_batches(columns=columns, batch_size=100_000):
+        table = batch.to_pydict()
+        policies = table.get("policy", [])
+        for idx, raw_policy in enumerate(policies):
+            policy = str(raw_policy)
+            if policy not in stats:
+                continue
+            policy_stats = stats[policy]
+            policy_stats["rows"] = int(policy_stats["rows"]) + 1
+            patched = _truthy_at(table, "patched_from_baseline", idx)
+            if patched:
+                policy_stats["patched_rows"] = int(policy_stats["patched_rows"]) + 1
+            policy_stats["max_tokens"] = max(
+                float(policy_stats["max_tokens"]),
+                _float_at(table, "patched_token_count", idx),
+            )
+            _update_role_set(policy_stats["roles"], table, "patched_roles", idx)
+            _update_role_set(policy_stats["match_roles"], table, "patch_matched_roles", idx)
+    for policy, policy_stats in stats.items():
+        if int(policy_stats["rows"]) == 0:
+            failures.append(f"patch policy `{policy}` has no cache-stat rows")
+            continue
+        if int(policy_stats["patched_rows"]) == 0:
+            failures.append(f"patch policy `{policy}` has no patched cache-stat rows")
+        if float(policy_stats["max_tokens"]) <= 0:
+            failures.append(f"patch policy `{policy}` patched zero tokens")
+    if not any("system" in policy_stats["roles"] for policy_stats in stats.values()):
+        failures.append("cache stats show no system-role patch rows")
+    if not any(
+        "user" in policy_stats["roles"] and "system" in policy_stats["match_roles"]
+        for policy_stats in stats.values()
+    ):
+        failures.append("cache stats show no matched user-role patch control rows")
 
 
 def _float_at(table: dict[str, list], column: str, idx: int) -> float:
@@ -326,6 +474,30 @@ def _float_at(table: dict[str, list], column: str, idx: int) -> float:
     if value is None:
         return 0.0
     return float(value)
+
+
+def _truthy_at(table: dict[str, list], column: str, idx: int) -> bool:
+    values = table.get(column)
+    if values is None:
+        return False
+    value = values[idx]
+    if isinstance(value, bool):
+        return value
+    return str(value).lower() in {"1", "true", "yes"}
+
+
+def _update_role_set(target: object, table: dict[str, list], column: str, idx: int) -> None:
+    if not isinstance(target, set):
+        return
+    values = table.get(column)
+    if values is None:
+        return
+    value = values[idx]
+    if value is None:
+        return
+    for role in str(value).split(","):
+        if role:
+            target.add(role)
 
 
 if __name__ == "__main__":

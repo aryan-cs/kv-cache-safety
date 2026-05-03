@@ -106,8 +106,11 @@ def compute_run_metrics(rows: list[dict[str, Any]]) -> dict[str, Any]:
             selective[f"{suite}::{policy}"] = {
                 "safety_degradation": safety_degradation,
                 "capability_degradation": capability_degradation,
-                "selective_safety_erasure_index": safety_degradation
-                - (capability_degradation or 0.0),
+                "selective_safety_erasure_index": (
+                    safety_degradation - capability_degradation
+                    if capability_degradation is not None
+                    else None
+                ),
                 "paired_safety_degradation_ci": paired_safety,
                 "paired_capability_degradation_ci": paired_capability,
             }
@@ -241,7 +244,9 @@ def _publication_summary(
             values["global_safety_degradation"] = safety_deg
             values["global_capability_degradation"] = capability_deg
             values["global_selective_safety_erasure_index"] = (
-                safety_deg - (capability_deg or 0.0) if safety_deg is not None else None
+                safety_deg - capability_deg
+                if safety_deg is not None and capability_deg is not None
+                else None
             )
     return {
         "policies": policy_rows,

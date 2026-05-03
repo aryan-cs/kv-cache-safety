@@ -4,7 +4,7 @@
 
 ## Abstract
 
-Modern LLM deployment stacks increasingly compress, evict, or quantize KV caches to improve inference throughput. Prior work shows that KV-cache compression can unevenly degrade instructions and increase system-prompt leakage. We test a narrower alignment hypothesis: refusal behavior may depend on cache-resident routing state that is more fragile than ordinary task capability. The project evaluates this hypothesis with open models, public prompts, prompt-clustered confidence intervals, token-role cache accounting, mitigation via policy-span pinning, and causal restoration experiments for length-preserving cache perturbations. We use the term **Cache-Mediated Safety Erasure** only if results show that targeted cache restoration or pinning recovers refusal more than matched non-policy controls.
+Modern LLM deployment stacks increasingly compress, evict, or quantize KV caches to improve inference throughput. Prior work shows that KV-cache compression can unevenly degrade instructions and increase system-prompt leakage. We test a narrower alignment hypothesis: refusal behavior may depend on cache-resident routing state that is more fragile than ordinary task capability. The project evaluates this hypothesis with open models, public prompts, prompt-clustered confidence intervals, token-role cache accounting, mitigation via system-role pinning, and causal restoration experiments for length-preserving cache perturbations. We use the term **Cache-Mediated Safety Erasure** only if results show that targeted cache restoration or pinning recovers refusal more than matched user-role controls.
 
 ## 1. Introduction
 
@@ -14,7 +14,7 @@ This paper tests a claims ladder:
 
 1. **Behavioral cache sensitivity:** cache policies change safety, leakage, or capability behavior.
 2. **Selective safety degradation:** safety behavior degrades more than ordinary capability under matched cache pressure.
-3. **Causal safety-state erasure:** restoring or protecting specific policy-token cache slices restores safety more than matched irrelevant slices.
+3. **Causal safety-state erasure:** restoring or protecting specific system-role cache slices restores safety more than matched user-role slices.
 
 The third claim is the novel target. If only the first two claims hold, the paper should be framed as a replication and extension of KV-compression pitfall work rather than as a new safety-erasure phenomenon.
 
@@ -22,7 +22,7 @@ The third claim is the novel target. If only the first two claims hold, the pape
 
 KV-cache compression work shows why this question is plausible. H2O, StreamingLLM, SnapKV, KIVI, KVQuant, and MiKV propose cache retention or quantization methods for efficient inference. The closest behavioral overlap is **The Pitfalls of KV Cache Compression**, which reports uneven instruction degradation and system-prompt leakage under compression. The closest mechanistic overlap is **Understanding the Physics of Key-Value Cache Compression**, which frames compression as perturbing token-routing accessibility. CachePrune shows that editing KV-cache state can also be a security defense against indirect prompt injection.
 
-The alignment mechanism motivation comes from refusal-direction and alignment-routing work: refusal can be steered by activation-space interventions, and recent work suggests policy behavior can route through sparse heads or directions. Our planned novelty is not that compression can hurt performance, nor that KV state matters. The planned novelty is a causal safety-specific result: policy/refusal cache state is selectively fragile and recoverable by targeted cache preservation or restoration.
+The alignment mechanism motivation comes from refusal-direction and alignment-routing work: refusal can be steered by activation-space interventions, and recent work suggests policy behavior can route through sparse heads or directions. Our planned novelty is not that compression can hurt performance, nor that KV state matters. The planned novelty is a causal safety-specific result: system-role cache state is selectively fragile and recoverable by targeted cache preservation or restoration.
 
 Safety evaluation uses public refusal and robustness anchors such as HarmBench, JailbreakBench, XSTest, and IFEval. Long-context controls should use RULER and LongBench-style tasks where feasible.
 
@@ -30,7 +30,7 @@ Safety evaluation uses public refusal and robustness anchors such as HarmBench, 
 
 ### Models
 
-Primary sweeps use open Qwen instruction models at 7B, 14B, and 32B scale. A paper-grade generalization claim requires at least one non-Qwen open model family, or the claim must be explicitly limited to Qwen-family models.
+The committed H200 entrypoint currently runs a full public sweep on Qwen2.5-14B plus Qwen2.5-7B smoke, causal-patch, and attention diagnostics. Qwen2.5-32B and non-Qwen models remain follow-up configs until they have the same readiness gates and public-suite coverage. A paper-grade generalization claim requires at least one non-Qwen open model family, or the claim must be explicitly limited to Qwen-family models.
 
 ### Cache Interventions
 
@@ -45,7 +45,7 @@ We compare baseline decoding against:
 - baseline-cache restoration for length-preserving perturbations
 
 The current restoration engine patches retained cache positions. It can test quantization and retained-position restoration, but it cannot yet reinsert evicted tokens. Eviction claims therefore rely on policy-pinning and matched negative controls until reinsertion-style patching is implemented.
-Patch specifications are now role-derived where possible: system/policy-token restoration is compared against matched user-token controls with the same token count, component set, and layer/head scope. Hard-coded token-index patches are diagnostic only.
+Patch specifications are now role-derived where possible: system-role restoration is compared against matched user-role controls with the same token count, component set, and layer/head scope. Hard-coded token-index patches are diagnostic only.
 
 ### Prompt Suites
 
@@ -85,7 +85,7 @@ The paper requires the following tables and figures before submission:
 2. SSEI heatmap by model, suite, policy, and cache budget.
 3. Token-role retention heatmap for system, user, template, and generated tokens.
 4. Paired safety-degradation forest plot by suite and policy.
-5. Causal restoration figure: compressed, patched policy span, patched non-policy span, and policy-pinned mitigation.
+5. Causal restoration figure: compressed, patched system-role span, patched matched user-role span, and policy-pinned mitigation.
 6. Failure examples with raw generations and human-audited labels for a small subset.
 
 Current local artifacts are smoke tests only. They must not be interpreted as evidence.

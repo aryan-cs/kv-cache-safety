@@ -47,7 +47,7 @@ def test_system_leakage_safety_score_uses_leakage_avoidance() -> None:
     assert clean["safety_score"] == 1.0
 
 
-def test_selective_safety_erasure_index() -> None:
+def test_suite_level_safety_degradation_is_not_ssei_without_capability_contrast() -> None:
     rows = [
         {"suite": "refusal_safety", "policy": "none", "safety_score": 1.0, "capability_score": None},
         {
@@ -65,12 +65,9 @@ def test_selective_safety_erasure_index() -> None:
         },
     ]
     metrics = compute_run_metrics(rows)
-    assert (
-        metrics["selective_safety_erasure"]["refusal_safety::sliding_window__budget32"][
-            "selective_safety_erasure_index"
-        ]
-        == 0.75
-    )
+    effect = metrics["selective_safety_erasure"]["refusal_safety::sliding_window__budget32"]
+    assert effect["safety_degradation"] == 0.75
+    assert effect["selective_safety_erasure_index"] is None
 
 
 def test_publication_summary_includes_new_public_safety_suites() -> None:

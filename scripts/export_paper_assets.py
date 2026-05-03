@@ -67,7 +67,9 @@ def main() -> None:
                 "policy": policy,
                 "safety_degradation": values.get("safety_degradation"),
                 "capability_degradation": values.get("capability_degradation"),
-                "selective_safety_erasure_index": values.get("selective_safety_erasure_index"),
+                "within_suite_ssei_if_capability_available": values.get(
+                    "selective_safety_erasure_index"
+                ),
                 "paired_n": values.get("paired_safety_degradation_ci", {}).get("paired_n"),
                 "cluster_n": values.get("paired_safety_degradation_ci", {}).get("cluster_n"),
                 "safety_ci_low": values.get("paired_safety_degradation_ci", {}).get("ci_low"),
@@ -81,7 +83,7 @@ def main() -> None:
             "policy",
             "safety_degradation",
             "capability_degradation",
-            "selective_safety_erasure_index",
+            "within_suite_ssei_if_capability_available",
             "paired_n",
             "cluster_n",
             "safety_ci_low",

@@ -253,6 +253,7 @@ CACHE_STATS_COLUMNS = [
     "patch_layers",
     "patch_heads",
     "patch_components",
+    "cache_l2_after_patch",
 ]
 
 
