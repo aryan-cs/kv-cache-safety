@@ -13,7 +13,7 @@ add_src_to_path()
 
 from cache_safety_erasure.cache_policies.registry import build_cache_policy, cache_policy_label
 from cache_safety_erasure.config import dump_yaml, parse_experiment_config
-from cache_safety_erasure.evals.io import load_prompt_suite
+from cache_safety_erasure.evals.io import load_prompt_suite, load_prompt_suite_manifest
 from cache_safety_erasure.evals.rendering import rendered_prompt_manifest
 from cache_safety_erasure.evals.spans import character_span_manifest
 from cache_safety_erasure.generation.runner import generate_one
@@ -72,12 +72,14 @@ def main() -> None:
     )
     suite_prompts = {}
     prompt_counts = {}
+    prompt_suite_manifests = {}
     for suite in config.prompt_suites:
         prompts = load_prompt_suite(suite)
         if config.limit_per_suite is not None:
             prompts = prompts[: config.limit_per_suite]
         suite_prompts[suite] = prompts
         prompt_counts[suite] = len(prompts)
+        prompt_suite_manifests[suite] = load_prompt_suite_manifest(suite)
     policy_labels = [cache_policy_label(policy) for policy in config.cache_policies]
     expected_generation_count = sum(prompt_counts.values()) * len(config.seeds) * len(policy_labels)
 
@@ -94,6 +96,7 @@ def main() -> None:
             "config_sha256": _stable_hash(raw_config),
             "prompt_suites": list(config.prompt_suites),
             "prompt_counts": prompt_counts,
+            "prompt_suite_manifests": prompt_suite_manifests,
             "cache_policy_configs": [_policy_manifest(policy) for policy in config.cache_policies],
             "cache_policy_labels": policy_labels,
             "seeds": list(config.seeds),
@@ -103,7 +106,7 @@ def main() -> None:
     )
 
     cache_stat_rows: list[dict] = []
-    cache_stats_writer = None
+    cache_stats_sink = _CacheStatsSink(run_dir / "cache_stats.parquet", resume=config.run.resume)
     prompt_manifest_rows: list[dict] = []
 
     for _suite, prompts in suite_prompts.items():
@@ -163,29 +166,16 @@ def main() -> None:
                     for decision in result.cache_decisions:
                         cache_stat_rows.extend(decision.to_rows(prompt.id, seed))
                         if len(cache_stat_rows) >= 50_000:
-                            cache_stats_writer = _write_cache_stats_batch(
-                                run_dir / "cache_stats.parquet",
-                                cache_stat_rows,
-                                cache_stats_writer,
-                            )
+                            cache_stats_sink.write(cache_stat_rows)
                             cache_stat_rows = []
 
     rows = read_jsonl(generations_path)
     metrics = compute_run_metrics(rows)
     write_jsonl(run_dir / "prompts.jsonl", prompt_manifest_rows)
     write_json(run_dir / "metrics.json", metrics)
-    if cache_stats_writer is not None:
-        if cache_stat_rows:
-            cache_stats_writer = _write_cache_stats_batch(
-                run_dir / "cache_stats.parquet",
-                cache_stat_rows,
-                cache_stats_writer,
-            )
-        cache_stats_writer.close()
-    elif cache_stat_rows:
-        write_parquet(run_dir / "cache_stats.parquet", _normalize_cache_stat_rows(cache_stat_rows))
-    else:
-        write_parquet(run_dir / "cache_stats.parquet", [])
+    if cache_stat_rows:
+        cache_stats_sink.write(cache_stat_rows)
+    cache_stats_sink.close()
     print(f"Completed run: {run_dir}")
 
 
@@ -261,19 +251,76 @@ def _normalize_cache_stat_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any
     return [{column: row.get(column) for column in CACHE_STATS_COLUMNS} for row in rows]
 
 
-def _write_cache_stats_batch(path: Path, rows: list[dict[str, Any]], writer: Any) -> Any:
+class _CacheStatsSink:
+    def __init__(self, path: Path, *, resume: bool) -> None:
+        self.path = path
+        self.resume = resume
+        self.writer: Any | None = None
+        self.temp_path: Path | None = None
+
+    def write(self, rows: list[dict[str, Any]]) -> None:
+        if not rows:
+            return
+        table = _cache_stats_table(rows)
+        if self.writer is None:
+            write_path = self.path
+            if self.resume and self.path.exists():
+                self.temp_path = self.path.with_suffix(".parquet.tmp")
+                write_path = self.temp_path
+            try:
+                import pyarrow.parquet as pq
+            except ModuleNotFoundError as exc:
+                raise RuntimeError("pyarrow is required for cache_stats.parquet.") from exc
+            self.writer = pq.ParquetWriter(write_path, table.schema)
+            if self.temp_path is not None:
+                _copy_existing_cache_stats(self.path, self.writer, table.schema)
+        self.writer.write_table(table)
+
+    def close(self) -> None:
+        if self.writer is not None:
+            self.writer.close()
+            if self.temp_path is not None:
+                self.temp_path.replace(self.path)
+            return
+        if not self.path.exists():
+            write_parquet(self.path, [])
+
+
+def _cache_stats_table(rows: list[dict[str, Any]]) -> Any:
     try:
         import pandas as pd
         import pyarrow as pa
-        import pyarrow.parquet as pq
     except ModuleNotFoundError as exc:
         raise RuntimeError("pandas and pyarrow are required for cache_stats.parquet.") from exc
     df = pd.DataFrame(_normalize_cache_stat_rows(rows), columns=CACHE_STATS_COLUMNS)
-    table = pa.Table.from_pandas(df, preserve_index=False)
-    if writer is None:
-        writer = pq.ParquetWriter(path, table.schema)
-    writer.write_table(table)
-    return writer
+    return pa.Table.from_pandas(df, preserve_index=False)
+
+
+def _copy_existing_cache_stats(path: Path, writer: Any, schema: Any) -> None:
+    try:
+        import pyarrow as pa
+        import pyarrow.parquet as pq
+    except ModuleNotFoundError as exc:
+        raise RuntimeError("pyarrow is required for resume-safe cache stats.") from exc
+    parquet_file = pq.ParquetFile(path)
+    for batch in parquet_file.iter_batches(batch_size=100_000):
+        table = pa.Table.from_batches([batch])
+        writer.write_table(_align_table_to_schema(table, schema))
+
+
+def _align_table_to_schema(table: Any, schema: Any) -> Any:
+    import pyarrow as pa
+
+    columns = []
+    for field in schema:
+        if field.name in table.column_names:
+            column = table[field.name]
+            if not column.type.equals(field.type):
+                column = column.cast(field.type)
+            columns.append(column)
+        else:
+            columns.append(pa.nulls(table.num_rows, type=field.type))
+    return pa.Table.from_arrays(columns, schema=schema)
 
 
 if __name__ == "__main__":

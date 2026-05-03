@@ -95,11 +95,21 @@ def _check_config(config_path: Path, args: argparse.Namespace, failures: list[st
         if not prompts:
             failures.append(f"{config_path}: prompt suite `{suite}` is empty")
     if not args.skip_model_config_check:
-        _check_hf_model_config(config_path, config.model.model_id, config.model.local_files_only, failures)
+        _check_hf_model_config(
+            config_path,
+            config.model.model_id,
+            config.model.revision,
+            config.model.local_files_only,
+            failures,
+        )
 
 
 def _check_hf_model_config(
-    config_path: Path, model_id: str, local_files_only: bool, failures: list[str]
+    config_path: Path,
+    model_id: str,
+    revision: str | None,
+    local_files_only: bool,
+    failures: list[str],
 ) -> None:
     try:
         from transformers import AutoConfig, AutoTokenizer
@@ -107,8 +117,8 @@ def _check_hf_model_config(
         failures.append("transformers is not installed")
         return
     try:
-        AutoConfig.from_pretrained(model_id, local_files_only=local_files_only)
-        AutoTokenizer.from_pretrained(model_id, local_files_only=local_files_only)
+        AutoConfig.from_pretrained(model_id, revision=revision, local_files_only=local_files_only)
+        AutoTokenizer.from_pretrained(model_id, revision=revision, local_files_only=local_files_only)
     except Exception as exc:
         failures.append(f"{config_path}: cannot load model config/tokenizer for `{model_id}`: {exc}")
 

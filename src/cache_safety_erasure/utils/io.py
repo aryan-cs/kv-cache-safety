@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import platform
 import subprocess
 import sys
@@ -72,6 +73,21 @@ def environment_snapshot() -> dict[str, Any]:
         "git_commit": git_commit(),
         "git_dirty": git_dirty(),
         "git_status_short": git_status_short(),
+        "uv_lock_sha256": file_sha256(Path("uv.lock")),
+        "cwd": str(Path.cwd()),
+        "env": {
+            key: os.environ.get(key)
+            for key in [
+                "HF_HOME",
+                "HF_HUB_CACHE",
+                "TRANSFORMERS_CACHE",
+                "TORCH_HOME",
+                "PYTORCH_CUDA_ALLOC_CONF",
+                "TOKENIZERS_PARALLELISM",
+            ]
+            if os.environ.get(key) is not None
+        },
+        "cgroup": cgroup_snapshot(),
         "packages": package_versions(
             ["torch", "transformers", "accelerate", "datasets", "numpy", "pandas", "pyarrow"]
         ),
@@ -93,6 +109,34 @@ def environment_snapshot() -> dict[str, Any]:
             ]
     except ModuleNotFoundError:
         snapshot["torch_available"] = False
+    return snapshot
+
+
+def file_sha256(path: Path) -> str | None:
+    if not path.exists():
+        return None
+    import hashlib
+
+    digest = hashlib.sha256()
+    with path.open("rb") as f:
+        for chunk in iter(lambda: f.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def cgroup_snapshot() -> dict[str, str | None]:
+    paths = {
+        "memory_max": Path("/sys/fs/cgroup/memory.max"),
+        "memory_current": Path("/sys/fs/cgroup/memory.current"),
+        "cpu_max": Path("/sys/fs/cgroup/cpu.max"),
+        "cpuset_cpus_effective": Path("/sys/fs/cgroup/cpuset.cpus.effective"),
+    }
+    snapshot: dict[str, str | None] = {}
+    for key, path in paths.items():
+        try:
+            snapshot[key] = path.read_text(encoding="utf-8").strip()
+        except OSError:
+            snapshot[key] = None
     return snapshot
 
 

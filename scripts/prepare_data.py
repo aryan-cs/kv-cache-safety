@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
+import json
 from pathlib import Path
 from typing import Any
 
@@ -22,6 +24,7 @@ OPEN_DATASET_PRESETS = {
         "suite": "refusal_safety",
         "category": "public_advbench",
         "should_refuse": True,
+        "revision": "acc3a2be720c48efb8c79db4f43993cf9f98f1fd",
     },
     "jailbreakbench_behaviors": {
         "dataset": "JailbreakBench/JBB-Behaviors",
@@ -31,6 +34,7 @@ OPEN_DATASET_PRESETS = {
         "suite": "refusal_safety",
         "category": "public_jailbreakbench",
         "should_refuse": True,
+        "revision": "886acc352a31533ffbcf4ef22c744658688086fc",
     },
     "dolly_benign": {
         "dataset": "databricks/databricks-dolly-15k",
@@ -40,6 +44,7 @@ OPEN_DATASET_PRESETS = {
         "suite": "benign_overrefusal",
         "category": "public_benign_instruction",
         "should_refuse": False,
+        "revision": "bdd27f4d94b9c1f951818a7da7fd7aeea5dbff1a",
     },
     "arc_easy": {
         "dataset": "ai2_arc",
@@ -48,6 +53,7 @@ OPEN_DATASET_PRESETS = {
         "suite": "capability_smoke",
         "category": "public_arc_easy",
         "kind": "multiple_choice",
+        "revision": "210d026faf9955653af8916fad021475a3f00453",
     },
     "xstest_safe": {
         "dataset": "purpcode/XSTest",
@@ -58,6 +64,7 @@ OPEN_DATASET_PRESETS = {
         "kind": "xstest",
         "label": "safe",
         "should_refuse": False,
+        "revision": "b27d6ba9a839a2d5b2ce5f48a31c97f46a34e61e",
     },
 }
 
@@ -69,13 +76,31 @@ def main() -> None:
     parser.add_argument("--limit", type=int, default=None)
     parser.add_argument("--output-suite", default=None)
     parser.add_argument("--output-dir", type=Path, default=Path("data/processed"))
+    parser.add_argument(
+        "--revision",
+        default=None,
+        help="Override the pinned HF dataset revision for --source hf.",
+    )
     args = parser.parse_args()
 
     if args.source == "hf":
-        records = load_hf_preset(args.suite, args.limit, args.output_suite)
+        records = load_hf_preset(args.suite, args.limit, args.output_suite, args.revision)
         suite_name = args.output_suite or OPEN_DATASET_PRESETS[args.suite]["suite"]
         path = write_prompt_suite(suite_name, records, args.output_dir)
+        manifest_path = write_suite_manifest(
+            suite_name=suite_name,
+            path=path,
+            records=records,
+            source="hf",
+            source_args={
+                "preset": args.suite,
+                "limit": args.limit,
+                "output_suite": args.output_suite,
+                "revision": args.revision or OPEN_DATASET_PRESETS[args.suite].get("revision"),
+            },
+        )
         print(f"Wrote {len(records)} records from HF preset `{args.suite}` to {path}")
+        print(f"Wrote suite manifest to {manifest_path}")
         return
 
     suite_names = list(BUILTIN_SUITES) if args.suite == "all" else [args.suite]
@@ -84,10 +109,20 @@ def main() -> None:
         if args.limit is not None:
             records = records[: args.limit]
         path = write_prompt_suite(suite_name, records, args.output_dir)
+        manifest_path = write_suite_manifest(
+            suite_name=suite_name,
+            path=path,
+            records=records,
+            source="builtin",
+            source_args={"suite": suite_name, "limit": args.limit},
+        )
         print(f"Wrote {len(records)} built-in records to {path}")
+        print(f"Wrote suite manifest to {manifest_path}")
 
 
-def load_hf_preset(name: str, limit: int | None, output_suite: str | None) -> list[PromptRecord]:
+def load_hf_preset(
+    name: str, limit: int | None, output_suite: str | None, revision: str | None = None
+) -> list[PromptRecord]:
     if name not in OPEN_DATASET_PRESETS:
         raise SystemExit(
             f"Unknown HF preset `{name}`. Available: {', '.join(sorted(OPEN_DATASET_PRESETS))}"
@@ -98,11 +133,15 @@ def load_hf_preset(name: str, limit: int | None, output_suite: str | None) -> li
         raise SystemExit("Install dependencies with `uv sync --extra dev` to use HF datasets.") from exc
 
     preset = OPEN_DATASET_PRESETS[name]
+    resolved_revision = revision or preset.get("revision")
+    load_kwargs = {"split": str(preset["split"])}
+    if resolved_revision:
+        load_kwargs["revision"] = str(resolved_revision)
     if preset.get("config"):
-        dataset = load_dataset(str(preset["dataset"]), str(preset["config"]), split=str(preset["split"]))
+        dataset = load_dataset(str(preset["dataset"]), str(preset["config"]), **load_kwargs)
     else:
-        dataset = load_dataset(str(preset["dataset"]), split=str(preset["split"]))
-    dataset_metadata = _dataset_metadata(dataset, preset)
+        dataset = load_dataset(str(preset["dataset"]), **load_kwargs)
+    dataset_metadata = _dataset_metadata(dataset, preset, resolved_revision)
     rows: list[PromptRecord] = []
     for idx, item in enumerate(dataset):
         if preset.get("kind") == "multiple_choice":
@@ -207,8 +246,9 @@ def _xstest_record(
     )
 
 
-def _dataset_metadata(dataset: Any, preset: dict[str, Any]) -> dict[str, Any]:
+def _dataset_metadata(dataset: Any, preset: dict[str, Any], revision: str | None) -> dict[str, Any]:
     metadata = _dataset_metadata_from_preset(preset)
+    metadata["source_revision"] = revision
     metadata["source_fingerprint"] = getattr(dataset, "_fingerprint", None)
     info = getattr(dataset, "info", None)
     if info is not None:
@@ -226,7 +266,38 @@ def _dataset_metadata_from_preset(preset: dict[str, Any]) -> dict[str, Any]:
         "source_dataset": preset["dataset"],
         "source_config": preset.get("config"),
         "source_split": preset["split"],
+        "source_revision": preset.get("revision"),
     }
+
+
+def write_suite_manifest(
+    *,
+    suite_name: str,
+    path: Path,
+    records: list[PromptRecord],
+    source: str,
+    source_args: dict[str, Any],
+) -> Path:
+    manifest = {
+        "suite_name": suite_name,
+        "path": str(path),
+        "record_count": len(records),
+        "sha256": _sha256_file(path),
+        "source": source,
+        "source_args": source_args,
+        "prompt_ids": [record.id for record in records],
+    }
+    manifest_path = path.with_suffix(".manifest.json")
+    manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    return manifest_path
+
+
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as f:
+        for chunk in iter(lambda: f.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 if __name__ == "__main__":

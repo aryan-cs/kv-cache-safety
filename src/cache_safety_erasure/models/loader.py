@@ -44,6 +44,7 @@ def _load_hf_model(config: ModelConfig) -> ModelBundle:
 
     tokenizer = AutoTokenizer.from_pretrained(
         config.model_id,
+        revision=config.revision,
         trust_remote_code=config.trust_remote_code,
         local_files_only=config.local_files_only,
     )
@@ -52,6 +53,7 @@ def _load_hf_model(config: ModelConfig) -> ModelBundle:
 
     model_kwargs = {
         "torch_dtype": dtype,
+        "revision": config.revision,
         "device_map": config.device_map,
         "trust_remote_code": config.trust_remote_code,
         "low_cpu_mem_usage": config.low_cpu_mem_usage,

@@ -77,6 +77,15 @@ def main() -> None:
             failures.append("manifest lacks expected generation count")
         if not manifest.get("prompt_counts"):
             failures.append("manifest lacks prompt counts")
+        prompt_suite_manifests = manifest.get("prompt_suite_manifests") or {}
+        if args.require_public_provenance:
+            for suite in manifest.get("prompt_suites", []):
+                if str(suite).startswith("public_"):
+                    suite_manifest = prompt_suite_manifests.get(suite)
+                    if not suite_manifest:
+                        failures.append(f"missing processed suite manifest for `{suite}`")
+                    elif not suite_manifest.get("sha256") or not suite_manifest.get("record_count"):
+                        failures.append(f"processed suite manifest for `{suite}` lacks hash/count")
         policy_configs = manifest.get("cache_policy_configs") or []
         if len(policy_configs) < args.min_policies:
             failures.append(f"manifest has {len(policy_configs)} policies; need >= {args.min_policies}")

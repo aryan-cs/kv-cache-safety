@@ -43,6 +43,7 @@ class RunConfig:
 class ModelConfig:
     provider: str
     model_id: str
+    revision: str | None = None
     dtype: str = "bfloat16"
     device_map: str = "auto"
     allow_cpu_offload: bool = False
@@ -115,6 +116,7 @@ def parse_experiment_config(path: str | Path) -> tuple[ExperimentConfig, dict[st
     model = ModelConfig(
         provider=str(model_raw.get("provider", "hf")),
         model_id=str(model_raw["model_id"]),
+        revision=model_raw.get("revision"),
         dtype=str(model_raw.get("dtype", "bfloat16")),
         device_map=str(model_raw.get("device_map", "auto")),
         allow_cpu_offload=bool(model_raw.get("allow_cpu_offload", False)),
