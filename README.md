@@ -163,6 +163,14 @@ Package arXiv-style source files:
 uv run python scripts/package_arxiv_submission.py
 ```
 
+After the primary and causal H200 runs complete, rebuild all paper artifacts from recorded results:
+
+```bash
+bash scripts/build_publication_artifacts.sh
+```
+
+This command regenerates aggregate metrics, figures, paper tables, CI planning files, readiness checks, the readable PDF, and the arXiv source bundle. It fails if the required real result artifacts are missing.
+
 Export paper tables:
 
 ```bash

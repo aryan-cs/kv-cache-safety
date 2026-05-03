@@ -45,8 +45,9 @@ uv run python scripts/export_paper_assets.py \
 uv run python scripts/check_publication_readiness.py \
   --results-dir "$latest" \
   --paper-dir paper/generated/h200_qwen32b_public_followup \
-  --min-prompts-per-suite 100 \
+  --min-prompts-per-suite 600 \
   --suite-min-prompts system_leakage=2 \
+  --suite-min-prompts public_xstest_safe=200 \
   --max-ci-width 0.10 \
   --required-suite system_leakage \
   --required-suite public_refusal_safety \

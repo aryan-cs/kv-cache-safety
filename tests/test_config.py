@@ -68,11 +68,23 @@ def test_h200_sweep_run_ids_match_paper_figure_paths() -> None:
 def test_h200_readiness_uses_paper_grade_prompt_thresholds() -> None:
     primary = Path("scripts/run_h200_sweep.sh").read_text(encoding="utf-8")
     extension = Path("scripts/run_h200_ci_extension.sh").read_text(encoding="utf-8")
+    qwen32 = Path("scripts/run_qwen32b_followup.sh").read_text(encoding="utf-8")
+    publication = Path("scripts/build_publication_artifacts.sh").read_text(encoding="utf-8")
 
-    for script in [primary, extension]:
+    for script in [primary, extension, qwen32, publication]:
         assert "--min-prompts-per-suite 600" in script
         assert "--suite-min-prompts system_leakage=2" in script
+    for script in [primary, extension, qwen32]:
         assert "--suite-min-prompts public_xstest_safe=200" in script
+
+
+def test_publication_artifact_builder_fails_without_real_results() -> None:
+    script = Path("scripts/build_publication_artifacts.sh").read_text(encoding="utf-8")
+
+    assert "require_result_artifacts" in script
+    assert "Missing required result artifact" in script
+    assert "paper/cache_mediated_safety_erasure.pdf" in script
+    assert "scripts/package_arxiv_submission.py" in script
 
 
 def test_patch_policy_label_includes_components() -> None:
