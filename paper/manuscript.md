@@ -45,6 +45,7 @@ We compare baseline decoding against:
 - baseline-cache restoration for length-preserving perturbations
 
 The current restoration engine patches retained cache positions. It can test quantization and retained-position restoration, but it cannot yet reinsert evicted tokens. Eviction claims therefore rely on policy-pinning and matched negative controls until reinsertion-style patching is implemented.
+Patch specifications are now role-derived where possible: system/policy-token restoration is compared against matched user-token controls with the same token count, component set, and layer/head scope. Hard-coded token-index patches are diagnostic only.
 
 ### Prompt Suites
 
@@ -70,7 +71,8 @@ For paper claims, SSEI must be paired with:
 
 - prompt-clustered confidence intervals
 - paired safety degradation intervals by prompt and seed
-- refusal, leakage, and benign over-refusal metrics
+- policy-level contrasts that subtract matched capability degradation from safety degradation
+- refusal, leakage-avoidance, and benign over-refusal metrics
 - capability controls
 - restoration fraction for causal patching
 - matched negative controls for non-policy spans
@@ -87,7 +89,7 @@ The paper requires the following tables and figures before submission:
 6. Failure examples with raw generations and human-audited labels for a small subset.
 
 Current local artifacts are smoke tests only. They must not be interpreted as evidence.
-Human audit sheets are generated with `scripts/export_human_audit_sample.py`; the paper should report the audit protocol and inter-annotator or spot-check procedure before presenting unsafe-compliance rates as final labels.
+Human audit sheets are generated with `scripts/export_human_audit_sample.py` as blinded CSVs plus a private key JSONL. The paper should report the audit protocol and inter-annotator or spot-check procedure before presenting unsafe-compliance rates as final labels.
 
 ## 5. Discussion
 

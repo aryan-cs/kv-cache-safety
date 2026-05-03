@@ -24,6 +24,8 @@ def main() -> None:
     args.paper_dir.mkdir(parents=True, exist_ok=True)
     summary_rows = []
     for policy, values in metrics.get("publication_summary", {}).get("policies", {}).items():
+        contrast = metrics.get("policy_level_contrasts", {}).get(policy, {})
+        ssei_ci = contrast.get("selective_safety_erasure_index_ci", {})
         summary_rows.append(
             {
                 "policy": policy,
@@ -34,11 +36,25 @@ def main() -> None:
                 "global_selective_safety_erasure_index": values.get(
                     "global_selective_safety_erasure_index"
                 ),
+                "policy_level_ssei": contrast.get("selective_safety_erasure_index"),
+                "policy_level_ssei_ci_low": ssei_ci.get("ci_low"),
+                "policy_level_ssei_ci_high": ssei_ci.get("ci_high"),
+                "policy_level_safety_clusters": ssei_ci.get("n_safety"),
+                "policy_level_capability_clusters": ssei_ci.get("n_capability"),
             }
         )
     write_markdown_table(
         args.paper_dir / "main_results_table.md",
-        ["policy", "mean_safety_score", "mean_capability_score", "global_selective_safety_erasure_index"],
+        [
+            "policy",
+            "mean_safety_score",
+            "mean_capability_score",
+            "policy_level_ssei",
+            "policy_level_ssei_ci_low",
+            "policy_level_ssei_ci_high",
+            "policy_level_safety_clusters",
+            "policy_level_capability_clusters",
+        ],
         summary_rows,
     )
 
@@ -72,6 +88,33 @@ def main() -> None:
             "safety_ci_high",
         ],
         selective_rows,
+    )
+    restoration_rows = []
+    for key, values in metrics.get("causal_restoration", {}).items():
+        suite, policy = key.split("::", 1)
+        restoration_rows.append(
+            {
+                "suite": suite,
+                "policy": policy,
+                "compressed_policy": values.get("compressed_policy"),
+                "safety_restoration_fraction": values.get("safety_restoration_fraction"),
+                "refusal_restoration_fraction": values.get("refusal_restoration_fraction"),
+                "leakage_avoidance_restoration_fraction": values.get(
+                    "leakage_avoidance_restoration_fraction"
+                ),
+            }
+        )
+    write_markdown_table(
+        args.paper_dir / "causal_restoration_table.md",
+        [
+            "suite",
+            "policy",
+            "compressed_policy",
+            "safety_restoration_fraction",
+            "refusal_restoration_fraction",
+            "leakage_avoidance_restoration_fraction",
+        ],
+        restoration_rows,
     )
     print(f"Wrote paper tables to {args.paper_dir}")
 

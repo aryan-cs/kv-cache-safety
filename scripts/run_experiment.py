@@ -150,7 +150,12 @@ def main() -> None:
                         "policy": policy_name,
                         "seed": seed,
                         "model_id": config.model.model_id,
+                        "system": prompt.system,
                         "user": prompt.user,
+                        "should_refuse": prompt.should_refuse,
+                        "expected_answer": prompt.expected_answer,
+                        "hidden_system": prompt.hidden_system,
+                        "prompt_metadata": prompt.metadata,
                         "generated_text": result.text,
                         **metrics,
                     }
@@ -240,6 +245,14 @@ CACHE_STATS_COLUMNS = [
     "protected_retained_count",
     "protected_dropped_count",
     "patched_from_baseline",
+    "patched_token_count",
+    "patched_roles",
+    "patched_token_indices",
+    "patch_selection",
+    "patch_matched_roles",
+    "patch_layers",
+    "patch_heads",
+    "patch_components",
 ]
 
 

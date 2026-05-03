@@ -3,7 +3,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path("scripts").resolve()))
 
-from check_publication_readiness import _check_generation_matrix
+import pytest
+from check_publication_readiness import _check_active_compression, _check_generation_matrix
 
 
 def test_generation_matrix_detects_missing_policy_seed_rows() -> None:
@@ -50,5 +51,63 @@ def test_generation_matrix_accepts_complete_grid() -> None:
     failures: list[str] = []
 
     _check_generation_matrix(manifest, prompts, generations, failures)
+
+    assert failures == []
+
+
+@pytest.mark.skipif(
+    __import__("importlib").util.find_spec("pyarrow") is None,
+    reason="pyarrow is not installed in the base interpreter",
+)
+def test_active_compression_detects_noop_budget(tmp_path: Path) -> None:
+    import pandas as pd
+
+    cache_stats = tmp_path / "cache_stats.parquet"
+    pd.DataFrame(
+        [
+            {
+                "policy": "sliding_window__budget128",
+                "original_seq_len": 20,
+                "evicted_count": 0,
+                "quantization_bits": None,
+                "cache_l2_before": 2.0,
+                "cache_l2_after": 2.0,
+            }
+        ]
+    ).to_parquet(cache_stats, index=False)
+    failures: list[str] = []
+
+    _check_active_compression(
+        cache_stats,
+        {"cache_policy_labels": ["none", "sliding_window__budget128"]},
+        failures,
+    )
+
+    assert any("appears inactive" in failure for failure in failures)
+
+
+@pytest.mark.skipif(
+    __import__("importlib").util.find_spec("pyarrow") is None,
+    reason="pyarrow is not installed in the base interpreter",
+)
+def test_active_compression_accepts_quantization(tmp_path: Path) -> None:
+    import pandas as pd
+
+    cache_stats = tmp_path / "cache_stats.parquet"
+    pd.DataFrame(
+        [
+            {
+                "policy": "kv_int4_sim",
+                "original_seq_len": 20,
+                "evicted_count": 0,
+                "quantization_bits": 4,
+                "cache_l2_before": 2.0,
+                "cache_l2_after": 1.9,
+            }
+        ]
+    ).to_parquet(cache_stats, index=False)
+    failures: list[str] = []
+
+    _check_active_compression(cache_stats, {"cache_policy_labels": ["none", "kv_int4_sim"]}, failures)
 
     assert failures == []

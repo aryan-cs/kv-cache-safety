@@ -26,18 +26,29 @@ uv run python scripts/preflight_h200.py \
   --config configs/experiments/h200_causal_patch_qwen7b.yaml \
   --config configs/experiments/h200_attention_diagnostic_qwen7b.yaml
 
-echo "Running Qwen 7B smoke validation..."
-uv run python scripts/run_experiment.py --config configs/experiments/qwen7b_smoke.yaml
+smoke_run_id="${SMOKE_RUN_ID:-qwen7b_smoke_h200}"
+full_run_id="${FULL_RUN_ID:-h200_public_qwen14b_primary}"
+causal_run_id="${CAUSAL_RUN_ID:-h200_causal_patch_qwen7b_primary}"
+attention_run_id="${ATTENTION_RUN_ID:-h200_attention_diagnostic_qwen7b_primary}"
 
-latest_smoke="$(ls -td results/qwen7b_smoke_* | head -1)"
+echo "Running Qwen 7B smoke validation..."
+uv run python scripts/run_experiment.py \
+  --config configs/experiments/qwen7b_smoke.yaml \
+  --run-id "$smoke_run_id" \
+  --resume
+
+latest_smoke="results/$smoke_run_id"
 uv run python scripts/aggregate_results.py --results-dir "$latest_smoke"
 uv run python scripts/make_figures.py --results-dir "$latest_smoke"
 uv run python scripts/export_paper_assets.py --results-dir "$latest_smoke" --paper-dir paper/generated/qwen7b_smoke
 
 echo "Running primary H200 Qwen 14B sweep..."
-uv run python scripts/run_experiment.py --config configs/experiments/h200_public_qwen14b.yaml
+uv run python scripts/run_experiment.py \
+  --config configs/experiments/h200_public_qwen14b.yaml \
+  --run-id "$full_run_id" \
+  --resume
 
-latest_full="$(ls -td results/h200_public_qwen14b_* | head -1)"
+latest_full="results/$full_run_id"
 uv run python scripts/aggregate_results.py --results-dir "$latest_full"
 uv run python scripts/make_figures.py --results-dir "$latest_full"
 uv run python scripts/export_paper_assets.py --results-dir "$latest_full" --paper-dir paper/generated/h200_qwen_full_sweep
@@ -62,9 +73,12 @@ uv run python scripts/check_publication_readiness.py \
 uv run python scripts/export_human_audit_sample.py --results-dir "$latest_full" --per-suite-policy 3
 
 echo "Running causal patch diagnostic on Qwen 7B..."
-uv run python scripts/run_experiment.py --config configs/experiments/h200_causal_patch_qwen7b.yaml
+uv run python scripts/run_experiment.py \
+  --config configs/experiments/h200_causal_patch_qwen7b.yaml \
+  --run-id "$causal_run_id" \
+  --resume
 
-latest_causal="$(ls -td results/h200_causal_patch_qwen7b_* | head -1)"
+latest_causal="results/$causal_run_id"
 uv run python scripts/aggregate_results.py --results-dir "$latest_causal"
 uv run python scripts/make_figures.py --results-dir "$latest_causal"
 uv run python scripts/export_paper_assets.py --results-dir "$latest_causal" --paper-dir paper/generated/h200_causal_patch_qwen7b
@@ -83,9 +97,12 @@ uv run python scripts/check_publication_readiness.py \
 uv run python scripts/export_human_audit_sample.py --results-dir "$latest_causal" --per-suite-policy 3
 
 echo "Running attention-policy diagnostic on Qwen 7B..."
-uv run python scripts/run_experiment.py --config configs/experiments/h200_attention_diagnostic_qwen7b.yaml
+uv run python scripts/run_experiment.py \
+  --config configs/experiments/h200_attention_diagnostic_qwen7b.yaml \
+  --run-id "$attention_run_id" \
+  --resume
 
-latest_attention="$(ls -td results/h200_attention_diagnostic_qwen7b_* | head -1)"
+latest_attention="results/$attention_run_id"
 uv run python scripts/aggregate_results.py --results-dir "$latest_attention"
 uv run python scripts/make_figures.py --results-dir "$latest_attention"
 uv run python scripts/export_paper_assets.py --results-dir "$latest_attention" --paper-dir paper/generated/h200_attention_diagnostic_qwen7b

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import random
 from pathlib import Path
 from typing import Any
@@ -26,13 +27,16 @@ def main() -> None:
         raise SystemExit(f"No generations found in {args.results_dir}")
     run_id = args.results_dir.name
     sample = _stratified_sample(rows, args.per_suite_policy, args.seed)
-    audit_rows = [_audit_row(row, run_id) for row in sample]
+    audit_pairs = [_audit_pair(row, run_id, idx) for idx, row in enumerate(sample)]
+    blinded_rows = [pair[0] for pair in audit_pairs]
+    key_rows = [pair[1] for pair in audit_pairs]
     args.output_dir.mkdir(parents=True, exist_ok=True)
-    jsonl_path = args.output_dir / f"{run_id}_audit_sample.jsonl"
-    csv_path = args.output_dir / f"{run_id}_audit_sample.csv"
-    write_jsonl(jsonl_path, audit_rows)
-    _write_csv(csv_path, audit_rows)
-    print(f"Wrote {len(audit_rows)} audit rows to {csv_path} and {jsonl_path}")
+    blinded_csv_path = args.output_dir / f"{run_id}_audit_blinded.csv"
+    key_jsonl_path = args.output_dir / f"{run_id}_audit_key.jsonl"
+    _write_csv(blinded_csv_path, blinded_rows)
+    write_jsonl(key_jsonl_path, key_rows)
+    print(f"Wrote {len(blinded_rows)} blinded audit rows to {blinded_csv_path}")
+    print(f"Wrote audit key to {key_jsonl_path}")
 
 
 def _stratified_sample(rows: list[dict[str, Any]], per_suite_policy: int, seed: int) -> list[dict[str, Any]]:
@@ -48,8 +52,24 @@ def _stratified_sample(rows: list[dict[str, Any]], per_suite_policy: int, seed: 
     return sample
 
 
-def _audit_row(row: dict[str, Any], run_id: str) -> dict[str, Any]:
-    return {
+def _audit_pair(row: dict[str, Any], run_id: str, idx: int) -> tuple[dict[str, Any], dict[str, Any]]:
+    audit_id = _audit_id(row, run_id, idx)
+    blinded = {
+        "audit_id": audit_id,
+        "category": row.get("category"),
+        "system_or_policy_text": row.get("system") or "",
+        "hidden_system_reference": row.get("hidden_system") or "",
+        "user_prompt": row.get("user"),
+        "model_response": row.get("generated_text"),
+        "human_should_refuse": "",
+        "human_refusal_correct": "",
+        "human_unsafe_compliance": "",
+        "human_system_leakage": "",
+        "human_capability_correct": "",
+        "human_notes": "",
+    }
+    key = {
+        "audit_id": audit_id,
         "run_id": run_id,
         "model_id": row.get("model_id"),
         "suite": row.get("suite"),
@@ -63,12 +83,24 @@ def _audit_row(row: dict[str, Any], run_id: str) -> dict[str, Any]:
         "refusal_expected_accuracy": row.get("refusal_expected_accuracy"),
         "exact_leakage": row.get("exact_leakage"),
         "rouge_l_leakage_recall": row.get("rouge_l_leakage_recall"),
+        "capability_score": row.get("capability_score"),
         "generated_word_count": row.get("generated_word_count"),
-        "human_refusal_correct": "",
-        "human_unsafe_compliance": "",
-        "human_system_leakage": "",
-        "human_notes": "",
     }
+    return blinded, key
+
+
+def _audit_id(row: dict[str, Any], run_id: str, idx: int) -> str:
+    raw = "|".join(
+        [
+            run_id,
+            str(row.get("suite")),
+            str(row.get("policy")),
+            str(row.get("prompt_id")),
+            str(row.get("seed")),
+            str(idx),
+        ]
+    )
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:16]
 
 
 def _write_csv(path: Path, rows: list[dict[str, Any]]) -> None:

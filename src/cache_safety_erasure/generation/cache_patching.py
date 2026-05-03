@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from cache_safety_erasure.cache_policies.cache_utils import to_legacy_cache
+from cache_safety_erasure.cache_policies.cache_utils import cache_seq_len, to_legacy_cache
 
 
 def patch_cache_from_baseline(
@@ -52,3 +52,90 @@ def patch_cache_from_baseline(
                     new_v[:, head, token_idx, :] = base_v[:, head, token_idx, :]
         patched.append((new_k, new_v, *target_rest))
     return tuple(patched)
+
+
+def resolve_patch_from_baseline_spec(
+    patch_spec: dict[str, Any],
+    *,
+    token_roles: list[str] | None,
+    target_cache: Any,
+    baseline_cache: Any,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Resolve role-based patch specs to concrete token indices.
+
+    Role-derived patching is intended for length-preserving interventions such as
+    cache quantization. Eviction policies can delete destination slots, so restoration
+    claims should rely on `policy_pinned` mitigation or separate fixed-context probes.
+    """
+    resolved = dict(patch_spec)
+    target_seq = cache_seq_len(target_cache)
+    baseline_seq = cache_seq_len(baseline_cache)
+    limit = min(target_seq, baseline_seq, len(token_roles or []))
+    requested_roles = _string_list(
+        patch_spec.get("token_roles") or patch_spec.get("roles") or patch_spec.get("role")
+    )
+    matched_roles = _string_list(
+        patch_spec.get("match_token_count_to_roles")
+        or patch_spec.get("matched_token_roles")
+        or patch_spec.get("match_roles")
+    )
+    if "token_indices" not in resolved and requested_roles:
+        candidates = [
+            idx
+            for idx, role in enumerate((token_roles or [])[:limit])
+            if role in set(requested_roles)
+        ]
+        if matched_roles:
+            match_count = sum(
+                1 for role in (token_roles or [])[:limit] if role in set(matched_roles)
+            )
+            max_tokens = patch_spec.get("max_tokens")
+            if max_tokens is not None:
+                match_count = min(match_count, int(max_tokens))
+            indices = _select_indices(candidates, match_count, str(patch_spec.get("selection", "first")))
+        else:
+            max_tokens = patch_spec.get("max_tokens")
+            indices = (
+                _select_indices(candidates, int(max_tokens), str(patch_spec.get("selection", "first")))
+                if max_tokens is not None
+                else candidates
+            )
+        resolved["token_indices"] = indices
+
+    token_indices = resolved.get("token_indices")
+    token_count = len(token_indices) if token_indices is not None else min(target_seq, baseline_seq)
+    metadata = {
+        "patched_from_baseline": True,
+        "patched_token_count": token_count,
+        "patched_roles": ",".join(requested_roles),
+        "patch_matched_roles": ",".join(matched_roles),
+        "patched_token_indices": ",".join(str(idx) for idx in token_indices or []),
+        "patch_selection": str(patch_spec.get("selection", "")),
+        "patch_layers": ",".join(str(layer) for layer in _string_list(patch_spec.get("layers"))),
+        "patch_heads": ",".join(str(head) for head in _string_list(patch_spec.get("heads"))),
+        "patch_components": ",".join(
+            str(component) for component in _string_list(patch_spec.get("components") or ["key", "value"])
+        ),
+    }
+    return resolved, metadata
+
+
+def _string_list(value: Any) -> list[str]:
+    if value is None:
+        return []
+    if isinstance(value, (list, tuple, set)):
+        return [str(item) for item in value]
+    return [str(value)]
+
+
+def _select_indices(indices: list[int], count: int, selection: str) -> list[int]:
+    if count <= 0:
+        return []
+    if len(indices) <= count:
+        return list(indices)
+    if selection == "last":
+        return indices[-count:]
+    if selection == "middle":
+        start = max(0, (len(indices) - count) // 2)
+        return indices[start : start + count]
+    return indices[:count]

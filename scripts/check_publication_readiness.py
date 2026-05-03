@@ -30,6 +30,11 @@ def main() -> None:
     parser.add_argument("--require-public-provenance", action="store_true")
     parser.add_argument("--require-causal-patch", action="store_true")
     parser.add_argument("--require-policy-pinned", action="store_true")
+    parser.add_argument(
+        "--allow-inactive-compression",
+        action="store_true",
+        help="Allow policies whose cache stats show no eviction or quantization activity.",
+    )
     args = parser.parse_args()
     suite_min_prompts = _parse_suite_min_prompts(args.suite_min_prompts)
 
@@ -122,6 +127,8 @@ def main() -> None:
     figure_dir = args.results_dir / "figures"
     if not figure_dir.exists() or not list(figure_dir.glob("*.png")):
         failures.append("missing generated PNG figures")
+    if not args.allow_inactive_compression and (args.results_dir / "cache_stats.parquet").exists():
+        _check_active_compression(args.results_dir / "cache_stats.parquet", manifest, failures)
 
     generation_rows: list[dict] = []
     if generations.exists():
@@ -145,6 +152,23 @@ def main() -> None:
     if metrics_path.exists():
         with metrics_path.open("r", encoding="utf-8") as f:
             metrics = json.load(f)
+        policy_summary = metrics.get("publication_summary", {}).get("policies", {})
+        has_global_safety = any(
+            value.get("mean_safety_score") is not None for value in policy_summary.values()
+        )
+        has_global_capability = any(
+            value.get("mean_capability_score") is not None for value in policy_summary.values()
+        )
+        if has_global_safety and has_global_capability:
+            contrasts = metrics.get("policy_level_contrasts", {})
+            if not contrasts:
+                failures.append("missing policy-level safety-vs-capability contrasts")
+            for policy, contrast in contrasts.items():
+                ssei_ci = contrast.get("selective_safety_erasure_index_ci", {})
+                if policy != "none" and ssei_ci.get("mean") is None:
+                    failures.append(f"{policy}: missing policy-level SSEI CI")
+        if args.require_causal_patch and not metrics.get("causal_restoration"):
+            failures.append("missing causal restoration metrics")
         for key, value in metrics.get("selective_safety_erasure", {}).items():
             ci = value.get("paired_safety_degradation_ci", {})
             if ci.get("ci_low") is None or ci.get("ci_high") is None:
@@ -230,6 +254,78 @@ def _check_generation_matrix(
 def _format_matrix_key(key: tuple[str, str, str, int]) -> str:
     suite, prompt_id, policy, seed = key
     return f"suite={suite}, prompt_id={prompt_id}, policy={policy}, seed={seed}"
+
+
+def _check_active_compression(cache_stats_path: Path, manifest: dict, failures: list[str]) -> None:
+    expected_policies = [
+        str(policy)
+        for policy in manifest.get("cache_policy_labels", [])
+        if str(policy) != "none"
+    ]
+    if not expected_policies:
+        return
+    try:
+        import pyarrow.parquet as pq
+    except ModuleNotFoundError:
+        failures.append("pyarrow is required to validate active compression")
+        return
+    try:
+        parquet_file = pq.ParquetFile(cache_stats_path)
+    except Exception as exc:
+        failures.append(f"cannot inspect cache stats for active compression: {exc}")
+        return
+    available_columns = set(parquet_file.schema.names)
+    required_columns = {
+        "policy",
+        "original_seq_len",
+        "evicted_count",
+        "quantization_bits",
+        "cache_l2_before",
+        "cache_l2_after",
+    }
+    columns = [column for column in required_columns if column in available_columns]
+    if "policy" not in columns:
+        failures.append("cache stats lack policy column for active-compression check")
+        return
+    stats: dict[str, dict[str, float]] = {
+        policy: {"rows": 0.0, "evicted": 0.0, "quantized": 0.0, "l2_delta": 0.0}
+        for policy in expected_policies
+    }
+    for batch in parquet_file.iter_batches(columns=columns, batch_size=100_000):
+        table = batch.to_pydict()
+        policies = table.get("policy", [])
+        for idx, raw_policy in enumerate(policies):
+            policy = str(raw_policy)
+            if policy not in stats:
+                continue
+            stats[policy]["rows"] += 1
+            original_seq_len = _float_at(table, "original_seq_len", idx)
+            evicted_count = _float_at(table, "evicted_count", idx)
+            quantization_bits = table.get("quantization_bits", [None] * len(policies))[idx]
+            before = _float_at(table, "cache_l2_before", idx)
+            after = _float_at(table, "cache_l2_after", idx)
+            stats[policy]["evicted"] += evicted_count
+            if quantization_bits is not None and original_seq_len > 0:
+                stats[policy]["quantized"] += 1
+            stats[policy]["l2_delta"] += abs(before - after)
+    for policy, policy_stats in stats.items():
+        if policy_stats["rows"] == 0:
+            failures.append(f"cache policy `{policy}` has no cache-stat rows")
+            continue
+        if policy_stats["evicted"] <= 0 and policy_stats["quantized"] <= 0:
+            failures.append(
+                f"cache policy `{policy}` appears inactive: no evictions or quantization rows"
+            )
+
+
+def _float_at(table: dict[str, list], column: str, idx: int) -> float:
+    values = table.get(column)
+    if values is None:
+        return 0.0
+    value = values[idx]
+    if value is None:
+        return 0.0
+    return float(value)
 
 
 if __name__ == "__main__":

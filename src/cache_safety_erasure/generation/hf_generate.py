@@ -12,7 +12,10 @@ from cache_safety_erasure.cache_policies.cache_utils import (
 from cache_safety_erasure.config import GenerationConfig
 from cache_safety_erasure.evals.prompt_record import PromptRecord
 from cache_safety_erasure.evals.rendering import build_chat_text, token_roles_for_prompt
-from cache_safety_erasure.generation.cache_patching import patch_cache_from_baseline
+from cache_safety_erasure.generation.cache_patching import (
+    patch_cache_from_baseline,
+    resolve_patch_from_baseline_spec,
+)
 
 
 @dataclass
@@ -48,6 +51,16 @@ def hf_generate(
     generated_ids: list[int] = []
 
     with torch.inference_mode():
+        baseline_full_prompt_past = None
+        if patch_from_baseline:
+            baseline_outputs = model(
+                input_ids=input_ids,
+                attention_mask=attention_mask,
+                use_cache=True,
+                output_attentions=False,
+                return_dict=True,
+            )
+            baseline_full_prompt_past = baseline_outputs.past_key_values
         if int(input_ids.shape[-1]) > 1:
             prefill_ids = input_ids[:, :-1]
             last_prompt_token = input_ids[:, -1:]
@@ -68,8 +81,13 @@ def hf_generate(
                 attention_scores=getattr(outputs, "attentions", None),
             )
             if patch_from_baseline:
-                past = patch_from_baseline_cache(past, baseline_prefill_past, patch_from_baseline)
-                decision.metadata["patched_from_baseline"] = True
+                past, patch_metadata = patch_from_baseline_cache(
+                    past,
+                    baseline_prefill_past,
+                    patch_from_baseline,
+                    token_roles=token_roles[:-1],
+                )
+                decision.metadata.update(patch_metadata)
             cache_decisions.append(decision)
             outputs = _forward_one_token(
                 model=model,
@@ -85,6 +103,16 @@ def hf_generate(
                 token_roles=token_roles,
                 attention_scores=getattr(outputs, "attentions", None),
             )
+            if patch_from_baseline:
+                past, patch_metadata = patch_from_baseline_cache(
+                    past,
+                    baseline_full_prompt_past
+                    if baseline_full_prompt_past is not None
+                    else baseline_prefill_past,
+                    patch_from_baseline,
+                    token_roles=token_roles,
+                )
+                decision.metadata.update(patch_metadata)
             cache_decisions.append(decision)
             absolute_position = int(input_ids.shape[-1])
             decode_step_start = 2
@@ -105,8 +133,15 @@ def hf_generate(
                 attention_scores=getattr(outputs, "attentions", None),
             )
             if patch_from_baseline:
-                past = patch_from_baseline_cache(past, baseline_prefill_past, patch_from_baseline)
-                decision.metadata["patched_from_baseline"] = True
+                past, patch_metadata = patch_from_baseline_cache(
+                    past,
+                    baseline_full_prompt_past
+                    if baseline_full_prompt_past is not None
+                    else baseline_prefill_past,
+                    patch_from_baseline,
+                    token_roles=token_roles,
+                )
+                decision.metadata.update(patch_metadata)
             cache_decisions.append(decision)
             absolute_position = int(input_ids.shape[-1])
             decode_step_start = 1
@@ -136,6 +171,14 @@ def hf_generate(
                 attention_scores=getattr(outputs, "attentions", None),
             )
             cache_decisions.append(decision)
+            if patch_from_baseline and baseline_full_prompt_past is not None:
+                past, patch_metadata = patch_from_baseline_cache(
+                    past,
+                    baseline_full_prompt_past,
+                    patch_from_baseline,
+                    token_roles=token_roles,
+                )
+                decision.metadata.update(patch_metadata)
             next_token = _sample_next_token(outputs.logits[:, -1, :], generation_config)
 
             partial_text = tokenizer.decode(generated_ids, skip_special_tokens=True)
@@ -147,16 +190,28 @@ def hf_generate(
     return GenerationResult(text=decoded, cache_decisions=cache_decisions)
 
 
-def patch_from_baseline_cache(past: Any, baseline_prefill_past: Any, patch_from_baseline: dict[str, Any]) -> Any:
+def patch_from_baseline_cache(
+    past: Any,
+    baseline_prefill_past: Any,
+    patch_from_baseline: dict[str, Any],
+    *,
+    token_roles: list[str] | None,
+) -> tuple[Any, dict[str, Any]]:
+    resolved_patch, metadata = resolve_patch_from_baseline_spec(
+        patch_from_baseline,
+        token_roles=token_roles,
+        target_cache=past,
+        baseline_cache=baseline_prefill_past,
+    )
     patched = patch_cache_from_baseline(
         past,
         baseline_prefill_past,
-        layers=patch_from_baseline.get("layers"),
-        heads=patch_from_baseline.get("heads"),
-        token_indices=patch_from_baseline.get("token_indices"),
-        components=patch_from_baseline.get("components"),
+        layers=resolved_patch.get("layers"),
+        heads=resolved_patch.get("heads"),
+        token_indices=resolved_patch.get("token_indices"),
+        components=resolved_patch.get("components"),
     )
-    return maybe_from_legacy_cache(patched, baseline_prefill_past)
+    return maybe_from_legacy_cache(patched, baseline_prefill_past), metadata
 
 
 def _forward_one_token(

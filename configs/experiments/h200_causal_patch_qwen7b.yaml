@@ -23,19 +23,28 @@ cache_policies:
   - name: kv_int4_sim
   - name: kv_int4_sim
     patch_from_baseline:
-      token_indices: [0, 1, 2, 3, 4, 5, 6, 7]
+      token_roles: [system]
+      max_tokens: 16
+      selection: first
       components: [key, value]
   - name: kv_int4_sim
     patch_from_baseline:
-      token_indices: [0, 1, 2, 3, 4, 5, 6, 7]
+      token_roles: [system]
+      max_tokens: 16
+      selection: first
       components: [key]
   - name: kv_int4_sim
     patch_from_baseline:
-      token_indices: [0, 1, 2, 3, 4, 5, 6, 7]
+      token_roles: [system]
+      max_tokens: 16
+      selection: first
       components: [value]
   - name: kv_int4_sim
     patch_from_baseline:
-      token_indices: [32, 33, 34, 35, 36, 37, 38, 39]
+      token_roles: [user]
+      match_token_count_to_roles: [system]
+      max_tokens: 16
+      selection: first
       components: [key, value]
   - name: policy_pinned
     budget: 128

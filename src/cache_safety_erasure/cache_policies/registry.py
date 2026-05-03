@@ -70,6 +70,22 @@ def cache_policy_label(config: CachePolicyConfig) -> str:
         patch = config.patch_from_baseline
         components = patch.get("components") or ["key", "value"]
         parts.append("patch" + "-".join(str(component) for component in components))
+        roles = patch.get("token_roles") or patch.get("roles") or patch.get("role")
+        if roles:
+            role_values = roles if isinstance(roles, list) else [roles]
+            parts.append("role" + "-".join(str(role) for role in role_values))
+        matched_roles = (
+            patch.get("match_token_count_to_roles")
+            or patch.get("matched_token_roles")
+            or patch.get("match_roles")
+        )
+        if matched_roles:
+            matched_values = matched_roles if isinstance(matched_roles, list) else [matched_roles]
+            parts.append("match" + "-".join(str(role) for role in matched_values))
+        if patch.get("max_tokens"):
+            parts.append(f"max{patch['max_tokens']}")
+        if patch.get("selection"):
+            parts.append(f"sel{patch['selection']}")
         if patch.get("token_indices"):
             indices = list(patch["token_indices"])
             parts.append(f"tok{indices[0]}to{indices[-1]}")

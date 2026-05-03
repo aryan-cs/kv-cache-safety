@@ -37,3 +37,21 @@ def test_patch_policy_label_includes_components() -> None:
         )
     )
     assert label == "kv_int4_sim__patchkey__tok0to2"
+
+
+def test_patch_policy_label_includes_role_controls() -> None:
+    from cache_safety_erasure.cache_policies.registry import cache_policy_label
+
+    label = cache_policy_label(
+        CachePolicyConfig(
+            name="kv_int4_sim",
+            patch_from_baseline={
+                "components": ["key", "value"],
+                "token_roles": ["user"],
+                "match_token_count_to_roles": ["system"],
+                "max_tokens": 16,
+                "selection": "first",
+            },
+        )
+    )
+    assert label == "kv_int4_sim__patchkey-value__roleuser__matchsystem__max16__selfirst"
