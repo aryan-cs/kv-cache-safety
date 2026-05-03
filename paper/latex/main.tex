@@ -52,6 +52,35 @@ Testing Whether KV-Cache Optimizations Selectively Weaken Refusal Behavior}
     }%
   }%
 }
+\newcommand{\maybeinputtable}[2]{%
+  \IfFileExists{#1}{%
+    \input{#1}%
+  }{%
+    \todoresult{#2}%
+  }%
+}
+\newcommand{\PrimaryRunId}{results pending}
+\newcommand{\PrimaryPolicyCount}{}
+\newcommand{\PrimaryTopSSEIPolicy}{}
+\newcommand{\PrimaryTopSSEI}{}
+\newcommand{\PrimaryTopSSEICILow}{}
+\newcommand{\PrimaryTopSSEICIHigh}{}
+\newcommand{\PrimarySafetyClusterCount}{}
+\newcommand{\PrimaryCapabilityClusterCount}{}
+\newcommand{\CausalRunId}{results pending}
+\newcommand{\CausalPolicyCount}{}
+\newcommand{\CausalTopSSEIPolicy}{}
+\newcommand{\CausalTopSSEI}{}
+\newcommand{\CausalTopSSEICILow}{}
+\newcommand{\CausalTopSSEICIHigh}{}
+\newcommand{\CausalSafetyClusterCount}{}
+\newcommand{\CausalCapabilityClusterCount}{}
+\IfFileExists{../generated/h200_qwen_full_sweep/result_macros.tex}{%
+  \input{../generated/h200_qwen_full_sweep/result_macros.tex}%
+}{}
+\IfFileExists{../generated/h200_causal_patch_qwen7b/result_macros.tex}{%
+  \input{../generated/h200_causal_patch_qwen7b/result_macros.tex}%
+}{}
 
 \begin{document}
 
@@ -244,16 +273,19 @@ For audited prompts, we will embed each prompt-condition pair using simple open 
 \section{Results}
 
 \subsection{Behavioral Cache Sensitivity}
-\todoresult{Report baseline versus each cache policy for refusal, leakage, benign over-refusal, and capability. Include prompt-clustered confidence intervals and a table of per-suite effects.}
+Primary behavioral run: \PrimaryRunId. The generated table below is loaded directly from the H200 paper-artifact export when present.
+\maybeinputtable{../generated/h200_qwen_full_sweep/suite_level_effects_table.tex}{Report baseline versus each cache policy for refusal, leakage, benign over-refusal, and capability. Include prompt-clustered confidence intervals and a table of per-suite effects.}
 
 \subsection{Selective Safety Degradation}
-\todoresult{Report $\ssei$ by model, suite, policy, and budget. A publishable positive result requires safety degradation to exceed capability degradation under matched cache pressure, not merely lower overall quality.}
+Top exported policy-level $\ssei$: \PrimaryTopSSEIPolicy{} with estimate \PrimaryTopSSEI{} and 95\% interval [\PrimaryTopSSEICILow{}, \PrimaryTopSSEICIHigh{}]. A publishable positive result requires safety degradation to exceed capability degradation under matched cache pressure, not merely lower overall quality.
+\maybeinputtable{../generated/h200_qwen_full_sweep/main_results_table.tex}{Report $\ssei$ by model, suite, policy, and budget after a readiness-passing H200 run.}
 
 \subsection{Token-Role Cache Accounting}
 \todoresult{Report whether system or policy spans are evicted or perturbed disproportionately, and whether role retention predicts changes in refusal or leakage.}
 
 \subsection{Causal Restoration and Mitigation}
-\todoresult{Report system-role patching, matched user-role patching, and policy-pinned mitigation. The central claim requires system-role restoration or pinning to outperform matched non-policy controls.}
+Causal diagnostic run: \CausalRunId. The central claim requires system-role restoration or pinning to outperform matched non-policy controls.
+\maybeinputtable{../generated/h200_causal_patch_qwen7b/causal_restoration_table.tex}{Report system-role patching, matched user-role patching, and policy-pinned mitigation after the causal patch run passes readiness.}
 
 \subsection{Failure Examples}
 \todoresult{Include a small table of blinded, human-audited examples. Do not include procedural harmful details; summarize unsafe-compliance categories at a high level.}

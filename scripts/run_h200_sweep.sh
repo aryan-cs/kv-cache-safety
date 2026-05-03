@@ -55,7 +55,10 @@ uv run python scripts/run_experiment.py \
 latest_full="results/$full_run_id"
 uv run python scripts/aggregate_results.py --results-dir "$latest_full"
 uv run python scripts/make_figures.py --results-dir "$latest_full"
-uv run python scripts/export_paper_assets.py --results-dir "$latest_full" --paper-dir paper/generated/h200_qwen_full_sweep
+uv run python scripts/export_paper_assets.py \
+  --results-dir "$latest_full" \
+  --paper-dir paper/generated/h200_qwen_full_sweep \
+  --macro-prefix Primary
 uv run python scripts/check_publication_readiness.py \
   --results-dir "$latest_full" \
   --paper-dir paper/generated/h200_qwen_full_sweep \
@@ -86,7 +89,10 @@ uv run python scripts/run_experiment.py \
 latest_causal="results/$causal_run_id"
 uv run python scripts/aggregate_results.py --results-dir "$latest_causal"
 uv run python scripts/make_figures.py --results-dir "$latest_causal"
-uv run python scripts/export_paper_assets.py --results-dir "$latest_causal" --paper-dir paper/generated/h200_causal_patch_qwen7b
+uv run python scripts/export_paper_assets.py \
+  --results-dir "$latest_causal" \
+  --paper-dir paper/generated/h200_causal_patch_qwen7b \
+  --macro-prefix Causal
 uv run python scripts/check_publication_readiness.py \
   --results-dir "$latest_causal" \
   --paper-dir paper/generated/h200_causal_patch_qwen7b \

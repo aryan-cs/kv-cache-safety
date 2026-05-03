@@ -49,3 +49,36 @@ def test_latex_table_export_escapes_policy_names(tmp_path: Path) -> None:
     assert "sliding\\_window\\_\\_budget64" in text
     assert "0.125" in text
     assert "\\label{tab:test}" in text
+
+
+def test_latex_macro_export_writes_headline_result_macros(tmp_path: Path) -> None:
+    import sys
+
+    sys.path.insert(0, str(Path("scripts").resolve()))
+    from export_paper_assets import write_latex_macros
+
+    macro_path = tmp_path / "result_macros.tex"
+    write_latex_macros(
+        macro_path,
+        {
+            "publication_summary": {"policies": {"none": {}, "kv_int4_sim": {}}},
+            "policy_level_contrasts": {
+                "kv_int4_sim": {
+                    "selective_safety_erasure_index": 0.25,
+                    "selective_safety_erasure_index_ci": {
+                        "ci_low": 0.1,
+                        "ci_high": 0.4,
+                        "n_safety": 12,
+                        "n_capability": 8,
+                    },
+                }
+            },
+        },
+        tmp_path / "results" / "run_001",
+        "Primary",
+    )
+
+    text = macro_path.read_text(encoding="utf-8")
+    assert "\\renewcommand{\\PrimaryRunId}{run\\_001}" in text
+    assert "\\renewcommand{\\PrimaryTopSSEIPolicy}{kv\\_int4\\_sim}" in text
+    assert "\\renewcommand{\\PrimaryTopSSEI}{0.250}" in text

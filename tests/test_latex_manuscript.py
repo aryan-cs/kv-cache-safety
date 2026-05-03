@@ -15,6 +15,8 @@ def test_latex_manuscript_is_arxiv_friendly_pre_results_draft() -> None:
     assert "pre-results" in tex.lower()
     assert "reports no empirical claims" in tex
     assert "Result pending" in tex
+    assert r"\maybeinputtable{../generated/h200_qwen_full_sweep/main_results_table.tex}" in tex
+    assert r"\PrimaryTopSSEIPolicy" in tex
     assert r"\bibliography{../references}" in tex
     assert "neurips" not in tex.lower()
 
@@ -45,4 +47,7 @@ def test_arxiv_rewrite_uses_local_bibliography_and_figures() -> None:
 
     assert r"\bibliography{references}" in rewritten
     assert "figures/safety_capability_phase_portrait.pdf" in rewritten
+    assert "generated/h200_qwen_full_sweep" in _rewrite_main_tex_for_arxiv(
+        "../generated/h200_qwen_full_sweep/main_results_table.tex"
+    )
     assert "../../results" not in rewritten

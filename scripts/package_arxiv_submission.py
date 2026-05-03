@@ -25,6 +25,11 @@ FIGURE_SOURCES = {
         "results/h200_causal_patch_qwen7b/figures/causal_restoration_flow.pdf"
     ),
 }
+GENERATED_DIRS = [
+    Path("paper/generated/h200_qwen_full_sweep"),
+    Path("paper/generated/h200_causal_patch_qwen7b"),
+    Path("paper/generated/h200_qwen32b_public_followup"),
+]
 
 
 def main() -> None:
@@ -51,6 +56,15 @@ def main() -> None:
             copied_figures.append(str(target_path))
         else:
             missing_figures.append(str(source_path))
+    copied_generated = []
+    missing_generated = []
+    for source_path in GENERATED_DIRS:
+        if not source_path.exists():
+            missing_generated.append(str(source_path))
+            continue
+        target_path = source_dir / "generated" / source_path.name
+        shutil.copytree(source_path, target_path)
+        copied_generated.append(str(target_path))
 
     write_json(
         source_dir / "manifest.json",
@@ -60,6 +74,8 @@ def main() -> None:
             "references_sha256": file_sha256(source_dir / "references.bib"),
             "copied_figures": copied_figures,
             "missing_figures": missing_figures,
+            "copied_generated": copied_generated,
+            "missing_generated": missing_generated,
             "note": "Missing figures are allowed for pre-results drafts; main.tex renders placeholders via IfFileExists.",
         },
     )
@@ -73,6 +89,7 @@ def main() -> None:
 
 def _rewrite_main_tex_for_arxiv(text: str) -> str:
     text = text.replace(r"\bibliography{../references}", r"\bibliography{references}")
+    text = text.replace("../generated/", "generated/")
     for output_name, source_path in FIGURE_SOURCES.items():
         text = text.replace(str(Path("../..") / source_path), f"figures/{output_name}")
     return text

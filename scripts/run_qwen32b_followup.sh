@@ -35,7 +35,10 @@ uv run python scripts/run_experiment.py \
 latest="results/$run_id"
 uv run python scripts/aggregate_results.py --results-dir "$latest"
 uv run python scripts/make_figures.py --results-dir "$latest"
-uv run python scripts/export_paper_assets.py --results-dir "$latest" --paper-dir paper/generated/h200_qwen32b_public_followup
+uv run python scripts/export_paper_assets.py \
+  --results-dir "$latest" \
+  --paper-dir paper/generated/h200_qwen32b_public_followup \
+  --macro-prefix QwenThirtyTwo
 uv run python scripts/check_publication_readiness.py \
   --results-dir "$latest" \
   --paper-dir paper/generated/h200_qwen32b_public_followup \
