@@ -14,6 +14,7 @@ hf_cache/
 # Large generated artifacts
 data/external/*
 data/processed/*.jsonl
+data/processed/*.manifest.json
 results/*
 !data/external/.gitkeep
 !data/processed/.gitkeep
