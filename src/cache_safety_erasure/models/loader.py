@@ -60,5 +60,29 @@ def _load_hf_model(config: ModelConfig) -> ModelBundle:
     if config.attn_implementation:
         model_kwargs["attn_implementation"] = config.attn_implementation
     model = AutoModelForCausalLM.from_pretrained(config.model_id, **model_kwargs)
+    hf_device_map = getattr(model, "hf_device_map", None)
+    if not config.allow_cpu_offload and _device_map_has_cpu_or_disk(hf_device_map):
+        raise RuntimeError(
+            "Model loaded with CPU or disk offload in `hf_device_map`, which is disabled for "
+            "paper evidence runs. Use a smaller model, lower precision, or set "
+            "`model.allow_cpu_offload: true` only for local smoke tests."
+        )
     model.eval()
     return ModelBundle(provider="hf", model_id=config.model_id, model=model, tokenizer=tokenizer)
+
+
+def hf_device_map(model: Any) -> dict[str, str] | None:
+    device_map = getattr(model, "hf_device_map", None)
+    if not isinstance(device_map, dict):
+        return None
+    return {str(module): str(device) for module, device in device_map.items()}
+
+
+def _device_map_has_cpu_or_disk(device_map: Any) -> bool:
+    if not isinstance(device_map, dict):
+        return False
+    for device in device_map.values():
+        device_name = str(device).lower()
+        if device_name == "cpu" or "disk" in device_name:
+            return True
+    return False

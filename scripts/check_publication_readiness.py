@@ -66,6 +66,10 @@ def main() -> None:
             failures.append(f"smoke run `{run_name}` is not paper evidence")
         if not manifest.get("cache_policy_configs"):
             failures.append("manifest lacks full cache policy configs")
+        if not manifest.get("cache_policy_labels"):
+            failures.append("manifest lacks cache policy labels")
+        if manifest.get("expected_generation_count") is None:
+            failures.append("manifest lacks expected generation count")
         if not manifest.get("prompt_counts"):
             failures.append("manifest lacks prompt counts")
         policy_configs = manifest.get("cache_policy_configs") or []
@@ -91,6 +95,7 @@ def main() -> None:
             if required_suite not in prompt_counts:
                 failures.append(f"missing required suite `{required_suite}`")
 
+    prompt_rows: list[dict] = []
     if prompts_path.exists():
         token_span_failures = 0
         public_without_provenance = 0
@@ -99,6 +104,7 @@ def main() -> None:
                 if not line.strip():
                     continue
                 row = json.loads(line)
+                prompt_rows.append(row)
                 rendered = row.get("rendered_prompt", {})
                 if manifest.get("model_provider") != "mock" and (
                     rendered.get("token_count") is None or not rendered.get("token_role_spans")
@@ -117,6 +123,7 @@ def main() -> None:
     if not figure_dir.exists() or not list(figure_dir.glob("*.png")):
         failures.append("missing generated PNG figures")
 
+    generation_rows: list[dict] = []
     if generations.exists():
         counts: dict[str, set[str]] = {}
         with generations.open("r", encoding="utf-8") as f:
@@ -124,6 +131,7 @@ def main() -> None:
                 if not line.strip():
                     continue
                 row = json.loads(line)
+                generation_rows.append(row)
                 counts.setdefault(row["suite"], set()).add(row["prompt_id"])
         for suite, prompt_ids in counts.items():
             required_count = suite_min_prompts.get(suite, args.min_prompts_per_suite)
@@ -131,6 +139,8 @@ def main() -> None:
                 failures.append(
                     f"suite `{suite}` has {len(prompt_ids)} prompts; need >= {required_count}"
                 )
+        if manifest:
+            _check_generation_matrix(manifest, prompt_rows, generation_rows, failures)
 
     if metrics_path.exists():
         with metrics_path.open("r", encoding="utf-8") as f:
@@ -162,6 +172,64 @@ def _parse_suite_min_prompts(values: list[str]) -> dict[str, int]:
         suite, raw_count = value.split("=", 1)
         parsed[suite] = int(raw_count)
     return parsed
+
+
+def _check_generation_matrix(
+    manifest: dict,
+    prompt_rows: list[dict],
+    generation_rows: list[dict],
+    failures: list[str],
+) -> None:
+    expected_count = manifest.get("expected_generation_count")
+    if expected_count is not None and len(generation_rows) != int(expected_count):
+        failures.append(
+            f"generation row count is {len(generation_rows)}; expected {int(expected_count)}"
+        )
+
+    policy_labels = [str(label) for label in manifest.get("cache_policy_labels", [])]
+    seeds = [int(seed) for seed in manifest.get("seeds", [])]
+    if not prompt_rows or not policy_labels or not seeds:
+        return
+
+    expected_keys = {
+        (str(prompt["suite"]), str(prompt["prompt_id"]), policy, seed)
+        for prompt in prompt_rows
+        for policy in policy_labels
+        for seed in seeds
+    }
+    observed_keys = []
+    malformed = 0
+    for row in generation_rows:
+        try:
+            seed = int(row["seed"])
+            observed_keys.append(
+                (str(row["suite"]), str(row["prompt_id"]), str(row["policy"]), seed)
+            )
+        except (KeyError, TypeError, ValueError):
+            malformed += 1
+    if malformed:
+        failures.append(f"{malformed} generation rows have malformed matrix keys")
+    observed_key_set = set(observed_keys)
+    duplicate_count = len(observed_keys) - len(observed_key_set)
+    if duplicate_count:
+        failures.append(f"generation matrix has {duplicate_count} duplicate rows")
+    missing = expected_keys - observed_key_set
+    extra = observed_key_set - expected_keys
+    if missing:
+        failures.append(
+            f"generation matrix is missing {len(missing)} rows; "
+            f"first missing: {_format_matrix_key(sorted(missing)[0])}"
+        )
+    if extra:
+        failures.append(
+            f"generation matrix has {len(extra)} rows outside the manifest; "
+            f"first extra: {_format_matrix_key(sorted(extra)[0])}"
+        )
+
+
+def _format_matrix_key(key: tuple[str, str, str, int]) -> str:
+    suite, prompt_id, policy, seed = key
+    return f"suite={suite}, prompt_id={prompt_id}, policy={policy}, seed={seed}"
 
 
 if __name__ == "__main__":

@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from pathlib import Path
 from typing import Any
 
@@ -11,14 +11,14 @@ from _path import add_src_to_path
 
 add_src_to_path()
 
-from cache_safety_erasure.cache_policies.registry import build_cache_policy
+from cache_safety_erasure.cache_policies.registry import build_cache_policy, cache_policy_label
 from cache_safety_erasure.config import dump_yaml, parse_experiment_config
 from cache_safety_erasure.evals.io import load_prompt_suite
 from cache_safety_erasure.evals.rendering import rendered_prompt_manifest
 from cache_safety_erasure.evals.spans import character_span_manifest
 from cache_safety_erasure.generation.runner import generate_one
 from cache_safety_erasure.metrics.aggregate import compute_example_metrics, compute_run_metrics
-from cache_safety_erasure.models.loader import load_model
+from cache_safety_erasure.models.loader import hf_device_map, load_model
 from cache_safety_erasure.utils.io import (
     append_jsonl,
     environment_snapshot,
@@ -33,9 +33,25 @@ from cache_safety_erasure.utils.io import (
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run cache safety erasure experiments.")
     parser.add_argument("--config", required=True, type=Path)
+    parser.add_argument("--run-id", help="Override run.run_id without editing the config file.")
+    parser.add_argument(
+        "--resume",
+        action="store_true",
+        help="Resume the target run directory and skip completed prompt/policy/seed rows.",
+    )
     args = parser.parse_args()
 
     config, raw_config = parse_experiment_config(args.config)
+    if args.run_id or args.resume:
+        config = replace(
+            config,
+            run=replace(
+                config.run,
+                run_id=args.run_id or config.run.run_id,
+                resume=config.run.resume or args.resume,
+            ),
+        )
+        raw_config = _raw_config_with_run_overrides(raw_config, args.run_id, args.resume)
     run_dir = make_run_dir(
         config.run.output_dir, config.run.name, config.run.run_id, config.run.resume
     )
@@ -49,6 +65,11 @@ def main() -> None:
     }
 
     model_bundle = load_model(config.model)
+    device_map = (
+        hf_device_map(model_bundle.model)
+        if getattr(model_bundle, "model", None) is not None
+        else None
+    )
     suite_prompts = {}
     prompt_counts = {}
     for suite in config.prompt_suites:
@@ -57,6 +78,8 @@ def main() -> None:
             prompts = prompts[: config.limit_per_suite]
         suite_prompts[suite] = prompts
         prompt_counts[suite] = len(prompts)
+    policy_labels = [cache_policy_label(policy) for policy in config.cache_policies]
+    expected_generation_count = sum(prompt_counts.values()) * len(config.seeds) * len(policy_labels)
 
     write_json(
         run_dir / "manifest.json",
@@ -64,14 +87,18 @@ def main() -> None:
             "run_name": config.run.name,
             "model_id": config.model.model_id,
             "model_provider": config.model.provider,
+            "model_config": asdict(config.model),
+            "model_device_map": device_map,
             "git_commit": env.get("git_commit"),
             "git_dirty": env.get("git_dirty"),
             "config_sha256": _stable_hash(raw_config),
             "prompt_suites": list(config.prompt_suites),
             "prompt_counts": prompt_counts,
             "cache_policy_configs": [_policy_manifest(policy) for policy in config.cache_policies],
+            "cache_policy_labels": policy_labels,
             "seeds": list(config.seeds),
             "limit_per_suite": config.limit_per_suite,
+            "expected_generation_count": expected_generation_count,
         },
     )
 
@@ -160,6 +187,18 @@ def main() -> None:
 def _stable_hash(value: Any) -> str:
     encoded = json.dumps(value, sort_keys=True, default=str).encode("utf-8")
     return hashlib.sha256(encoded).hexdigest()
+
+
+def _raw_config_with_run_overrides(
+    raw_config: dict[str, Any], run_id: str | None, resume: bool
+) -> dict[str, Any]:
+    updated = json.loads(json.dumps(raw_config, default=str))
+    run = updated.setdefault("run", {})
+    if run_id:
+        run["run_id"] = run_id
+    if resume:
+        run["resume"] = True
+    return updated
 
 
 def _policy_manifest(policy: Any) -> dict[str, Any]:

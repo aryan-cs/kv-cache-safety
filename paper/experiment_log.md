@@ -20,10 +20,10 @@ Required fields for each entry:
 - date: 2026-05-03
 - commit hash: local dirty tree during development; do not cite
 - config path: `configs/experiments/tiny_hf_smoke.yaml`
-- run id: latest local `tiny_hf_smoke_*`
+- run id: `tiny_hf_guard_smoke_20260503`
 - machine / GPU: local development environment
 - model: `sshleifer/tiny-gpt2`
 - prompt suites: `capability_smoke`
 - cache policies: `none`, `sliding_window`, `kv_int8_sim`
-- main metrics: not meaningful
+- main metrics: not meaningful; artifact/readiness plumbing produced `generations.jsonl`, `metrics.json`, `cache_stats.parquet`, and figures with explicit tiny/smoke override flags
 - decision: discard as evidence; keep only as plumbing validation

@@ -45,6 +45,7 @@ class ModelConfig:
     model_id: str
     dtype: str = "bfloat16"
     device_map: str = "auto"
+    allow_cpu_offload: bool = False
     attn_implementation: str | None = None
     trust_remote_code: bool = False
     low_cpu_mem_usage: bool = True
@@ -116,6 +117,7 @@ def parse_experiment_config(path: str | Path) -> tuple[ExperimentConfig, dict[st
         model_id=str(model_raw["model_id"]),
         dtype=str(model_raw.get("dtype", "bfloat16")),
         device_map=str(model_raw.get("device_map", "auto")),
+        allow_cpu_offload=bool(model_raw.get("allow_cpu_offload", False)),
         attn_implementation=model_raw.get("attn_implementation"),
         trust_remote_code=bool(model_raw.get("trust_remote_code", False)),
         low_cpu_mem_usage=bool(model_raw.get("low_cpu_mem_usage", True)),
