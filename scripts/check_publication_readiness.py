@@ -133,6 +133,7 @@ def main() -> None:
     figure_dir = args.results_dir / "figures"
     if not figure_dir.exists() or not list(figure_dir.glob("*.png")):
         failures.append("missing generated PNG figures")
+    _check_figure_manifest(figure_dir, failures)
     if not args.allow_inactive_compression and (args.results_dir / "cache_stats.parquet").exists():
         _check_active_compression(args.results_dir / "cache_stats.parquet", manifest, failures)
     if args.require_causal_patch and (args.results_dir / "cache_stats.parquet").exists():
@@ -204,6 +205,34 @@ def _parse_suite_min_prompts(values: list[str]) -> dict[str, int]:
         suite, raw_count = value.split("=", 1)
         parsed[suite] = int(raw_count)
     return parsed
+
+
+def _check_figure_manifest(figure_dir: Path, failures: list[str]) -> None:
+    manifest_path = figure_dir / "manifest.json"
+    if not manifest_path.exists():
+        failures.append("missing figures/manifest.json")
+        return
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        failures.append(f"invalid figures/manifest.json: {exc}")
+        return
+    figures = manifest.get("figures")
+    if not isinstance(figures, list) or not figures:
+        failures.append("figures manifest has no figure entries")
+        return
+    for figure in figures:
+        if not isinstance(figure, dict):
+            failures.append("figures manifest contains non-object entry")
+            continue
+        name = figure.get("name", "<unnamed>")
+        for key in ["png", "png_sha256", "svg", "svg_sha256", "data_csv", "data_csv_sha256"]:
+            if not figure.get(key):
+                failures.append(f"figure `{name}` lacks `{key}`")
+        for path_key in ["png", "svg", "data_csv"]:
+            raw_path = figure.get(path_key)
+            if raw_path and not Path(str(raw_path)).exists():
+                failures.append(f"figure `{name}` references missing {path_key}: {raw_path}")
 
 
 def _check_causal_patch_config(policy_configs: list[dict], failures: list[str]) -> None:

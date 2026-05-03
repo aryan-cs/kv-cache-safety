@@ -1,14 +1,16 @@
 from __future__ import annotations
 
 import argparse
+import csv
 import json
 from pathlib import Path
+from typing import Any
 
 from _path import add_src_to_path
 
 add_src_to_path()
 
-from cache_safety_erasure.utils.io import write_json
+from cache_safety_erasure.utils.io import file_sha256, write_json
 
 
 def main() -> None:
@@ -29,7 +31,7 @@ def main() -> None:
     figures_dir = args.results_dir / "figures"
     figures_dir.mkdir(exist_ok=True)
 
-    made: list[str] = []
+    made: list[dict[str, Any]] = []
     for metric in ["safety_score", "capability_score", "rouge_l_leakage_recall"]:
         if metric not in df or df[metric].dropna().empty:
             continue
@@ -43,10 +45,14 @@ def main() -> None:
         ax.tick_params(axis="x", labelrotation=30)
         ax.legend()
         fig.tight_layout()
-        out = figures_dir / f"{metric}.png"
-        fig.savefig(out, dpi=180)
+        _save_figure(
+            fig,
+            figures_dir,
+            metric,
+            made,
+            data_rows=grouped.to_dict(orient="records"),
+        )
         plt.close(fig)
-        made.append(str(out))
 
     metrics_path = args.results_dir / "metrics.json"
     if metrics_path.exists():
@@ -76,10 +82,14 @@ def main() -> None:
             ax.set_title("Selective Safety Erasure Index")
             fig.colorbar(im, ax=ax, label="safety degradation - capability degradation")
             fig.tight_layout()
-            out = figures_dir / "selective_safety_erasure_heatmap.png"
-            fig.savefig(out, dpi=180)
+            _save_figure(
+                fig,
+                figures_dir,
+                "selective_safety_erasure_heatmap",
+                made,
+                data_rows=selective_df.to_dict(orient="records"),
+            )
             plt.close(fig)
-            made.append(str(out))
 
             fig, ax = plt.subplots(figsize=(8, 6))
             plot_df = selective_df.dropna(subset=["safety_degradation"]).copy()
@@ -112,10 +122,14 @@ def main() -> None:
             ax.set_ylabel("Safety degradation")
             ax.legend(title="suite", fontsize=8)
             fig.tight_layout()
-            out = figures_dir / "safety_vs_capability_degradation.png"
-            fig.savefig(out, dpi=180)
+            _save_figure(
+                fig,
+                figures_dir,
+                "safety_vs_capability_degradation",
+                made,
+                data_rows=plot_df.to_dict(orient="records"),
+            )
             plt.close(fig)
-            made.append(str(out))
 
             forest_rows = []
             for key, value in metrics.get("selective_safety_erasure", {}).items():
@@ -146,10 +160,14 @@ def main() -> None:
                 ax.set_xlabel("Paired safety degradation")
                 ax.set_title("Paired Safety Degradation With Prompt-Clustered CIs")
                 fig.tight_layout()
-                out = figures_dir / "paired_safety_degradation_forest.png"
-                fig.savefig(out, dpi=180)
+                _save_figure(
+                    fig,
+                    figures_dir,
+                    "paired_safety_degradation_forest",
+                    made,
+                    data_rows=forest_rows,
+                )
                 plt.close(fig)
-                made.append(str(out))
 
             fig, ax = plt.subplots(figsize=(10, 5))
             top = selective_df.sort_values("index", ascending=False).head(12)
@@ -160,24 +178,21 @@ def main() -> None:
             ax.set_ylabel("Selective Safety Erasure Index")
             ax.tick_params(axis="x", labelrotation=45)
             fig.tight_layout()
-            out = figures_dir / "top_selective_effects.png"
-            fig.savefig(out, dpi=180)
+            _save_figure(
+                fig,
+                figures_dir,
+                "top_selective_effects",
+                made,
+                data_rows=top.to_dict(orient="records"),
+            )
             plt.close(fig)
-            made.append(str(out))
 
     cache_path = args.results_dir / "cache_stats.parquet"
     if cache_path.exists():
-        cache_df = pd.read_parquet(cache_path)
-        if {"policy", "decode_step", "cache_l2_before", "cache_l2_after"}.issubset(cache_df.columns):
-            cache_df = cache_df.copy()
-            cache_df["l2_retained_fraction"] = cache_df["cache_l2_after"] / cache_df[
-                "cache_l2_before"
-            ].replace(0, float("nan"))
-            grouped = (
-                cache_df.groupby(["policy", "decode_step"])["l2_retained_fraction"]
-                .mean()
-                .reset_index()
-            )
+        cache_summaries = _stream_cache_summaries(cache_path)
+        l2_grouped = cache_summaries["l2_rows"]
+        if l2_grouped:
+            grouped = pd.DataFrame(l2_grouped)
             if not grouped.empty:
                 fig, ax = plt.subplots(figsize=(10, 5))
                 for policy, policy_df in grouped.groupby("policy"):
@@ -193,31 +208,15 @@ def main() -> None:
                 ax.set_ylim(0, 1.05)
                 ax.legend()
                 fig.tight_layout()
-                out = figures_dir / "cache_l2_retained_fraction.png"
-                fig.savefig(out, dpi=180)
-                plt.close(fig)
-                made.append(str(out))
-        role_columns = [col for col in cache_df.columns if col.startswith("retained_") and col.endswith("_tokens")]
-        role_rows = []
-        for retained_col in role_columns:
-            role = retained_col[len("retained_") : -len("_tokens")]
-            evicted_col = f"evicted_{role}_tokens"
-            if evicted_col not in cache_df.columns:
-                continue
-            grouped = cache_df.groupby("policy")[[retained_col, evicted_col]].sum().reset_index()
-            for row in grouped.itertuples(index=False):
-                retained_count = float(getattr(row, retained_col))
-                evicted_count = float(getattr(row, evicted_col))
-                total = retained_count + evicted_count
-                if total <= 0:
-                    continue
-                role_rows.append(
-                    {
-                        "policy": row.policy,
-                        "role": role,
-                        "retention_fraction": retained_count / total,
-                    }
+                _save_figure(
+                    fig,
+                    figures_dir,
+                    "cache_l2_retained_fraction",
+                    made,
+                    data_rows=l2_grouped,
                 )
+                plt.close(fig)
+        role_rows = cache_summaries["role_rows"]
         if role_rows:
             role_df = pd.DataFrame(role_rows)
             pivot = role_df.pivot_table(
@@ -230,13 +229,145 @@ def main() -> None:
             ax.set_title("Token Role Retention By Cache Policy")
             fig.colorbar(im, ax=ax, label="retained / observed role tokens")
             fig.tight_layout()
-            out = figures_dir / "token_role_retention_heatmap.png"
-            fig.savefig(out, dpi=180)
+            _save_figure(
+                fig,
+                figures_dir,
+                "token_role_retention_heatmap",
+                made,
+                data_rows=role_rows,
+            )
             plt.close(fig)
-            made.append(str(out))
 
     write_json(figures_dir / "manifest.json", {"figures": made})
     print(f"Wrote {len(made)} figure(s) to {figures_dir}")
+
+
+def _save_figure(
+    fig: Any,
+    figures_dir: Path,
+    stem: str,
+    made: list[dict[str, Any]],
+    *,
+    data_rows: list[dict[str, Any]] | None = None,
+) -> None:
+    png_path = figures_dir / f"{stem}.png"
+    svg_path = figures_dir / f"{stem}.svg"
+    data_path = figures_dir / f"{stem}.csv"
+    fig.savefig(png_path, dpi=180)
+    fig.savefig(svg_path)
+    entry: dict[str, Any] = {
+        "name": stem,
+        "png": str(png_path),
+        "png_sha256": file_sha256(png_path),
+        "svg": str(svg_path),
+        "svg_sha256": file_sha256(svg_path),
+    }
+    if data_rows is not None:
+        _write_csv(data_path, data_rows)
+        entry["data_csv"] = str(data_path)
+        entry["data_csv_sha256"] = file_sha256(data_path)
+        entry["data_row_count"] = len(data_rows)
+    made.append(entry)
+
+
+def _write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if not rows:
+        path.write_text("", encoding="utf-8")
+        return
+    fieldnames = sorted({key for row in rows for key in row})
+    with path.open("w", encoding="utf-8", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(rows)
+
+
+def _stream_cache_summaries(cache_path: Path) -> dict[str, list[dict[str, Any]]]:
+    try:
+        import pyarrow.parquet as pq
+    except ModuleNotFoundError as exc:
+        raise SystemExit("pyarrow is required to summarize cache_stats.parquet.") from exc
+    parquet_file = pq.ParquetFile(cache_path)
+    schema_names = set(parquet_file.schema.names)
+    l2_columns = [
+        column
+        for column in ["policy", "decode_step", "cache_l2_before", "cache_l2_after"]
+        if column in schema_names
+    ]
+    role_columns = [
+        column
+        for column in schema_names
+        if (
+            column.startswith("retained_")
+            and column.endswith("_tokens")
+            and f"evicted_{column[len('retained_'):]}" in schema_names
+        )
+    ]
+    columns = sorted(set(l2_columns + role_columns + ["policy"] + [
+        f"evicted_{column[len('retained_'):]}" for column in role_columns
+    ]))
+    if "policy" not in columns:
+        return {"l2_rows": [], "role_rows": []}
+
+    l2_sums: dict[tuple[str, int], list[float]] = {}
+    role_sums: dict[tuple[str, str], list[float]] = {}
+    for batch in parquet_file.iter_batches(columns=columns, batch_size=100_000):
+        table = batch.to_pydict()
+        policies = table.get("policy", [])
+        for idx, raw_policy in enumerate(policies):
+            policy = str(raw_policy)
+            if {"decode_step", "cache_l2_before", "cache_l2_after"}.issubset(table):
+                before = _float_at(table, "cache_l2_before", idx)
+                after = _float_at(table, "cache_l2_after", idx)
+                if before:
+                    key = (policy, int(_float_at(table, "decode_step", idx)))
+                    l2_sums.setdefault(key, [0.0, 0.0])
+                    l2_sums[key][0] += after / before
+                    l2_sums[key][1] += 1.0
+            for retained_col in role_columns:
+                role = retained_col[len("retained_") : -len("_tokens")]
+                evicted_col = f"evicted_{role}_tokens"
+                retained = _float_at(table, retained_col, idx)
+                evicted = _float_at(table, evicted_col, idx)
+                if retained or evicted:
+                    key = (policy, role)
+                    role_sums.setdefault(key, [0.0, 0.0])
+                    role_sums[key][0] += retained
+                    role_sums[key][1] += evicted
+
+    l2_rows = [
+        {
+            "policy": policy,
+            "decode_step": decode_step,
+            "l2_retained_fraction": total / count if count else None,
+        }
+        for (policy, decode_step), (total, count) in sorted(l2_sums.items())
+    ]
+    role_rows = []
+    for (policy, role), (retained, evicted) in sorted(role_sums.items()):
+        total = retained + evicted
+        if total <= 0:
+            continue
+        role_rows.append(
+            {
+                "policy": policy,
+                "role": role,
+                "retention_fraction": retained / total,
+                "retained_count": retained,
+                "evicted_count": evicted,
+            }
+        )
+    return {"l2_rows": l2_rows, "role_rows": role_rows}
+
+
+def _float_at(table: dict[str, list[Any]], column: str, idx: int) -> float:
+    values = table.get(column)
+    if values is None:
+        return 0.0
+    value = values[idx]
+    if value is None:
+        return 0.0
+    return float(value)
 
 
 if __name__ == "__main__":
