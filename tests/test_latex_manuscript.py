@@ -6,19 +6,24 @@ sys.path.insert(0, str(Path("scripts").resolve()))
 from package_arxiv_submission import _rewrite_main_tex_for_arxiv
 
 
-def test_latex_manuscript_is_arxiv_friendly_pre_results_draft() -> None:
+def test_latex_manuscript_is_formal_registered_protocol() -> None:
     tex = Path("paper/latex/main.tex").read_text(encoding="utf-8")
 
     assert r"\documentclass[11pt]{article}" in tex
     assert "Aryan Gupta" in tex
     assert "aryan.cs.app@gmail.com" in tex
-    assert "pre-results" in tex.lower()
+    assert "registered analysis protocol" in tex
     assert "reports no empirical claims" in tex
-    assert "Result pending" in tex
+    assert "Empirical result not yet reported" in tex
     assert r"\maybeinputtable{../generated/h200_qwen_full_sweep/main_results_table.tex}" in tex
     assert r"\PrimaryTopSSEIPolicy" in tex
     assert r"\bibliography{../references}" in tex
     assert "neurips" not in tex.lower()
+    assert "H200" not in tex
+    assert "cgroup" not in tex
+    assert "MacBook" not in tex
+    assert "dirty-tree" not in tex
+    assert "mock-model" not in tex
 
 
 def test_latex_references_cover_primary_model_and_cache_work() -> None:
