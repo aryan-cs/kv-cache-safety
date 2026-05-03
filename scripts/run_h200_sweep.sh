@@ -6,6 +6,12 @@ cd "$(dirname "$0")/.."
 export TOKENIZERS_PARALLELISM=false
 export PYTORCH_CUDA_ALLOC_CONF="${PYTORCH_CUDA_ALLOC_CONF:-expandable_segments:True}"
 
+if [[ -n "$(git status --short)" ]]; then
+  echo "Refusing to run H200 sweep from a dirty git working tree." >&2
+  echo "Commit or stash local changes so generated artifacts point to an exact commit." >&2
+  exit 1
+fi
+
 uv sync --extra dev
 
 uv run python scripts/prepare_data.py --suite all
