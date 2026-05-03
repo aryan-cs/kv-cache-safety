@@ -1,0 +1,9 @@
+suites:
+  - system_leakage
+  - refusal_safety
+  - benign_overrefusal
+  - instruction_following
+  - capability_smoke
+notes:
+  - Built-in suites are diagnostic seed suites for code validation and smoke testing.
+  - Publication runs should ingest open public datasets with scripts/prepare_data.py --source hf.

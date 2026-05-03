@@ -1,0 +1,28 @@
+.DS_Store
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+
+# Local model and dataset caches
+.cache/
+hf_cache/
+models/
+
+# Large generated artifacts
+data/external/*
+data/processed/*.jsonl
+results/*
+!data/external/.gitkeep
+!data/processed/.gitkeep
+!results/README.md
+
+# Paper build outputs
+paper/build/
+*.aux
+*.bbl
+*.blg
+*.log
+*.out
+*.pdf
