@@ -108,7 +108,7 @@ The primary workflow defaults to `PUBLIC_PROMPT_LIMIT=650`, one deterministic se
 If the H200 GPU is busy, queue the sweep behind an availability gate from the H200 checkout:
 
 ```bash
-nohup bash scripts/wait_and_run_h200_sweep.sh > logs/h200/launcher.out 2>&1 &
+nohup bash scripts/wait_and_run_h200_sweep.sh </dev/null > logs/h200/launcher.out 2>&1 &
 ```
 
 The launcher refuses to run outside `/home/aryang9/sandbox/llm-safety`, pulls `master`, checks that the tree is clean, runs the CPU-only test suite, waits until `nvidia-smi` is below `MAX_USED_MIB=20000` and `MAX_UTIL_PCT=20`, then starts the selected sweep. Override `SWEEP_SCRIPT=scripts/run_h200_ci_extension.sh` or `SWEEP_SCRIPT=scripts/run_qwen32b_followup.sh` only after the earlier registered stage has passed.
