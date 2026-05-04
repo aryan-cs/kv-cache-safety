@@ -64,6 +64,7 @@ def test_h200_sweep_run_ids_match_paper_figure_paths() -> None:
     assert 'causal_run_id="${CAUSAL_RUN_ID:-h200_causal_patch_qwen7b}"' in script
     assert "scripts/assess_claims.py" in script
     assert "scripts/plan_registered_followups.py" in script
+    assert "scripts/post_h200_next_steps.py" in script
     assert "../../results/h200_qwen_full_sweep/figures/" in tex
     assert "../../results/h200_causal_patch_qwen7b/figures/" in tex
 

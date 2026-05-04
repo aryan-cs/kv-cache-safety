@@ -171,4 +171,8 @@ uv run python scripts/aggregate_results.py --results-dir "$latest_attention"
 uv run python scripts/make_figures.py --results-dir "$latest_attention"
 uv run python scripts/export_paper_assets.py --results-dir "$latest_attention" --paper-dir paper/generated/h200_attention_diagnostic_qwen7b
 
+uv run python scripts/post_h200_next_steps.py \
+  --output-json paper/generated/post_h200_next_steps.json \
+  --output-md paper/generated/post_h200_next_steps.md
+
 echo "Primary sweep complete: $latest_full"
