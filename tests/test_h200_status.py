@@ -123,6 +123,43 @@ def test_wait_history_marks_prolonged_gate_block_only_while_blocked(tmp_path: Pa
     assert history["prolonged_gate_block"] is True
 
 
+def test_wait_history_prolonged_gate_block_starts_at_sixty_minutes(
+    tmp_path: Path,
+) -> None:
+    log = tmp_path / "wait.log"
+    log.write_text(
+        "\n".join(
+            [
+                "Waiting for H200 GPU: memory.used <= 20000 MiB and utilization <= 20%",
+                "2026-05-04T02:04:08Z memory.used=82139MiB utilization=100%",
+                "2026-05-04T03:04:07Z memory.used=82139MiB utilization=100%",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    history = _wait_history(log)
+
+    assert history["observed_wait_minutes"] == pytest.approx(59.9833333333)
+    assert history["prolonged_gate_block"] is False
+
+    log.write_text(
+        "\n".join(
+            [
+                "Waiting for H200 GPU: memory.used <= 20000 MiB and utilization <= 20%",
+                "2026-05-04T02:04:08Z memory.used=82139MiB utilization=100%",
+                "2026-05-04T03:04:08Z memory.used=82139MiB utilization=100%",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    history = _wait_history(log)
+
+    assert history["observed_wait_minutes"] == 60.0
+    assert history["prolonged_gate_block"] is True
+
+
 def test_latest_memory_plateau_tracks_repeated_latest_memory() -> None:
     plateau = _latest_memory_plateau(
         [
