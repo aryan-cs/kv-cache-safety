@@ -9,7 +9,22 @@ primary_results="${PRIMARY_RESULTS_DIR:-results/h200_qwen_full_sweep}"
 causal_results="${CAUSAL_RESULTS_DIR:-results/h200_causal_patch_qwen7b}"
 primary_paper_dir="${PRIMARY_PAPER_DIR:-paper/generated/h200_qwen_full_sweep}"
 causal_paper_dir="${CAUSAL_PAPER_DIR:-paper/generated/h200_causal_patch_qwen7b}"
+primary_audit_dir="${PRIMARY_AUDIT_SUMMARY_DIR:-paper/audit/h200_qwen_full_sweep_summary}"
+causal_audit_dir="${CAUSAL_AUDIT_SUMMARY_DIR:-paper/audit/h200_causal_patch_qwen7b_summary}"
+claim_assessment="${CLAIM_ASSESSMENT_PATH:-paper/generated/claim_assessment/claim_assessment.json}"
+arxiv_source_dir="${ARXIV_SOURCE_DIR:-paper/build/arxiv_source}"
+arxiv_archive="${ARXIV_ARCHIVE:-paper/build/arxiv_source.tar.gz}"
 mkdir -p "$build_dir"
+
+publication_status_args=(
+  --primary-results-dir "$primary_results"
+  --causal-results-dir "$causal_results"
+  --primary-audit-dir "$primary_audit_dir"
+  --causal-audit-dir "$causal_audit_dir"
+  --claim-assessment "$claim_assessment"
+  --arxiv-source-dir "$arxiv_source_dir"
+  --arxiv-archive "$arxiv_archive"
+)
 
 require_valid_pdf() {
   local pdf="$1"
@@ -29,6 +44,7 @@ if [[ "${REQUIRE_COMPLETE_PAPER:-0}" == "1" ]]; then
     --pair "$primary_paper_dir=$primary_results" \
     --pair "$causal_paper_dir=$causal_results"
   uv run python scripts/report_publication_status.py \
+    "${publication_status_args[@]}" \
     --paper-pdf "$build_dir/cache_mediated_safety_erasure.pdf" \
     --allow-missing-paper-pdf \
     --fail-if-not-ready
@@ -65,6 +81,7 @@ require_valid_pdf "$build_dir/cache_mediated_safety_erasure.pdf"
 
 if [[ "${REQUIRE_COMPLETE_PAPER:-0}" == "1" ]]; then
   uv run python scripts/report_publication_status.py \
+    "${publication_status_args[@]}" \
     --paper-pdf "$build_dir/cache_mediated_safety_erasure.pdf" \
     --fail-if-not-ready
 fi

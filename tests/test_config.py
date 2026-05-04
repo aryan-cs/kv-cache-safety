@@ -95,6 +95,21 @@ def test_h200_sweep_run_ids_match_paper_figure_paths() -> None:
     assert "../../results/h200_causal_patch_qwen7b/figures/" in tex
 
 
+def test_build_paper_pdf_status_checks_use_explicit_artifact_paths() -> None:
+    script = Path("scripts/build_paper_pdf.sh").read_text(encoding="utf-8")
+
+    assert 'primary_results="${PRIMARY_RESULTS_DIR:-results/h200_qwen_full_sweep}"' in script
+    assert 'primary_audit_dir="${PRIMARY_AUDIT_SUMMARY_DIR:-paper/audit/h200_qwen_full_sweep_summary}"' in script
+    assert 'claim_assessment="${CLAIM_ASSESSMENT_PATH:-paper/generated/claim_assessment/claim_assessment.json}"' in script
+    assert "--primary-results-dir \"$primary_results\"" in script
+    assert "--causal-results-dir \"$causal_results\"" in script
+    assert "--primary-audit-dir \"$primary_audit_dir\"" in script
+    assert "--causal-audit-dir \"$causal_audit_dir\"" in script
+    assert "--claim-assessment \"$claim_assessment\"" in script
+    assert "--arxiv-source-dir \"$arxiv_source_dir\"" in script
+    assert "--arxiv-archive \"$arxiv_archive\"" in script
+
+
 def test_h200_launcher_revalidates_after_gpu_gate() -> None:
     script = Path("scripts/wait_and_run_h200_sweep.sh").read_text(encoding="utf-8")
 
