@@ -126,6 +126,12 @@ uv run python scripts/write_h200_admin_report.py \
 
 If the status report says `Hidden GPU context likely: true`, `nvidia-smi` is showing high memory or utilization without a visible compute process inside the notebook namespace. Treat that as an infrastructure/allocation blocker, not an experiment result. Do not kill the waiting launcher, and do not run `nvidia-smi --gpu-reset` on shared infrastructure unless an administrator explicitly authorizes it. First preserve the status report, then release or restart the H200 notebook allocation from the Illinois Computes/Jupyter UI if this is your session. After reconnecting, return to `/home/aryang9/sandbox/llm-safety` and rerun `uv run python scripts/report_h200_status.py`; the existing launcher should continue waiting or start automatically once the GPU gate clears. If the launcher process is gone, restart it with the `setsid -f bash scripts/wait_and_run_h200_sweep.sh ...` command above from a clean `master` checkout.
 
+From the local checkout, copy the latest H200 status and admin-support report into `logs/h200/`:
+
+```bash
+bash scripts/fetch_h200_reports.sh
+```
+
 Run the prompt-count extension for narrower confidence intervals after the primary pilot identifies viable effects:
 
 ```bash

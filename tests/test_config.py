@@ -88,6 +88,19 @@ def test_h200_wait_script_logs_visible_gpu_users() -> None:
     assert "log_visible_gpu_users" in script
 
 
+def test_h200_report_fetcher_copies_expected_reports() -> None:
+    script = Path("scripts/fetch_h200_reports.sh").read_text(encoding="utf-8")
+    readme = Path("README.md").read_text(encoding="utf-8")
+
+    assert "H200_HOST:-uiuc-h200" in script
+    assert "/home/aryang9/sandbox/llm-safety" in script
+    assert "h200_admin_report.md" in script
+    assert "h200_status_latest.md" in script
+    assert "h200_status_latest.json" in script
+    assert "scp -q" in script
+    assert "bash scripts/fetch_h200_reports.sh" in readme
+
+
 def test_h200_readiness_uses_paper_grade_prompt_thresholds() -> None:
     primary = Path("scripts/run_h200_sweep.sh").read_text(encoding="utf-8")
     extension = Path("scripts/run_h200_ci_extension.sh").read_text(encoding="utf-8")
