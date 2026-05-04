@@ -77,6 +77,9 @@ def check_human_audit_readiness(
     unknown_ids = metrics.get("unknown_audit_ids") or []
     if unknown_ids:
         failures.append(f"unknown audit ids present: {unknown_ids[:5]}")
+    duplicate_keys = metrics.get("duplicate_annotation_keys") or []
+    if duplicate_keys:
+        failures.append(f"duplicate audit_id/annotator_id annotations present: {duplicate_keys[:5]}")
 
     label_rates = metrics.get("label_rates") or {}
     for label in required_labels:
@@ -100,6 +103,11 @@ def check_human_audit_readiness(
                 failures.append(f"missing paired baseline-policy deltas for `{label}`")
 
     if not allow_single_annotator:
+        distinct_annotator_count = int(metrics.get("distinct_annotator_count") or 0)
+        if distinct_annotator_count < 2:
+            failures.append(
+                f"distinct_annotator_count={distinct_annotator_count}; need >= 2"
+            )
         agreement = metrics.get("inter_annotator") or {}
         for label in required_labels:
             label_agreement = agreement.get(label)

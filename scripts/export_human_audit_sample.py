@@ -32,6 +32,14 @@ def main() -> None:
         default=0,
         help="Also write duplicate blinded CSV templates with prefilled annotator_id values.",
     )
+    parser.add_argument(
+        "--include-hidden-reference",
+        action="store_true",
+        help=(
+            "Include raw system/hidden-system reference text in the blinded CSV. "
+            "Default exports redact it and include only stable digests."
+        ),
+    )
     parser.add_argument("--seed", type=int, default=0)
     args = parser.parse_args()
 
@@ -40,7 +48,10 @@ def main() -> None:
         raise SystemExit(f"No generations found in {args.results_dir}")
     run_id = args.results_dir.name
     sample = _stratified_sample(rows, args.per_suite_policy, args.seed, strategy=args.strategy)
-    audit_pairs = [_audit_pair(row, run_id, idx) for idx, row in enumerate(sample)]
+    audit_pairs = [
+        _audit_pair(row, run_id, idx, include_hidden_reference=args.include_hidden_reference)
+        for idx, row in enumerate(sample)
+    ]
     blinded_rows = [pair[0] for pair in audit_pairs]
     key_rows = [pair[1] for pair in audit_pairs]
     args.output_dir.mkdir(parents=True, exist_ok=True)
@@ -187,13 +198,21 @@ def _maybe_float(value: Any) -> float | None:
         return None
 
 
-def _audit_pair(row: dict[str, Any], run_id: str, idx: int) -> tuple[dict[str, Any], dict[str, Any]]:
+def _audit_pair(
+    row: dict[str, Any],
+    run_id: str,
+    idx: int,
+    *,
+    include_hidden_reference: bool = False,
+) -> tuple[dict[str, Any], dict[str, Any]]:
     audit_id = _audit_id(row, run_id, idx)
+    system_text = row.get("system") or ""
+    hidden_system_text = row.get("hidden_system") or ""
     blinded = {
         "audit_id": audit_id,
         "category": row.get("category"),
-        "system_or_policy_text": row.get("system") or "",
-        "hidden_system_reference": row.get("hidden_system") or "",
+        "system_or_policy_digest": _text_digest(system_text),
+        "hidden_system_digest": _text_digest(hidden_system_text),
         "user_prompt": row.get("user"),
         "model_response": row.get("generated_text"),
         "human_should_refuse": "",
@@ -203,6 +222,9 @@ def _audit_pair(row: dict[str, Any], run_id: str, idx: int) -> tuple[dict[str, A
         "human_capability_correct": "",
         "human_notes": "",
     }
+    if include_hidden_reference:
+        blinded["system_or_policy_text"] = system_text
+        blinded["hidden_system_reference"] = hidden_system_text
     key = {
         "audit_id": audit_id,
         "run_id": run_id,
@@ -213,6 +235,8 @@ def _audit_pair(row: dict[str, Any], run_id: str, idx: int) -> tuple[dict[str, A
         "seed": row.get("seed"),
         "category": row.get("category"),
         "should_refuse": row.get("should_refuse"),
+        "system": system_text,
+        "hidden_system": hidden_system_text,
         "user": row.get("user"),
         "generated_text": row.get("generated_text"),
         "refusal_expected_accuracy": row.get("refusal_expected_accuracy"),
@@ -222,6 +246,12 @@ def _audit_pair(row: dict[str, Any], run_id: str, idx: int) -> tuple[dict[str, A
         "generated_word_count": row.get("generated_word_count"),
     }
     return blinded, key
+
+
+def _text_digest(text: str) -> str:
+    if not text:
+        return ""
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
 
 
 def _audit_id(row: dict[str, Any], run_id: str, idx: int) -> str:

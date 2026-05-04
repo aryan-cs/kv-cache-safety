@@ -6,7 +6,7 @@ Use `scripts/export_human_audit_sample.py` after a real run to create a stratifi
 uv run python scripts/export_human_audit_sample.py --results-dir results/<run_id>
 ```
 
-The script writes a blinded CSV for annotation and a private key JSONL that maps `audit_id` back to model, suite, policy, prompt id, seed, and automated metrics. Do not treat automated refusal-string scores as final unsafe-compliance labels without a small blinded human audit or a documented open local judge.
+The script writes a blinded CSV for annotation and a private key JSONL that maps `audit_id` back to model, suite, policy, prompt id, seed, hidden/system text, and automated metrics. By default, the blinded CSV redacts raw system and hidden-system text and includes only short digests. Use `--include-hidden-reference` only for a leakage-specific audit where annotators must compare the model response against the hidden reference. Do not treat automated refusal-string scores as final unsafe-compliance labels without a small blinded human audit or a documented open local judge.
 
 Use [labeling_guide.md](labeling_guide.md) when completing the blinded CSV. The export samples prompt-matched baseline/treatment pairs so the aggregation can compute paired human-audit deltas. By default, the exporter prioritizes pairs with the largest automated safety, leakage, or over-refusal shifts so human effort concentrates on claim-relevant examples. Add `--strategy random` for unbiased spot checks.
 
@@ -45,7 +45,7 @@ uv run python scripts/aggregate_human_audit.py \
   --output-dir paper/audit/h200_causal_patch_qwen7b_summary
 ```
 
-The completed CSV may include an optional `annotator_id` column. Multiple rows with the same `audit_id` are treated as multiple annotations and are used to compute pairwise agreement and Cohen's kappa for each boolean label.
+The completed CSV may include an optional `annotator_id` column. Multiple rows with the same `audit_id` are treated as multiple annotations only when they come from distinct annotator IDs. Duplicate `(audit_id, annotator_id)` rows are deduplicated, reported in the summary, and block publication readiness.
 
 Accepted label values are `yes`, `no`, `true`, `false`, `1`, `0`, or blank. The aggregation writes:
 
@@ -58,7 +58,7 @@ Accepted label values are `yes`, `no`, `true`, `false`, `1`, `0`, or blank. The 
 - `human_audit_deltas_table.tex`
 - `audit_manifest.json`
 
-The JSON summary includes Wilson confidence intervals for label rates, automated-vs-human confusion matrices, pairwise inter-annotator agreement, and paired baseline-vs-policy deltas when the same `prompt_id`, `seed`, and annotator appear under `none` and a treatment policy.
+The JSON summary includes Wilson confidence intervals for label rates, automated-vs-human confusion matrices, pairwise inter-annotator agreement across distinct annotators, duplicate-annotation diagnostics, and paired baseline-vs-policy deltas when the same `prompt_id`, `seed`, and annotator appear under `none` and a treatment policy.
 
 Before using the audit in the paper, run:
 
@@ -68,4 +68,4 @@ uv run python scripts/check_human_audit_readiness.py \
   --require-baseline-deltas
 ```
 
-By default this requires complete annotations, no unknown audit IDs, non-empty core safety labels, paired treatment-minus-baseline deltas, and at least one inter-annotator pair for each core label. Use `--allow-single-annotator` only for a clearly documented draft or ablation.
+By default this requires complete annotations, no unknown audit IDs, no duplicate `(audit_id, annotator_id)` rows, at least two distinct annotators, non-empty core safety labels, paired treatment-minus-baseline deltas, and at least one inter-annotator pair for each core label. Use `--allow-single-annotator` only for a clearly documented draft or ablation.

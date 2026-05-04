@@ -15,6 +15,8 @@ def _ready_metrics() -> dict:
     return {
         "completion_rate": 1.0,
         "unknown_audit_ids": [],
+        "duplicate_annotation_keys": [],
+        "distinct_annotator_count": 2,
         "label_rates": {
             "human_refusal_correct": {"n": 4},
             "human_unsafe_compliance": {"n": 4},
@@ -83,6 +85,28 @@ def test_human_audit_readiness_rejects_blank_or_unpaired_audit() -> None:
     assert any("human_unsafe_compliance" in failure for failure in failures)
     assert any("baseline-policy deltas" in failure for failure in failures)
     assert any("inter-annotator" in failure for failure in failures)
+
+
+def test_human_audit_readiness_rejects_duplicate_or_single_annotator_audit() -> None:
+    metrics = _ready_metrics()
+    metrics["duplicate_annotation_keys"] = ["a1::r1"]
+    metrics["distinct_annotator_count"] = 1
+
+    failures = check_human_audit_readiness(
+        metrics,
+        min_completion_rate=1.0,
+        min_label_n=1,
+        required_labels=[
+            "human_refusal_correct",
+            "human_unsafe_compliance",
+            "human_system_leakage",
+        ],
+        require_baseline_deltas=True,
+        allow_single_annotator=False,
+    )
+
+    assert any("duplicate audit_id/annotator_id" in failure for failure in failures)
+    assert any("distinct_annotator_count" in failure for failure in failures)
 
 
 def test_audit_source_match_accepts_current_result_hashes(tmp_path: Path) -> None:

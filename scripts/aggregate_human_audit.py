@@ -73,6 +73,7 @@ def aggregate_human_audit(audit_csv_paths: list[Path], key_jsonl_path: Path) -> 
         annotation_rows.extend(_read_audit_csv(path))
     if not annotation_rows:
         raise ValueError("No audit annotations found.")
+    annotation_rows, duplicate_annotation_keys = _dedupe_annotation_rows(annotation_rows)
 
     joined_rows = []
     unknown_ids = []
@@ -83,7 +84,12 @@ def aggregate_human_audit(audit_csv_paths: list[Path], key_jsonl_path: Path) -> 
             unknown_ids.append(audit_id)
             continue
         joined_rows.append(_joined_row(row, key))
-    metrics = _audit_metrics(joined_rows, expected_audit_ids=set(key_rows), unknown_ids=unknown_ids)
+    metrics = _audit_metrics(
+        joined_rows,
+        expected_audit_ids=set(key_rows),
+        unknown_ids=unknown_ids,
+        duplicate_annotation_keys=duplicate_annotation_keys,
+    )
     return {"metrics": metrics, "joined_rows": joined_rows}
 
 
@@ -115,6 +121,24 @@ def _joined_row(annotation: dict[str, str], key: dict[str, Any]) -> dict[str, An
     }
 
 
+def _dedupe_annotation_rows(
+    rows: list[dict[str, str]],
+) -> tuple[list[dict[str, str]], list[str]]:
+    seen: set[tuple[str, str]] = set()
+    deduped: list[dict[str, str]] = []
+    duplicate_keys: list[str] = []
+    for row in rows:
+        audit_id = str(row.get("audit_id", ""))
+        annotator_id = row.get("annotator_id") or row.get("rater_id") or "annotator_0"
+        key = (audit_id, str(annotator_id))
+        if key in seen:
+            duplicate_keys.append(f"{audit_id}::{annotator_id}")
+            continue
+        seen.add(key)
+        deduped.append(row)
+    return deduped, sorted(set(duplicate_keys))
+
+
 def parse_bool(value: Any) -> bool | None:
     if value is None:
         return None
@@ -135,6 +159,7 @@ def _audit_metrics(
     *,
     expected_audit_ids: set[str],
     unknown_ids: list[str],
+    duplicate_annotation_keys: list[str],
 ) -> dict[str, Any]:
     completed_ids = {
         str(row["audit_id"])
@@ -151,6 +176,11 @@ def _audit_metrics(
         "completed_audit_count": len(completed_ids),
         "completion_rate": len(completed_ids) / len(expected_audit_ids) if expected_audit_ids else None,
         "unknown_audit_ids": sorted(set(unknown_ids)),
+        "duplicate_annotation_keys": duplicate_annotation_keys,
+        "distinct_annotator_count": len(
+            {str(row.get("annotator_id")) for row in joined_rows if row.get("annotator_id")}
+        ),
+        "multi_annotator_audit_count": _multi_annotator_audit_count(joined_rows),
         "label_rates": {field: _rate(joined_rows, field) for field in BOOLEAN_LABELS},
         "automated_label_disagreement": _automated_disagreement(joined_rows),
         "automated_label_confusion": _automated_confusion(joined_rows),
@@ -306,18 +336,25 @@ def _auto_bool(value: Any) -> bool | None:
 
 
 def _inter_annotator_agreement(rows: list[dict[str, Any]], field: str) -> dict[str, Any]:
-    by_audit_id: dict[str, list[bool]] = defaultdict(list)
+    by_audit_id: dict[str, dict[str, bool]] = defaultdict(dict)
     for row in rows:
         value = row.get(field)
         if value is not None:
-            by_audit_id[str(row["audit_id"])].append(bool(value))
+            annotator_id = str(row.get("annotator_id") or "annotator_0")
+            by_audit_id[str(row["audit_id"])][annotator_id] = bool(value)
     pairs = []
-    for values in by_audit_id.values():
+    for by_annotator in by_audit_id.values():
+        values = list(by_annotator.values())
         if len(values) < 2:
             continue
         pairs.extend((left, right) for left, right in combinations(values, 2))
     if not pairs:
-        return {"pair_count": 0, "agreement": None, "cohens_kappa": None}
+        return {
+            "pair_count": 0,
+            "multi_annotator_item_count": 0,
+            "agreement": None,
+            "cohens_kappa": None,
+        }
     observed = mean(1.0 if left == right else 0.0 for left, right in pairs)
     left_true = mean(1.0 if left else 0.0 for left, _ in pairs)
     right_true = mean(1.0 if right else 0.0 for _, right in pairs)
@@ -328,9 +365,18 @@ def _inter_annotator_agreement(rows: list[dict[str, Any]], field: str) -> dict[s
         kappa = (observed - expected) / (1.0 - expected)
     return {
         "pair_count": len(pairs),
+        "multi_annotator_item_count": sum(1 for values in by_audit_id.values() if len(values) >= 2),
         "agreement": float(observed),
         "cohens_kappa": float(kappa) if kappa is not None else None,
     }
+
+
+def _multi_annotator_audit_count(rows: list[dict[str, Any]]) -> int:
+    by_audit_id: dict[str, set[str]] = defaultdict(set)
+    for row in rows:
+        if any(row.get(field) is not None for field in BOOLEAN_LABELS):
+            by_audit_id[str(row["audit_id"])].add(str(row.get("annotator_id") or "annotator_0"))
+    return sum(1 for annotators in by_audit_id.values() if len(annotators) >= 2)
 
 
 def _wilson_ci(successes: int, n: int, z: float = 1.96) -> tuple[float | None, float | None]:

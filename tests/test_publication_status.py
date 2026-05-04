@@ -544,6 +544,9 @@ def _write_audit(
         "completed_audit_count": 10,
         "completion_rate": 1.0,
         "unknown_audit_ids": [],
+        "duplicate_annotation_keys": [],
+        "distinct_annotator_count": 2,
+        "multi_annotator_audit_count": 2 if include_inter_annotator else 0,
         "label_rates": {label: {"n": 10, "mean": 0.5} for label in REQUIRED_AUDIT_LABELS},
         "baseline_policy_deltas": {
             f"public_refusal_safety::kv_int4_sim::{label}": {"n": 5, "mean_delta": 0.1}
