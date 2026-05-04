@@ -26,6 +26,7 @@ fi
 fetch_remote_report h200_status_latest.md h200_status_latest.md
 fetch_remote_report h200_status_latest.json h200_status_latest.json
 fetch_remote_report h200_support_bundle_latest.tar.gz h200_support_bundle_latest.tar.gz
+fetch_remote_report h200_support_bundle_latest.manifest.json h200_support_bundle_latest.manifest.json
 
 echo "Fetched H200 reports into ${local_dir}:"
 report_files=(
@@ -35,5 +36,8 @@ report_files=(
 )
 if [[ -f "${local_dir}/h200_support_bundle_latest.tar.gz" ]]; then
   report_files+=("${local_dir}/h200_support_bundle_latest.tar.gz")
+fi
+if [[ -f "${local_dir}/h200_support_bundle_latest.manifest.json" ]]; then
+  report_files+=("${local_dir}/h200_support_bundle_latest.manifest.json")
 fi
 ls -lh "${report_files[@]}"

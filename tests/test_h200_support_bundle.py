@@ -40,10 +40,12 @@ def test_support_bundle_packages_only_infrastructure_diagnostics(tmp_path: Path)
         admin_md=admin_md,
         output=output,
     )
+    sidecar_manifest = output.with_suffix("").with_suffix(".manifest.json")
 
     with tarfile.open(output, "r:gz") as archive:
         names = sorted(archive.getnames())
         manifest = json.loads(archive.extractfile("manifest.json").read().decode("utf-8"))
+    sidecar = json.loads(sidecar_manifest.read_text(encoding="utf-8"))
 
     assert names == [
         "h200_admin_report.md",
@@ -55,6 +57,8 @@ def test_support_bundle_packages_only_infrastructure_diagnostics(tmp_path: Path)
     assert manifest["contains_model_generations"] is False
     assert manifest["contains_paper_evidence"] is False
     assert manifest["hidden_gpu_context_likely"] is True
+    assert sidecar["git_commit"] == "abc123"
+    assert sidecar["files"][0]["arcname"] == "h200_status_latest.json"
 
 
 def test_support_bundle_inputs_skip_missing_optional_files(tmp_path: Path) -> None:
