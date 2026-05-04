@@ -7,6 +7,7 @@ sys.path.insert(0, str(Path("scripts").resolve()))
 
 from report_h200_status import (
     _artifact_status,
+    _gpu_gate_block_reasons,
     _gpu_gate_likely_blocked,
     _is_status_probe_process,
     _latest_memory_plateau,
@@ -35,6 +36,17 @@ def test_parse_gpu_query_line() -> None:
         "utilization_pct": 100,
     }
     assert _gpu_gate_likely_blocked(parsed)
+    assert _gpu_gate_block_reasons(parsed) == ["memory_used", "utilization"]
+
+
+def test_gpu_gate_block_reasons_can_report_utilization_only() -> None:
+    assert _gpu_gate_block_reasons(
+        {
+            "available": True,
+            "memory_used_mib": 5947,
+            "utilization_pct": 67,
+        }
+    ) == ["utilization"]
 
 
 def test_parse_gpu_query_line_rejects_malformed_output() -> None:
@@ -276,6 +288,7 @@ def test_render_markdown_summarizes_blocked_launcher() -> None:
             "experiment_running": False,
             "launcher_waiting": True,
             "gpu_gate_likely_blocked": True,
+            "gpu_gate_block_reasons": ["memory_used", "utilization"],
             "hidden_gpu_context_likely": True,
             "gpu": {
                 "available": True,
@@ -335,6 +348,7 @@ def test_render_markdown_summarizes_blocked_launcher() -> None:
     )
 
     assert "GPU gate likely blocked: `true`" in text
+    assert "gate block reasons: `memory_used, utilization`" in text
     assert "none reported by `nvidia-smi --query-compute-apps`" in text
     assert "Process Monitor Snapshot" in text
     assert "none found by scanning local `/proc/*/fd`" in text

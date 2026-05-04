@@ -38,6 +38,8 @@ WAIT_THRESHOLD_RE = re.compile(
     r"^Waiting for H200 GPU: memory\.used <= (?P<memory>\d+) MiB "
     r"and utilization <= (?P<utilization>\d+)%$"
 )
+DEFAULT_GATE_MEMORY_USED_MIB = 20_000
+DEFAULT_GATE_UTILIZATION_PCT = 20
 
 
 def main() -> None:
@@ -82,6 +84,7 @@ def h200_status(repo_dir: Path, *, log_lines: int = 40) -> dict[str, Any]:
         "experiment_running": any("run_experiment.py" in row["command"] for row in processes),
         "launcher_waiting": any("wait_for_h200_gpu" in row["command"] for row in processes),
         "gpu_gate_likely_blocked": _gpu_gate_likely_blocked(gpu),
+        "gpu_gate_block_reasons": _gpu_gate_block_reasons(gpu),
         "hidden_gpu_context_likely": _hidden_gpu_context_likely(gpu),
     }
 
@@ -107,6 +110,9 @@ def render_markdown(status: dict[str, Any]) -> str:
             f"- `{gpu['name']}` memory `{gpu['memory_used_mib']}/{gpu['memory_total_mib']} MiB`, "
             f"utilization `{gpu['utilization_pct']}%`"
         )
+        reasons = status.get("gpu_gate_block_reasons") or []
+        reason_text = ", ".join(reasons) if reasons else "none"
+        lines.append(f"- gate block reasons: `{reason_text}`")
     else:
         lines.append(f"- unavailable: `{gpu.get('error')}`")
     if gpu.get("available"):
@@ -265,9 +271,18 @@ def _parse_gpu_query_line(line: str) -> dict[str, Any] | None:
 
 
 def _gpu_gate_likely_blocked(gpu: dict[str, Any]) -> bool:
+    return bool(_gpu_gate_block_reasons(gpu))
+
+
+def _gpu_gate_block_reasons(gpu: dict[str, Any]) -> list[str]:
     if not gpu.get("available"):
-        return False
-    return int(gpu.get("memory_used_mib") or 0) > 20_000 or int(gpu.get("utilization_pct") or 0) > 20
+        return []
+    reasons = []
+    if int(gpu.get("memory_used_mib") or 0) > DEFAULT_GATE_MEMORY_USED_MIB:
+        reasons.append("memory_used")
+    if int(gpu.get("utilization_pct") or 0) > DEFAULT_GATE_UTILIZATION_PCT:
+        reasons.append("utilization")
+    return reasons
 
 
 def _hidden_gpu_context_likely(gpu: dict[str, Any]) -> bool:
@@ -459,7 +474,10 @@ def _latest_launcher_log(repo_dir: Path) -> Path | None:
 
 def _wait_history(path: Path) -> dict[str, Any]:
     samples = []
-    threshold = {"memory_used_mib": 20_000, "utilization_pct": 20}
+    threshold = {
+        "memory_used_mib": DEFAULT_GATE_MEMORY_USED_MIB,
+        "utilization_pct": DEFAULT_GATE_UTILIZATION_PCT,
+    }
     for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
         parsed_threshold = _parse_wait_threshold(line)
         if parsed_threshold is not None:
