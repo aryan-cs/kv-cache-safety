@@ -182,7 +182,19 @@ After the primary and causal H200 runs complete, rebuild all paper artifacts fro
 bash scripts/build_publication_artifacts.sh
 ```
 
-This command regenerates aggregate metrics, figures, paper tables, CI planning files, the evidence-gated claim assessment, readiness checks, the readable PDF, and the arXiv source bundle. It fails if the required real result artifacts, completed human-audit summaries, or cache-mediated-safety-erasure claim gates are missing. For a non-publication draft rebuild before audit labels or claim gates are complete, set `REQUIRE_HUMAN_AUDIT=0 REQUIRE_CACHE_MEDIATED_CLAIM=0`.
+This command regenerates aggregate metrics, figures, paper tables, CI planning files, the evidence-gated claim assessment, readiness checks, the readable PDF, and the arXiv source bundle. It fails if the required real result artifacts, completed human-audit summaries, or cache-mediated-safety-erasure claim gates are missing.
+
+If early results are weak or mixed, do not silently search for a better framing. Generate an evidence-gated follow-up plan from the completed claim assessment:
+
+```bash
+uv run python scripts/plan_registered_followups.py \
+  --claim-assessment paper/generated/preliminary_claim_assessment/claim_assessment.json \
+  --primary-ci-power results/h200_qwen_full_sweep/ci_power.json \
+  --causal-ci-power results/h200_causal_patch_qwen7b/ci_power.json \
+  --output-dir paper/generated/preliminary_followup_plan
+```
+
+The follow-up planner records whether the next legitimate step is a causal extension, a powered selectivity extension, a human-audit repair, a model-family replication, or a clearly preregistered pivot. It preserves the novelty search while preventing post-hoc threshold changes or unregistered suite/policy additions from becoming the main paper claim.
 
 Human-audit summaries must also pass the audit-readiness gate:
 

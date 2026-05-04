@@ -63,6 +63,7 @@ def test_h200_sweep_run_ids_match_paper_figure_paths() -> None:
     assert 'full_run_id="${FULL_RUN_ID:-h200_qwen_full_sweep}"' in script
     assert 'causal_run_id="${CAUSAL_RUN_ID:-h200_causal_patch_qwen7b}"' in script
     assert "scripts/assess_claims.py" in script
+    assert "scripts/plan_registered_followups.py" in script
     assert "../../results/h200_qwen_full_sweep/figures/" in tex
     assert "../../results/h200_causal_patch_qwen7b/figures/" in tex
 
@@ -124,6 +125,7 @@ def test_publication_artifact_builder_fails_without_real_results() -> None:
     assert "paper/cache_mediated_safety_erasure.pdf" in script
     assert "scripts/package_arxiv_submission.py" in script
     assert "scripts/assess_claims.py" in script
+    assert "scripts/plan_registered_followups.py" in script
     assert "scripts/report_publication_status.py" in script
     assert "REQUIRE_COMPLETE_PAPER=1 bash scripts/build_paper_pdf.sh" in script
     assert "publication_status.md" in script

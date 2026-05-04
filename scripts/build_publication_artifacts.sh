@@ -167,6 +167,11 @@ assess_claims() {
     --require-cache-mediated-claim
   )
   uv run python scripts/assess_claims.py "${claim_args[@]}"
+  uv run python scripts/plan_registered_followups.py \
+    --claim-assessment paper/generated/claim_assessment/claim_assessment.json \
+    --primary-ci-power "$primary_results/ci_power.json" \
+    --causal-ci-power "$causal_results/ci_power.json" \
+    --output-dir paper/generated/registered_followup_plan
 }
 
 write_publication_status() {

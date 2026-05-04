@@ -150,6 +150,11 @@ uv run python scripts/assess_claims.py \
   --primary-results-dir "$latest_full" \
   --causal-results-dir "$latest_causal" \
   --output-dir paper/generated/preliminary_claim_assessment
+uv run python scripts/plan_registered_followups.py \
+  --claim-assessment paper/generated/preliminary_claim_assessment/claim_assessment.json \
+  --primary-ci-power "$latest_full/ci_power.json" \
+  --causal-ci-power "$latest_causal/ci_power.json" \
+  --output-dir paper/generated/preliminary_followup_plan
 uv run python scripts/export_human_audit_sample.py \
   --results-dir "$latest_causal" \
   --per-suite-policy "$audit_per_suite_policy" \
