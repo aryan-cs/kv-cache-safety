@@ -205,6 +205,8 @@ uv run python scripts/post_h200_next_steps.py \
 if [[ "$attempt_publication_build" == "1" ]]; then
   if ! bash scripts/build_publication_artifacts.sh; then
     echo "Publication build did not pass. See paper/build/publication_status.md and claim assessment artifacts."
+    echo "Building an honest evidence-gated PDF/arXiv bundle from the completed artifacts."
+    bash scripts/build_evidence_gated_paper_artifacts.sh
   fi
 fi
 

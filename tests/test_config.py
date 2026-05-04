@@ -319,6 +319,8 @@ def test_complete_paper_build_checks_publication_status_before_latex() -> None:
 
     assert "scripts/check_latex_placeholders.py" in script
     assert "scripts/check_paper_asset_freshness.py" in script
+    assert "ALLOW_NONPASSING_CLAIM_PAPER" in script
+    assert "publication_status_fail_args" in script
     assert "scripts/report_publication_status.py" in script
     assert script.count("scripts/report_publication_status.py") == 2
     assert "--allow-missing-paper-pdf" in script
@@ -337,6 +339,17 @@ def test_complete_paper_build_checks_publication_status_before_latex() -> None:
     assert script.rindex("scripts/report_publication_status.py") < script.index(copy_cmd)
     assert "require_valid_pdf paper/cache_mediated_safety_erasure.pdf" in script
     assert "cd \"$src_dir\"\n    latexmk" in script
+
+
+def test_evidence_gated_paper_builder_allows_nonpassing_claim_pdf() -> None:
+    script = Path("scripts/build_evidence_gated_paper_artifacts.sh").read_text(encoding="utf-8")
+    finalizer = Path("scripts/finalize_h200_after_causal.sh").read_text(encoding="utf-8")
+
+    assert "ALLOW_NONPASSING_CLAIM_PAPER=1" in script
+    assert "REQUIRE_COMPLETE_PAPER=1" in script
+    assert "scripts/package_arxiv_submission.py" in script
+    assert "--require-arxiv-bundle" in script
+    assert "build_evidence_gated_paper_artifacts.sh" in finalizer
 
 
 def test_h200_scripts_use_composite_public_refusal_suite() -> None:

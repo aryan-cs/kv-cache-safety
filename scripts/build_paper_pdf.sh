@@ -62,6 +62,10 @@ publication_status_args=(
   --arxiv-source-dir "$arxiv_source_dir"
   --arxiv-archive "$arxiv_archive"
 )
+publication_status_fail_args=()
+if [[ "${ALLOW_NONPASSING_CLAIM_PAPER:-0}" != "1" ]]; then
+  publication_status_fail_args+=(--fail-if-not-ready)
+fi
 
 require_valid_pdf() {
   local pdf="$1"
@@ -102,7 +106,7 @@ if [[ "${REQUIRE_COMPLETE_PAPER:-0}" == "1" ]]; then
     "${publication_status_args[@]}" \
     --paper-pdf "$build_dir/cache_mediated_safety_erasure.pdf" \
     --allow-missing-paper-pdf \
-    --fail-if-not-ready
+    "${publication_status_fail_args[@]}"
 fi
 
 rm -f "$build_dir/main.pdf" "$build_dir/cache_mediated_safety_erasure.pdf"
@@ -142,7 +146,7 @@ if [[ "${REQUIRE_COMPLETE_PAPER:-0}" == "1" ]]; then
   uv run python scripts/report_publication_status.py \
     "${publication_status_args[@]}" \
     --paper-pdf "$build_dir/cache_mediated_safety_erasure.pdf" \
-    --fail-if-not-ready
+    "${publication_status_fail_args[@]}"
 fi
 
 cp "$build_dir/cache_mediated_safety_erasure.pdf" paper/cache_mediated_safety_erasure.pdf
