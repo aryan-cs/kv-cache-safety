@@ -27,6 +27,9 @@ FIGURE_SOURCES = {
     "safety_state_atlas.pdf": Path(
         "results/h200_qwen_full_sweep/figures/safety_state_atlas.pdf"
     ),
+    "causal_restoration_fraction.pdf": Path(
+        "results/h200_causal_patch_qwen7b/figures/causal_restoration_fraction.pdf"
+    ),
     "causal_restoration_flow.pdf": Path(
         "results/h200_causal_patch_qwen7b/figures/causal_restoration_flow.pdf"
     ),

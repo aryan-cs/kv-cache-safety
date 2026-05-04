@@ -455,6 +455,9 @@ def _check_active_compression(cache_stats_path: Path, manifest: dict, failures: 
         "evicted_count",
         "retained_system_tokens",
         "evicted_system_tokens",
+        "protected_candidate_count",
+        "protected_retained_count",
+        "protected_dropped_count",
         "quantization_bits",
         "cache_l2_before",
         "cache_l2_after",
@@ -488,6 +491,9 @@ def _check_active_compression(cache_stats_path: Path, manifest: dict, failures: 
             evicted_count = _float_at(table, "evicted_count", idx)
             retained_system = _float_at(table, "retained_system_tokens", idx)
             evicted_system = _float_at(table, "evicted_system_tokens", idx)
+            protected_candidate_count = _float_at(table, "protected_candidate_count", idx)
+            protected_retained_count = _float_at(table, "protected_retained_count", idx)
+            protected_dropped_count = _float_at(table, "protected_dropped_count", idx)
             quantization_bits = table.get("quantization_bits", [None] * len(policies))[idx]
             before = _float_at(table, "cache_l2_before", idx)
             after = _float_at(table, "cache_l2_after", idx)
@@ -502,6 +508,14 @@ def _check_active_compression(cache_stats_path: Path, manifest: dict, failures: 
                         stats[policy]["pre_response_system_touched"] += 1
                 if evicted_system > 0:
                     stats[policy]["pre_response_system_touched"] += evicted_system
+                if (
+                    policy.startswith("policy_pinned")
+                    and protected_candidate_count > 0
+                    and (protected_retained_count > 0 or protected_dropped_count > 0)
+                ):
+                    stats[policy]["pre_response_system_touched"] += max(
+                        protected_retained_count, protected_dropped_count
+                    )
             stats[policy]["l2_delta"] += abs(before - after)
     for policy, policy_stats in stats.items():
         if policy_stats["rows"] == 0:

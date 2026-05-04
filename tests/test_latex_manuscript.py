@@ -3,6 +3,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path("scripts").resolve()))
 
+from check_latex_placeholders import missing_placeholder_artifacts
 from package_arxiv_submission import GENERATED_DIRS, _rewrite_main_tex_for_arxiv
 
 
@@ -19,6 +20,7 @@ def test_latex_manuscript_is_formal_registered_protocol() -> None:
     assert r"\maybeinputtable{../generated/claim_assessment/claim_assessment_table.tex}" in tex
     assert r"\maybeinputtable{../generated/claim_assessment/claim_interpretation.tex}" in tex
     assert r"\maybeinputtable{../audit/h200_qwen_full_sweep_summary/human_audit_summary_table.tex}" in tex
+    assert "causal_restoration_fraction.pdf" in tex
     assert r"\PrimaryTopSSEIPolicy" in tex
     assert r"\bibliography{../references}" in tex
     assert "neurips" not in tex.lower()
@@ -67,6 +69,9 @@ def test_arxiv_rewrite_uses_local_bibliography_and_figures() -> None:
     assert "figures/safety_state_atlas.pdf" in _rewrite_main_tex_for_arxiv(
         "../../results/h200_qwen_full_sweep/figures/safety_state_atlas.pdf"
     )
+    assert "figures/causal_restoration_fraction.pdf" in _rewrite_main_tex_for_arxiv(
+        "../../results/h200_causal_patch_qwen7b/figures/causal_restoration_fraction.pdf"
+    )
     assert "generated/h200_qwen_full_sweep" in _rewrite_main_tex_for_arxiv(
         "../generated/h200_qwen_full_sweep/main_results_table.tex"
     )
@@ -78,3 +83,17 @@ def test_arxiv_rewrite_uses_local_bibliography_and_figures() -> None:
         "../audit/h200_qwen_full_sweep_summary/human_audit_summary_table.tex"
     )
     assert "../../results" not in rewritten
+
+
+def test_latex_placeholder_checker_reports_missing_artifacts(tmp_path: Path) -> None:
+    tex = tmp_path / "main.tex"
+    existing = tmp_path / "figure.pdf"
+    existing.write_text("not a real pdf", encoding="utf-8")
+    tex.write_text(
+        r"\maybeincludegraphic{figure.pdf}{0.9\linewidth}{ok}"
+        "\n"
+        r"\maybeinputtable{missing/table.tex}{pending}",
+        encoding="utf-8",
+    )
+
+    assert missing_placeholder_artifacts(tex) == ["missing/table.tex"]

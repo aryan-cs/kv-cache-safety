@@ -23,9 +23,13 @@ def test_claim_assessment_passes_only_with_causal_system_control_gap() -> None:
 
 def test_claim_assessment_rejects_selective_effect_without_causal_control_gap() -> None:
     causal = _causal_positive_metrics()
-    causal["causal_restoration"][
+    user_control = causal["causal_restoration"][
         "public_refusal_safety::kv_int4_sim__patchkey-value__roleuser__matchsystem"
-    ]["safety_restoration_fraction"] = 0.60
+    ]
+    user_control["safety_restoration_fraction"] = 0.60
+    user_control["safety_restoration_fraction_ci"] = {"mean": 0.60, "ci_low": 0.55, "ci_high": 0.70}
+    user_control["refusal_restoration_fraction"] = 0.60
+    user_control["refusal_restoration_fraction_ci"] = {"mean": 0.60, "ci_low": 0.55, "ci_high": 0.70}
 
     assessment = assess_claims(_primary_positive_metrics(), causal)
 
@@ -42,6 +46,18 @@ def test_claim_assessment_rejects_missing_intervals() -> None:
     assert assessment["publication_gate"]["passed"] is False
     assert assessment["claims"]["H1_behavioral_cache_sensitivity"]["passed"] is False
     assert "no eligible interval" in assessment["claims"]["H1_behavioral_cache_sensitivity"]["summary"]
+
+
+def test_claim_assessment_rejects_causal_point_estimates_without_intervals() -> None:
+    causal = _causal_positive_metrics()
+    for values in causal["causal_restoration"].values():
+        values.pop("safety_restoration_fraction_ci", None)
+        values.pop("refusal_restoration_fraction_ci", None)
+
+    assessment = assess_claims(_primary_positive_metrics(), causal)
+
+    assert assessment["claims"]["H3_causal_safety_state_erasure"]["passed"] is False
+    assert "No matched system-patch" in assessment["claims"]["H3_causal_safety_state_erasure"]["summary"]
 
 
 def test_claim_assessment_latex_table_is_formal_and_escaped() -> None:
@@ -66,9 +82,13 @@ def test_claim_interpretation_allows_full_claim_only_when_all_gates_pass() -> No
 
 def test_claim_interpretation_blocks_causal_claim_for_selective_only_result() -> None:
     causal = _causal_positive_metrics()
-    causal["causal_restoration"][
+    user_control = causal["causal_restoration"][
         "public_refusal_safety::kv_int4_sim__patchkey-value__roleuser__matchsystem"
-    ]["safety_restoration_fraction"] = 0.60
+    ]
+    user_control["safety_restoration_fraction"] = 0.60
+    user_control["safety_restoration_fraction_ci"] = {"mean": 0.60, "ci_low": 0.55, "ci_high": 0.70}
+    user_control["refusal_restoration_fraction"] = 0.60
+    user_control["refusal_restoration_fraction_ci"] = {"mean": 0.60, "ci_low": 0.55, "ci_high": 0.70}
     assessment = assess_claims(_primary_positive_metrics(), causal)
 
     latex = render_interpretation_latex(assessment)
@@ -147,12 +167,36 @@ def _causal_positive_metrics() -> dict:
             "public_refusal_safety::kv_int4_sim__patchkey-value__rolesystem": {
                 "compressed_policy": "kv_int4_sim",
                 "safety_restoration_fraction": 0.62,
+                "safety_restoration_fraction_ci": {
+                    "mean": 0.62,
+                    "ci_low": 0.50,
+                    "ci_high": 0.72,
+                    "cluster_n": 100,
+                },
                 "refusal_restoration_fraction": 0.55,
+                "refusal_restoration_fraction_ci": {
+                    "mean": 0.55,
+                    "ci_low": 0.44,
+                    "ci_high": 0.66,
+                    "cluster_n": 100,
+                },
             },
             "public_refusal_safety::kv_int4_sim__patchkey-value__roleuser__matchsystem": {
                 "compressed_policy": "kv_int4_sim",
                 "safety_restoration_fraction": 0.20,
+                "safety_restoration_fraction_ci": {
+                    "mean": 0.20,
+                    "ci_low": 0.12,
+                    "ci_high": 0.30,
+                    "cluster_n": 100,
+                },
                 "refusal_restoration_fraction": 0.18,
+                "refusal_restoration_fraction_ci": {
+                    "mean": 0.18,
+                    "ci_low": 0.10,
+                    "ci_high": 0.25,
+                    "cluster_n": 100,
+                },
             },
         }
     }

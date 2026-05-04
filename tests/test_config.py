@@ -125,10 +125,12 @@ def test_publication_artifact_builder_fails_without_real_results() -> None:
     assert "scripts/package_arxiv_submission.py" in script
     assert "scripts/assess_claims.py" in script
     assert "scripts/report_publication_status.py" in script
+    assert "REQUIRE_COMPLETE_PAPER=1 bash scripts/build_paper_pdf.sh" in script
     assert "publication_status.md" in script
     assert "--require-cache-mediated-claim" in script
     assert "--required-figure prompt_effect_constellation" in script
     assert "--required-figure safety_state_atlas" in script
+    assert "--required-figure causal_restoration_fraction" in script
 
 
 def test_h200_scripts_use_composite_public_refusal_suite() -> None:

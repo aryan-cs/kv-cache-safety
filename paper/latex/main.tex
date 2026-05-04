@@ -275,9 +275,16 @@ For audited prompts, the analysis embeds each prompt-condition pair using open e
 
 \begin{figure}[t]
   \centering
-  \maybeincludegraphic{../../results/h200_causal_patch_qwen7b/figures/causal_restoration_flow.pdf}{0.92\linewidth}{Compressed, system-patched, matched-user-patched, and policy-pinned conditions.}
-  \caption{Causal restoration test. The key comparison is system-role patching versus matched user-role patching.}
+  \maybeincludegraphic{../../results/h200_causal_patch_qwen7b/figures/causal_restoration_fraction.pdf}{0.92\linewidth}{Restoration fraction by causal patch and policy-pinned condition.}
+  \caption{Causal restoration fractions. The key comparison is system-role restoration versus matched user-role restoration under the same compressed condition.}
   \label{fig:causal}
+\end{figure}
+
+\begin{figure}[t]
+  \centering
+  \maybeincludegraphic{../../results/h200_causal_patch_qwen7b/figures/causal_restoration_flow.pdf}{0.92\linewidth}{Compressed, system-patched, matched-user-patched, and policy-pinned conditions.}
+  \caption{Causal restoration flow. The diagnostic pattern is movement toward baseline for policy-relevant restoration more than matched controls.}
+  \label{fig:causal-flow}
 \end{figure}
 
 \section{Results}

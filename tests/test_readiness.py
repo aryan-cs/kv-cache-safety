@@ -124,6 +124,45 @@ def test_active_compression_accepts_quantization(tmp_path: Path) -> None:
     assert failures == []
 
 
+@pytest.mark.skipif(
+    __import__("importlib").util.find_spec("pyarrow") is None,
+    reason="pyarrow is not installed in the base interpreter",
+)
+def test_active_compression_accepts_policy_pinned_protected_system_tokens(
+    tmp_path: Path,
+) -> None:
+    import pandas as pd
+
+    cache_stats = tmp_path / "cache_stats.parquet"
+    pd.DataFrame(
+        [
+            {
+                "policy": "policy_pinned__budget128",
+                "decode_step": 0,
+                "original_seq_len": 200,
+                "evicted_count": 72,
+                "retained_system_tokens": 5,
+                "evicted_system_tokens": 0,
+                "protected_candidate_count": 5,
+                "protected_retained_count": 5,
+                "protected_dropped_count": 0,
+                "quantization_bits": None,
+                "cache_l2_before": 2.0,
+                "cache_l2_after": 1.4,
+            }
+        ]
+    ).to_parquet(cache_stats, index=False)
+    failures: list[str] = []
+
+    _check_active_compression(
+        cache_stats,
+        {"cache_policy_labels": ["none", "policy_pinned__budget128"]},
+        failures,
+    )
+
+    assert failures == []
+
+
 def test_causal_patch_config_requires_system_and_matched_user_control() -> None:
     failures: list[str] = []
 

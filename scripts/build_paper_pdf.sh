@@ -7,6 +7,10 @@ src_dir="paper/latex"
 build_dir="paper/build"
 mkdir -p "$build_dir"
 
+if [[ "${REQUIRE_COMPLETE_PAPER:-0}" == "1" ]]; then
+  uv run python scripts/check_latex_placeholders.py --tex "$src_dir/main.tex"
+fi
+
 if command -v tectonic >/dev/null 2>&1; then
   (
     cd "$src_dir"

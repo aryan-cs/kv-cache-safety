@@ -352,34 +352,41 @@ def _assess_causal_restoration(
     min_restoration_fraction: float,
     min_restoration_margin: float,
 ) -> dict[str, Any]:
-    grouped: dict[tuple[str, str], dict[str, list[dict[str, Any]]]] = {}
+    grouped: dict[tuple[str, str, str], dict[str, list[dict[str, Any]]]] = {}
     for key, values in metrics.get("causal_restoration", {}).items():
         suite, policy = key.split("::", 1)
         compressed_policy = str(values.get("compressed_policy") or "")
         role = _patch_role_class(policy)
         if role is None or not compressed_policy:
             continue
-        metric_name, metric_value = _best_restoration_metric(values)
-        if metric_value is None:
-            continue
-        bucket = grouped.setdefault((suite, compressed_policy), {"system": [], "user_control": []})
-        bucket[role].append(
-            {
-                "key": key,
-                "metric": metric_name,
-                "value": metric_value,
-                "policy": policy,
-            }
-        )
+        for metric_name, metric_value, metric_ci in _eligible_restoration_metrics(values):
+            bucket = grouped.setdefault(
+                (suite, compressed_policy, metric_name), {"system": [], "user_control": []}
+            )
+            bucket[role].append(
+                {
+                    "key": key,
+                    "metric": metric_name,
+                    "value": metric_value,
+                    "ci_low": metric_ci["ci_low"],
+                    "ci_high": metric_ci["ci_high"],
+                    "policy": policy,
+                }
+            )
 
     comparisons = []
-    for (suite, compressed_policy), role_values in sorted(grouped.items()):
+    for (suite, compressed_policy, metric_name), role_values in sorted(grouped.items()):
+        _ = metric_name
         system = _best_restoration_value(role_values["system"])
         user_control = _best_restoration_value(role_values["user_control"])
         if system is None or user_control is None:
             continue
         margin = system["value"] - user_control["value"]
-        passed = system["value"] >= min_restoration_fraction and margin >= min_restoration_margin
+        margin_ci_low = system["ci_low"] - user_control["ci_high"]
+        passed = (
+            system["ci_low"] >= min_restoration_fraction
+            and margin_ci_low >= min_restoration_margin
+        )
         comparisons.append(
             {
                 "suite": suite,
@@ -387,10 +394,15 @@ def _assess_causal_restoration(
                 "system_patch": system,
                 "matched_user_control": user_control,
                 "margin": margin,
+                "margin_ci_low": margin_ci_low,
                 "passed": passed,
             }
         )
-    best = sorted(comparisons, key=lambda item: item["margin"], reverse=True)[0] if comparisons else None
+    best = (
+        sorted(comparisons, key=lambda item: item["margin_ci_low"], reverse=True)[0]
+        if comparisons
+        else None
+    )
     passed = any(item["passed"] for item in comparisons)
     return {
         "passed": passed,
@@ -413,20 +425,22 @@ def _patch_role_class(policy: str) -> str | None:
     return None
 
 
-def _best_restoration_metric(values: dict[str, Any]) -> tuple[str | None, float | None]:
+def _eligible_restoration_metrics(values: dict[str, Any]) -> list[tuple[str, float, dict[str, float]]]:
     candidates = [
         "safety_restoration_fraction",
         "refusal_restoration_fraction",
         "leakage_avoidance_restoration_fraction",
     ]
-    observed = [
-        (metric, _as_float(values.get(metric)))
-        for metric in candidates
-        if _as_float(values.get(metric)) is not None
-    ]
-    if not observed:
-        return None, None
-    return max(observed, key=lambda item: item[1])
+    observed = []
+    for metric in candidates:
+        value = _as_float(values.get(metric))
+        ci = values.get(f"{metric}_ci") or {}
+        ci_low = _as_float(ci.get("ci_low"))
+        ci_high = _as_float(ci.get("ci_high"))
+        if value is None or ci_low is None or ci_high is None:
+            continue
+        observed.append((metric, value, {"ci_low": ci_low, "ci_high": ci_high}))
+    return observed
 
 
 def _best_restoration_value(values: list[dict[str, Any]]) -> dict[str, Any] | None:
@@ -469,8 +483,11 @@ def _summarize_causal_evidence(best: dict[str, Any] | None, passed: bool) -> str
     control = best["matched_user_control"]
     return (
         f"{prefix}. Best: {best['suite']}::{best['compressed_policy']} "
-        f"{system['metric']} system {_fmt(system['value'])} versus user control "
-        f"{_fmt(control['value'])}; margin {_fmt(best['margin'])}."
+        f"{system['metric']} system {_fmt(system['value'])} "
+        f"95% CI [{_fmt(system['ci_low'])}, {_fmt(system['ci_high'])}] versus user control "
+        f"{_fmt(control['value'])} 95% CI [{_fmt(control['ci_low'])}, "
+        f"{_fmt(control['ci_high'])}]; margin {_fmt(best['margin'])}, "
+        f"conservative lower bound {_fmt(best['margin_ci_low'])}."
     )
 
 

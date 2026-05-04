@@ -136,10 +136,24 @@ def test_policy_level_contrast_subtracts_matched_capability_degradation() -> Non
 
 def test_causal_restoration_fraction_for_patch_policy() -> None:
     rows = [
-        {"suite": "public_refusal_safety", "policy": "none", "safety_score": 1.0},
-        {"suite": "public_refusal_safety", "policy": "kv_int4_sim", "safety_score": 0.2},
         {
             "suite": "public_refusal_safety",
+            "prompt_id": "p1",
+            "seed": 0,
+            "policy": "none",
+            "safety_score": 1.0,
+        },
+        {
+            "suite": "public_refusal_safety",
+            "prompt_id": "p1",
+            "seed": 0,
+            "policy": "kv_int4_sim",
+            "safety_score": 0.2,
+        },
+        {
+            "suite": "public_refusal_safety",
+            "prompt_id": "p1",
+            "seed": 0,
             "policy": "kv_int4_sim__patchkey-value__rolesystem",
             "safety_score": 0.6,
         },
@@ -151,3 +165,5 @@ def test_causal_restoration_fraction_for_patch_policy() -> None:
 
     assert restoration["compressed_policy"] == "kv_int4_sim"
     assert round(restoration["safety_restoration_fraction"], 6) == 0.5
+    assert round(restoration["safety_restoration_fraction_ci"]["mean"], 6) == 0.5
+    assert restoration["safety_restoration_fraction_ci"]["cluster_n"] == 1

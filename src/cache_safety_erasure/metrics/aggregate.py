@@ -119,7 +119,7 @@ def compute_run_metrics(rows: list[dict[str, Any]]) -> dict[str, Any]:
         "by_suite_policy": by_suite_policy,
         "by_suite_policy_ci": by_suite_policy_ci,
         "selective_safety_erasure": selective,
-        "causal_restoration": _causal_restoration(by_suite_policy),
+        "causal_restoration": _causal_restoration(by_suite_policy, rows),
         "policy_level_contrasts": _policy_level_contrasts(rows, policies),
         "publication_summary": _publication_summary(rows, by_suite_policy, selective),
     }
@@ -277,7 +277,9 @@ def _policy_level_contrasts(rows: list[dict[str, Any]], policies: list[str]) -> 
     return contrasts
 
 
-def _causal_restoration(by_suite_policy: dict[str, dict[str, Any]]) -> dict[str, Any]:
+def _causal_restoration(
+    by_suite_policy: dict[str, dict[str, Any]], rows: list[dict[str, Any]]
+) -> dict[str, Any]:
     restoration: dict[str, Any] = {}
     for key, patched_values in by_suite_policy.items():
         suite, policy = key.split("::", 1)
@@ -295,15 +297,24 @@ def _causal_restoration(by_suite_policy: dict[str, dict[str, Any]]) -> dict[str,
                 compressed_values.get("safety_score"),
                 patched_values.get("safety_score"),
             ),
+            "safety_restoration_fraction_ci": _restoration_fraction_ci(
+                rows, suite, compressed_policy, policy, "safety_score"
+            ),
             "refusal_restoration_fraction": _restoration_fraction(
                 baseline_values.get("refusal_expected_accuracy"),
                 compressed_values.get("refusal_expected_accuracy"),
                 patched_values.get("refusal_expected_accuracy"),
             ),
+            "refusal_restoration_fraction_ci": _restoration_fraction_ci(
+                rows, suite, compressed_policy, policy, "refusal_expected_accuracy"
+            ),
             "leakage_avoidance_restoration_fraction": _restoration_fraction(
                 baseline_values.get("leakage_avoidance_score"),
                 compressed_values.get("leakage_avoidance_score"),
                 patched_values.get("leakage_avoidance_score"),
+            ),
+            "leakage_avoidance_restoration_fraction_ci": _restoration_fraction_ci(
+                rows, suite, compressed_policy, policy, "leakage_avoidance_score"
             ),
         }
     return restoration
@@ -318,6 +329,48 @@ def _restoration_fraction(
     if abs(denominator) < 1e-12:
         return None
     return float((patched - compressed) / denominator)
+
+
+def _restoration_fraction_ci(
+    rows: list[dict[str, Any]],
+    suite: str,
+    compressed_policy: str,
+    patched_policy: str,
+    metric: str,
+) -> dict[str, float | int | None]:
+    baseline = _metric_by_pair(rows, suite, "none", metric)
+    compressed = _metric_by_pair(rows, suite, compressed_policy, metric)
+    patched = _metric_by_pair(rows, suite, patched_policy, metric)
+    common_keys = sorted(set(baseline).intersection(compressed).intersection(patched))
+    by_prompt: dict[str, list[tuple[float, float]]] = defaultdict(list)
+    for prompt_id, seed_id in common_keys:
+        denominator = baseline[(prompt_id, seed_id)] - compressed[(prompt_id, seed_id)]
+        if abs(denominator) < 1e-12:
+            continue
+        numerator = patched[(prompt_id, seed_id)] - compressed[(prompt_id, seed_id)]
+        by_prompt[prompt_id].append((numerator, denominator))
+    prompt_fractions = []
+    paired_n = 0
+    for values in by_prompt.values():
+        paired_n += len(values)
+        numerator_mean = mean([value[0] for value in values])
+        denominator_mean = mean([value[1] for value in values])
+        if abs(denominator_mean) >= 1e-12:
+            prompt_fractions.append(float(numerator_mean / denominator_mean))
+    result = mean_ci(prompt_fractions)
+    result["paired_n"] = paired_n
+    result["cluster_n"] = len(prompt_fractions)
+    return result
+
+
+def _metric_by_pair(
+    rows: list[dict[str, Any]], suite: str, policy: str, metric: str
+) -> dict[tuple[str, int], float]:
+    return {
+        _row_pair_key(row, idx): float(row[metric])
+        for idx, row in enumerate(rows)
+        if row["suite"] == suite and row["policy"] == policy and row.get(metric) is not None
+    }
 
 
 def _global_paired_cluster_deltas(

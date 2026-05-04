@@ -192,7 +192,7 @@ rebuild_causal
 assess_claims
 rebuild_qwen32_if_present
 
-bash scripts/build_paper_pdf.sh
+REQUIRE_COMPLETE_PAPER=1 bash scripts/build_paper_pdf.sh
 cp paper/build/cache_mediated_safety_erasure.pdf paper/cache_mediated_safety_erasure.pdf
 uv run python scripts/package_arxiv_submission.py
 write_publication_status
