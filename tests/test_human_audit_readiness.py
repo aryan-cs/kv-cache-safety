@@ -19,6 +19,7 @@ def _ready_metrics() -> dict:
         "completion_rate": 1.0,
         "unknown_audit_ids": [],
         "duplicate_annotation_keys": [],
+        "duplicate_key_audit_ids": [],
         "distinct_annotator_count": 2,
         "multi_annotator_audit_count": 4,
         "label_rates": {
@@ -41,9 +42,9 @@ def _ready_metrics() -> dict:
             },
         },
         "inter_annotator": {
-            "human_refusal_correct": {"pair_count": 2},
-            "human_unsafe_compliance": {"pair_count": 2},
-            "human_system_leakage": {"pair_count": 2},
+            "human_refusal_correct": {"pair_count": 2, "multi_annotator_item_count": 4},
+            "human_unsafe_compliance": {"pair_count": 2, "multi_annotator_item_count": 4},
+            "human_system_leakage": {"pair_count": 2, "multi_annotator_item_count": 4},
         },
         "label_consensus_ties": {},
         "label_context": {
@@ -51,6 +52,8 @@ def _ready_metrics() -> dict:
                 "n": 4,
                 "missing_reference_count": 0,
                 "missing_reference_audit_ids": [],
+                "mismatched_reference_count": 0,
+                "mismatched_reference_audit_ids": [],
             }
         },
     }
@@ -82,6 +85,7 @@ def test_human_audit_readiness_rejects_blank_or_unpaired_audit() -> None:
     metrics["label_consensus_ties"] = {"human_refusal_correct": ["a1"]}
     metrics["multi_annotator_audit_count"] = 1
     metrics["label_context"]["human_system_leakage"]["missing_reference_count"] = 1
+    metrics["label_context"]["human_system_leakage"]["mismatched_reference_count"] = 1
 
     failures = check_human_audit_readiness(
         metrics,
@@ -192,6 +196,25 @@ def test_audit_input_source_match_rejects_stale_or_missing_inputs(tmp_path: Path
     assert any("key JSONL source is missing" in failure for failure in failures)
 
 
+def test_audit_input_source_match_rejects_truncated_export_sample(
+    tmp_path: Path,
+) -> None:
+    results_dir = _write_result_sources(tmp_path / "results")
+    audit_dir = tmp_path / "audit"
+    audit_manifest = _audit_manifest_for(results_dir, audit_dir)
+    export_manifest = Path(audit_manifest["source_artifacts"]["export_manifest"]["path"])
+    payload = json.loads(export_manifest.read_text(encoding="utf-8"))
+    payload["sample_count"] = 999
+    payload["sampled_suite_policy_counts"] = {"public_refusal_safety::none": 999}
+    export_manifest.write_text(json.dumps(payload), encoding="utf-8")
+    audit_manifest["source_artifacts"]["export_manifest"]["sha256"] = _sha256(export_manifest)
+
+    failures = check_audit_input_source_match(audit_manifest)
+
+    assert any("sample_count=999" in failure for failure in failures)
+    assert "audit export manifest sampled_suite_policy_counts do not match key JSONL" in failures
+
+
 def _write_result_sources(results_dir: Path) -> Path:
     results_dir.mkdir()
     for name in ["manifest.json", "generations.jsonl", "metrics.json"]:
@@ -207,7 +230,10 @@ def _audit_manifest_for(results_dir: Path, audit_dir: Path) -> dict:
     key = audit_dir / "key.jsonl"
     export_manifest = audit_dir / "export_manifest.json"
     labels.write_text("audit_id,human_refusal_correct\n1,true\n", encoding="utf-8")
-    key.write_text('{"audit_id":"1"}\n', encoding="utf-8")
+    key.write_text(
+        '{"audit_id":"1","suite":"public_refusal_safety","policy":"none"}\n',
+        encoding="utf-8",
+    )
     export_manifest.write_text(
         json.dumps(
             {
@@ -215,6 +241,14 @@ def _audit_manifest_for(results_dir: Path, audit_dir: Path) -> dict:
                 "annotator_template_count": 2,
                 "strategy": "effect",
                 "seed": 0,
+                "sample_count": 1,
+                "sampled_suite_policy_counts": {"public_refusal_safety::none": 1},
+                "source_artifacts": {
+                    "key_jsonl": {
+                        "path": str(key),
+                        "sha256": hashlib.sha256(key.read_bytes()).hexdigest(),
+                    }
+                },
             }
         ),
         encoding="utf-8",

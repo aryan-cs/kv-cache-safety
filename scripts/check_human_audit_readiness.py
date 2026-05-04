@@ -87,9 +87,13 @@ def check_human_audit_readiness(
     duplicate_keys = metrics.get("duplicate_annotation_keys") or []
     if duplicate_keys:
         failures.append(f"duplicate audit_id/annotator_id annotations present: {duplicate_keys[:5]}")
+    duplicate_key_ids = metrics.get("duplicate_key_audit_ids") or []
+    if duplicate_key_ids:
+        failures.append(f"duplicate audit key ids present: {duplicate_key_ids[:5]}")
 
     label_rates = metrics.get("label_rates") or {}
     consensus_ties = metrics.get("label_consensus_ties") or {}
+    expected_audit_count = int(metrics.get("expected_audit_count") or 0)
     for label in required_labels:
         label_rate = label_rates.get(label)
         if not isinstance(label_rate, dict):
@@ -98,6 +102,10 @@ def check_human_audit_readiness(
         n = int(label_rate.get("n") or 0)
         if n < min_label_n:
             failures.append(f"`{label}` has n={n}; need >= {min_label_n}")
+        if expected_audit_count and n < expected_audit_count:
+            failures.append(
+                f"`{label}` has n={n}; need all {expected_audit_count} audit items labeled"
+            )
         tied_ids = consensus_ties.get(label) or []
         if tied_ids:
             failures.append(f"`{label}` has unresolved consensus ties: {tied_ids[:5]}")
@@ -109,6 +117,12 @@ def check_human_audit_readiness(
             failures.append(
                 "`human_system_leakage` has labels without required hidden/system "
                 f"reference context: {missing_reference_count}"
+            )
+        mismatched_reference_count = int(leakage_context.get("mismatched_reference_count") or 0)
+        if mismatched_reference_count:
+            failures.append(
+                "`human_system_leakage` has labels with mismatched hidden/system "
+                f"reference context: {mismatched_reference_count}"
             )
 
     if require_baseline_deltas:
@@ -128,7 +142,6 @@ def check_human_audit_readiness(
             failures.append(
                 f"distinct_annotator_count={distinct_annotator_count}; need >= 2"
             )
-        expected_audit_count = int(metrics.get("expected_audit_count") or 0)
         multi_annotator_count = int(metrics.get("multi_annotator_audit_count") or 0)
         required_multi = min_multi_annotator_fraction * expected_audit_count
         if expected_audit_count and multi_annotator_count < required_multi:
@@ -147,6 +160,17 @@ def check_human_audit_readiness(
             )
             if pair_count < 1:
                 failures.append(f"`{label}` has no inter-annotator pairs")
+            multi_item_count = (
+                int(label_agreement.get("multi_annotator_item_count") or 0)
+                if isinstance(label_agreement, dict)
+                else 0
+            )
+            if expected_audit_count and multi_item_count < required_multi:
+                failures.append(
+                    f"`{label}` multi_annotator_item_fraction="
+                    f"{multi_item_count / expected_audit_count:.3f}; need >= "
+                    f"{min_multi_annotator_fraction:.3f}"
+                )
     return failures
 
 
@@ -200,6 +224,8 @@ def check_audit_input_source_match(audit_manifest: dict[str, Any]) -> list[str]:
     else:
         failures.extend(_source_file_failures(export_manifest_source, "audit export manifest source"))
         failures.extend(_export_manifest_protocol_failures(export_manifest_source))
+        if isinstance(key_source, dict):
+            failures.extend(_export_manifest_sample_failures(export_manifest_source, key_source))
     return failures
 
 
@@ -238,7 +264,13 @@ def check_audit_summary_source_match(
         "multi_annotator_audit_count",
     ]:
         failures.extend(_summary_value_mismatch(summary, recomputed, key))
-    for key in ["unknown_audit_ids", "duplicate_annotation_keys", "label_consensus_ties"]:
+    for key in [
+        "unknown_audit_ids",
+        "duplicate_annotation_keys",
+        "duplicate_key_audit_ids",
+        "label_consensus_ties",
+        "label_context",
+    ]:
         if _normalized_json(summary.get(key)) != _normalized_json(recomputed.get(key)):
             failures.append(f"audit summary `{key}` does not match raw annotation recomputation")
     for label in DEFAULT_REQUIRED_LABELS:
@@ -347,6 +379,47 @@ def _export_manifest_protocol_failures(source: dict[str, Any]) -> list[str]:
         failures.append("audit export manifest lacks sampling strategy")
     if "seed" not in manifest:
         failures.append("audit export manifest lacks sampling seed")
+    return failures
+
+
+def _export_manifest_sample_failures(
+    export_manifest_source: dict[str, Any], key_source: dict[str, Any]
+) -> list[str]:
+    export_path = Path(str(export_manifest_source.get("path", "")))
+    key_path = Path(str(key_source.get("path", "")))
+    if not export_path.exists() or not key_path.exists():
+        return []
+    try:
+        manifest = json.loads(export_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return []
+    try:
+        from cache_safety_erasure.utils.io import read_jsonl
+
+        key_rows = read_jsonl(key_path)
+    except Exception as exc:
+        return [f"audit key JSONL could not be read for export-manifest check: {exc}"]
+    failures = []
+    sample_count = manifest.get("sample_count")
+    if sample_count is not None and int(sample_count or 0) != len(key_rows):
+        failures.append(
+            f"audit export manifest sample_count={sample_count}; key rows={len(key_rows)}"
+        )
+    observed_counts: dict[str, int] = {}
+    for row in key_rows:
+        key = f"{row.get('suite')}::{row.get('policy')}"
+        observed_counts[key] = observed_counts.get(key, 0) + 1
+    manifest_counts = manifest.get("sampled_suite_policy_counts")
+    if isinstance(manifest_counts, dict) and {
+        str(key): int(value) for key, value in manifest_counts.items()
+    } != observed_counts:
+        failures.append("audit export manifest sampled_suite_policy_counts do not match key JSONL")
+    export_sources = manifest.get("source_artifacts") or {}
+    export_key_source = export_sources.get("key_jsonl")
+    if isinstance(export_key_source, dict):
+        expected_sha = export_key_source.get("sha256")
+        if expected_sha and expected_sha != file_sha256(key_path):
+            failures.append("audit export manifest key_jsonl source hash is stale")
     return failures
 
 

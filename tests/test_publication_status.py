@@ -1797,6 +1797,14 @@ def _write_audit(
                 "annotator_template_count": 2,
                 "strategy": "effect",
                 "seed": 0,
+                "sample_count": len(key_rows),
+                "sampled_suite_policy_counts": _suite_policy_counts(key_rows),
+                "source_artifacts": {
+                    "key_jsonl": {
+                        "path": str(key_jsonl),
+                        "sha256": _sha256(key_jsonl),
+                    }
+                },
             }
         ),
         encoding="utf-8",
@@ -1894,6 +1902,14 @@ def _audit_fixture_rows(*, include_inter_annotator: bool) -> tuple[list[dict], l
                     }
                 )
     return key_rows, annotation_rows
+
+
+def _suite_policy_counts(rows: list[dict]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for row in rows:
+        key = f"{row.get('suite')}::{row.get('policy')}"
+        counts[key] = counts.get(key, 0) + 1
+    return dict(sorted(counts.items()))
 
 
 def _refresh_figure_manifest_source_hashes(path: Path) -> None:

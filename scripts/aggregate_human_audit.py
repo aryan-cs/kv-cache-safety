@@ -72,7 +72,7 @@ def main() -> None:
 
 
 def aggregate_human_audit(audit_csv_paths: list[Path], key_jsonl_path: Path) -> dict[str, Any]:
-    key_rows = {str(row["audit_id"]): row for row in read_jsonl(key_jsonl_path)}
+    key_rows, duplicate_key_audit_ids = _read_key_rows(key_jsonl_path)
     if not key_rows:
         raise ValueError(f"No key rows found in {key_jsonl_path}")
     annotation_rows = []
@@ -96,8 +96,21 @@ def aggregate_human_audit(audit_csv_paths: list[Path], key_jsonl_path: Path) -> 
         expected_audit_ids=set(key_rows),
         unknown_ids=unknown_ids,
         duplicate_annotation_keys=duplicate_annotation_keys,
+        duplicate_key_audit_ids=duplicate_key_audit_ids,
     )
     return {"metrics": metrics, "joined_rows": joined_rows}
+
+
+def _read_key_rows(path: Path) -> tuple[dict[str, dict[str, Any]], list[str]]:
+    rows: dict[str, dict[str, Any]] = {}
+    duplicates = []
+    for row in read_jsonl(path):
+        audit_id = str(row["audit_id"])
+        if audit_id in rows:
+            duplicates.append(audit_id)
+            continue
+        rows[audit_id] = row
+    return rows, sorted(set(duplicates))
 
 
 def _read_audit_csv(path: Path) -> list[dict[str, str]]:
@@ -131,6 +144,14 @@ def _joined_row(annotation: dict[str, str], key: dict[str, Any]) -> dict[str, An
         "hidden_system_reference_required": bool(hidden_system_text),
         "audit_system_reference_available": bool(annotation.get("system_or_policy_text")),
         "audit_hidden_reference_available": bool(annotation.get("hidden_system_reference")),
+        "audit_system_reference_matches": _reference_matches(
+            annotation.get("system_or_policy_text"),
+            system_text,
+        ),
+        "audit_hidden_reference_matches": _reference_matches(
+            annotation.get("hidden_system_reference"),
+            hidden_system_text,
+        ),
     }
 
 
@@ -173,6 +194,7 @@ def _audit_metrics(
     expected_audit_ids: set[str],
     unknown_ids: list[str],
     duplicate_annotation_keys: list[str],
+    duplicate_key_audit_ids: list[str],
 ) -> dict[str, Any]:
     consensus_rows, consensus_ties = _consensus_rows(joined_rows)
     completed_ids = {
@@ -192,6 +214,7 @@ def _audit_metrics(
         "completion_rate": len(completed_ids) / len(expected_audit_ids) if expected_audit_ids else None,
         "unknown_audit_ids": sorted(set(unknown_ids)),
         "duplicate_annotation_keys": duplicate_annotation_keys,
+        "duplicate_key_audit_ids": duplicate_key_audit_ids,
         "distinct_annotator_count": len(
             {str(row.get("annotator_id")) for row in joined_rows if row.get("annotator_id")}
         ),
@@ -255,6 +278,7 @@ def _label_context(rows: list[dict[str, Any]]) -> dict[str, Any]:
         row for row in rows if row.get("human_system_leakage") is not None
     ]
     missing = []
+    mismatched = []
     for row in leakage_rows:
         needs_hidden = bool(row.get("hidden_system_reference_required"))
         needs_system = bool(row.get("system_reference_required"))
@@ -262,13 +286,32 @@ def _label_context(rows: list[dict[str, Any]]) -> dict[str, Any]:
         has_system = bool(row.get("audit_system_reference_available"))
         if (needs_hidden and not has_hidden) or (not needs_hidden and needs_system and not has_system):
             missing.append(str(row["audit_id"]))
+        if needs_hidden and has_hidden and row.get("audit_hidden_reference_matches") is not True:
+            mismatched.append(str(row["audit_id"]))
+        if (
+            not needs_hidden
+            and needs_system
+            and has_system
+            and row.get("audit_system_reference_matches") is not True
+        ):
+            mismatched.append(str(row["audit_id"]))
     return {
         "human_system_leakage": {
             "n": len(leakage_rows),
             "missing_reference_count": len(set(missing)),
             "missing_reference_audit_ids": sorted(set(missing)),
+            "mismatched_reference_count": len(set(mismatched)),
+            "mismatched_reference_audit_ids": sorted(set(mismatched)),
         }
     }
+
+
+def _reference_matches(reference_text: Any, expected_text: str) -> bool | None:
+    if not expected_text:
+        return None
+    if reference_text is None or str(reference_text) == "":
+        return None
+    return str(reference_text) == expected_text
 
 
 def _rate(rows: list[dict[str, Any]], field: str) -> dict[str, float | int | None]:

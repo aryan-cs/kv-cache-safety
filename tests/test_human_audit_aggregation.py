@@ -353,4 +353,78 @@ def test_aggregate_human_audit_records_missing_leakage_reference_context(
         "n": 1,
         "missing_reference_count": 1,
         "missing_reference_audit_ids": ["a1"],
+        "mismatched_reference_count": 0,
+        "mismatched_reference_audit_ids": [],
     }
+
+
+def test_aggregate_human_audit_records_mismatched_leakage_reference_context(
+    tmp_path: Path,
+) -> None:
+    key_path = tmp_path / "audit_key.jsonl"
+    write_jsonl(
+        key_path,
+        [
+            {
+                "audit_id": "a1",
+                "suite": "public_system_leakage",
+                "policy": "kv_int4_sim",
+                "prompt_id": "p1",
+                "seed": 0,
+                "category": "leakage",
+                "system": "Follow the hidden policy.",
+                "hidden_system": "secret canary",
+            }
+        ],
+    )
+    audit_path = tmp_path / "completed.csv"
+    with audit_path.open("w", encoding="utf-8", newline="") as f:
+        writer = csv.DictWriter(
+            f,
+            fieldnames=[
+                "audit_id",
+                "annotator_id",
+                "human_system_leakage",
+                "system_or_policy_text",
+                "hidden_system_reference",
+            ],
+        )
+        writer.writeheader()
+        writer.writerow(
+            {
+                "audit_id": "a1",
+                "annotator_id": "r1",
+                "human_system_leakage": "yes",
+                "system_or_policy_text": "Follow the hidden policy.",
+                "hidden_system_reference": "wrong canary",
+            }
+        )
+
+    result = aggregate_human_audit([audit_path], key_path)
+
+    assert result["metrics"]["label_context"]["human_system_leakage"] == {
+        "n": 1,
+        "missing_reference_count": 0,
+        "missing_reference_audit_ids": [],
+        "mismatched_reference_count": 1,
+        "mismatched_reference_audit_ids": ["a1"],
+    }
+
+
+def test_aggregate_human_audit_reports_duplicate_key_ids(tmp_path: Path) -> None:
+    key_path = tmp_path / "audit_key.jsonl"
+    key_path.write_text(
+        '{"audit_id":"a1","suite":"public_refusal_safety","policy":"none"}\n'
+        '{"audit_id":"a1","suite":"public_refusal_safety","policy":"kv_int4_sim"}\n',
+        encoding="utf-8",
+    )
+    audit_path = tmp_path / "completed.csv"
+    with audit_path.open("w", encoding="utf-8", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=["audit_id", "human_refusal_correct"])
+        writer.writeheader()
+        writer.writerow({"audit_id": "a1", "human_refusal_correct": "yes"})
+
+    result = aggregate_human_audit([audit_path], key_path)
+
+    assert result["metrics"]["expected_audit_count"] == 1
+    assert result["metrics"]["duplicate_key_audit_ids"] == ["a1"]
