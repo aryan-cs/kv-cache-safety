@@ -26,6 +26,7 @@ def main() -> None:
     parser.add_argument("--results-dir", type=Path, default=None)
     parser.add_argument("--min-completion-rate", type=float, default=1.0)
     parser.add_argument("--min-label-n", type=int, default=1)
+    parser.add_argument("--min-multi-annotator-fraction", type=float, default=1.0)
     parser.add_argument("--required-label", action="append", default=[])
     parser.add_argument("--require-baseline-deltas", action="store_true")
     parser.add_argument("--require-result-source-match", action="store_true")
@@ -38,6 +39,7 @@ def main() -> None:
         metrics,
         min_completion_rate=args.min_completion_rate,
         min_label_n=args.min_label_n,
+        min_multi_annotator_fraction=args.min_multi_annotator_fraction,
         required_labels=required_labels,
         require_baseline_deltas=args.require_baseline_deltas,
         allow_single_annotator=args.allow_single_annotator,
@@ -64,6 +66,7 @@ def check_human_audit_readiness(
     *,
     min_completion_rate: float,
     min_label_n: int,
+    min_multi_annotator_fraction: float = 1.0,
     required_labels: list[str],
     require_baseline_deltas: bool,
     allow_single_annotator: bool,
@@ -94,6 +97,15 @@ def check_human_audit_readiness(
         tied_ids = consensus_ties.get(label) or []
         if tied_ids:
             failures.append(f"`{label}` has unresolved consensus ties: {tied_ids[:5]}")
+    label_context = metrics.get("label_context") or {}
+    if "human_system_leakage" in required_labels:
+        leakage_context = label_context.get("human_system_leakage") or {}
+        missing_reference_count = int(leakage_context.get("missing_reference_count") or 0)
+        if missing_reference_count:
+            failures.append(
+                "`human_system_leakage` has labels without required hidden/system "
+                f"reference context: {missing_reference_count}"
+            )
 
     if require_baseline_deltas:
         deltas = metrics.get("baseline_policy_deltas") or {}
@@ -111,6 +123,15 @@ def check_human_audit_readiness(
         if distinct_annotator_count < 2:
             failures.append(
                 f"distinct_annotator_count={distinct_annotator_count}; need >= 2"
+            )
+        expected_audit_count = int(metrics.get("expected_audit_count") or 0)
+        multi_annotator_count = int(metrics.get("multi_annotator_audit_count") or 0)
+        required_multi = min_multi_annotator_fraction * expected_audit_count
+        if expected_audit_count and multi_annotator_count < required_multi:
+            failures.append(
+                "multi_annotator_audit_fraction="
+                f"{multi_annotator_count / expected_audit_count:.3f}; need >= "
+                f"{min_multi_annotator_fraction:.3f}"
             )
         agreement = metrics.get("inter_annotator") or {}
         for label in required_labels:

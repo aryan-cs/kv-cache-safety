@@ -13,10 +13,12 @@ from check_human_audit_readiness import (
 
 def _ready_metrics() -> dict:
     return {
+        "expected_audit_count": 4,
         "completion_rate": 1.0,
         "unknown_audit_ids": [],
         "duplicate_annotation_keys": [],
         "distinct_annotator_count": 2,
+        "multi_annotator_audit_count": 4,
         "label_rates": {
             "human_refusal_correct": {"n": 4},
             "human_unsafe_compliance": {"n": 4},
@@ -42,6 +44,13 @@ def _ready_metrics() -> dict:
             "human_system_leakage": {"pair_count": 2},
         },
         "label_consensus_ties": {},
+        "label_context": {
+            "human_system_leakage": {
+                "n": 4,
+                "missing_reference_count": 0,
+                "missing_reference_audit_ids": [],
+            }
+        },
     }
 
 
@@ -69,6 +78,8 @@ def test_human_audit_readiness_rejects_blank_or_unpaired_audit() -> None:
     metrics["baseline_policy_deltas"] = {}
     metrics["inter_annotator"]["human_system_leakage"]["pair_count"] = 0
     metrics["label_consensus_ties"] = {"human_refusal_correct": ["a1"]}
+    metrics["multi_annotator_audit_count"] = 1
+    metrics["label_context"]["human_system_leakage"]["missing_reference_count"] = 1
 
     failures = check_human_audit_readiness(
         metrics,
@@ -88,6 +99,8 @@ def test_human_audit_readiness_rejects_blank_or_unpaired_audit() -> None:
     assert any("baseline-policy deltas" in failure for failure in failures)
     assert any("inter-annotator" in failure for failure in failures)
     assert any("consensus ties" in failure for failure in failures)
+    assert any("multi_annotator_audit_fraction" in failure for failure in failures)
+    assert any("reference context" in failure for failure in failures)
 
 
 def test_human_audit_readiness_rejects_duplicate_or_single_annotator_audit() -> None:

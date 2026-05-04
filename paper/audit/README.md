@@ -33,13 +33,13 @@ For the publication build, the expected summary directories are:
 
 ```bash
 uv run python scripts/aggregate_human_audit.py \
-  --audit-csv paper/audit/h200_qwen_full_sweep_audit_blinded.csv \
+  --audit-csv paper/audit/h200_qwen_full_sweep_audit_blinded_annotator_*.csv \
   --key-jsonl paper/audit/h200_qwen_full_sweep_audit_key.jsonl \
   --results-dir results/h200_qwen_full_sweep \
   --output-dir paper/audit/h200_qwen_full_sweep_summary
 
 uv run python scripts/aggregate_human_audit.py \
-  --audit-csv paper/audit/h200_causal_patch_qwen7b_audit_blinded.csv \
+  --audit-csv paper/audit/h200_causal_patch_qwen7b_audit_blinded_annotator_*.csv \
   --key-jsonl paper/audit/h200_causal_patch_qwen7b_audit_key.jsonl \
   --results-dir results/h200_causal_patch_qwen7b \
   --output-dir paper/audit/h200_causal_patch_qwen7b_summary
@@ -65,7 +65,10 @@ Before using the audit in the paper, run:
 ```bash
 uv run python scripts/check_human_audit_readiness.py \
   --summary-json paper/audit/<run_id>_summary/human_audit_summary.json \
-  --require-baseline-deltas
+  --audit-manifest paper/audit/<run_id>_summary/audit_manifest.json \
+  --results-dir results/<run_id> \
+  --require-baseline-deltas \
+  --require-result-source-match
 ```
 
-By default this requires complete annotations, no unknown audit IDs, no duplicate `(audit_id, annotator_id)` rows, at least two distinct annotators, non-empty core safety labels, paired treatment-minus-baseline deltas, and at least one inter-annotator pair for each core label. Use `--allow-single-annotator` only for a clearly documented draft or ablation.
+By default this requires complete annotations, no unknown audit IDs, no duplicate `(audit_id, annotator_id)` rows, at least two distinct annotators, full multi-annotator coverage, non-empty core safety labels, no unresolved consensus ties, hidden/system reference context for leakage labels, paired treatment-minus-baseline deltas, and at least one inter-annotator pair for each core label. Use `--allow-single-annotator` only for a clearly documented draft or ablation.

@@ -101,6 +101,8 @@ def _read_audit_csv(path: Path) -> list[dict[str, str]]:
 def _joined_row(annotation: dict[str, str], key: dict[str, Any]) -> dict[str, Any]:
     annotator_id = annotation.get("annotator_id") or annotation.get("rater_id") or "annotator_0"
     labels = {field: parse_bool(annotation.get(field)) for field in BOOLEAN_LABELS}
+    system_text = str(key.get("system") or "")
+    hidden_system_text = str(key.get("hidden_system") or "")
     return {
         "audit_id": key["audit_id"],
         "annotator_id": annotator_id,
@@ -118,6 +120,10 @@ def _joined_row(annotation: dict[str, str], key: dict[str, Any]) -> dict[str, An
         "auto_exact_leakage": key.get("exact_leakage"),
         "auto_rouge_l_leakage_recall": key.get("rouge_l_leakage_recall"),
         "auto_capability_score": key.get("capability_score"),
+        "system_reference_required": bool(system_text),
+        "hidden_system_reference_required": bool(hidden_system_text),
+        "audit_system_reference_available": bool(annotation.get("system_or_policy_text")),
+        "audit_hidden_reference_available": bool(annotation.get("hidden_system_reference")),
     }
 
 
@@ -186,6 +192,7 @@ def _audit_metrics(
         "label_rates": {field: _rate(consensus_rows, field) for field in BOOLEAN_LABELS},
         "annotation_label_rates": {field: _rate(joined_rows, field) for field in BOOLEAN_LABELS},
         "label_consensus_ties": consensus_ties,
+        "label_context": _label_context(joined_rows),
         "automated_label_disagreement": _automated_disagreement(consensus_rows),
         "automated_label_confusion": _automated_confusion(consensus_rows),
         "baseline_policy_deltas": _baseline_policy_deltas(consensus_rows),
@@ -234,6 +241,27 @@ def _consensus_rows(rows: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], d
         base["label_vote_counts"] = vote_counts
         consensus_rows.append(base)
     return consensus_rows, {field: ids for field, ids in ties.items() if ids}
+
+
+def _label_context(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    leakage_rows = [
+        row for row in rows if row.get("human_system_leakage") is not None
+    ]
+    missing = []
+    for row in leakage_rows:
+        needs_hidden = bool(row.get("hidden_system_reference_required"))
+        needs_system = bool(row.get("system_reference_required"))
+        has_hidden = bool(row.get("audit_hidden_reference_available"))
+        has_system = bool(row.get("audit_system_reference_available"))
+        if (needs_hidden and not has_hidden) or (not needs_hidden and needs_system and not has_system):
+            missing.append(str(row["audit_id"]))
+    return {
+        "human_system_leakage": {
+            "n": len(leakage_rows),
+            "missing_reference_count": len(set(missing)),
+            "missing_reference_audit_ids": sorted(set(missing)),
+        }
+    }
 
 
 def _rate(rows: list[dict[str, Any]], field: str) -> dict[str, float | int | None]:

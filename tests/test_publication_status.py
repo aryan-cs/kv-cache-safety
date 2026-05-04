@@ -1055,8 +1055,16 @@ def _write_audit(
         "unknown_audit_ids": [],
         "duplicate_annotation_keys": [],
         "distinct_annotator_count": 2,
-        "multi_annotator_audit_count": 2 if include_inter_annotator else 0,
+        "multi_annotator_audit_count": 10 if include_inter_annotator else 0,
         "label_rates": {label: {"n": 10, "mean": 0.5} for label in REQUIRED_AUDIT_LABELS},
+        "label_consensus_ties": {},
+        "label_context": {
+            "human_system_leakage": {
+                "n": 10,
+                "missing_reference_count": 0,
+                "missing_reference_audit_ids": [],
+            }
+        },
         "baseline_policy_deltas": {
             f"public_refusal_safety::kv_int4_sim::{label}": {"n": 5, "mean_delta": 0.1}
             for label in REQUIRED_AUDIT_LABELS
