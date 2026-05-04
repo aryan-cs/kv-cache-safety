@@ -4,6 +4,7 @@ import argparse
 import os
 import re
 import subprocess
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -174,6 +175,7 @@ def render_markdown(status: dict[str, Any]) -> str:
         latest = wait_history["latest"]
         minimum = wait_history["min_memory"]
         threshold = wait_history.get("gate_threshold") or {}
+        plateau = wait_history.get("latest_memory_plateau") or {}
         lines.extend(
             [
                 "",
@@ -195,6 +197,12 @@ def render_markdown(status: dict[str, Any]) -> str:
                 (
                     f"- minimum memory observed: `{minimum['memory_used_mib']} MiB` "
                     f"at `{minimum['timestamp_utc']}`"
+                ),
+                (
+                    f"- latest memory plateau: `{plateau.get('memory_used_mib', 'unknown')} MiB` "
+                    f"for `{plateau.get('sample_count', 'unknown')}` samples "
+                    f"since `{plateau.get('first_seen_utc', 'unknown')}` "
+                    f"({float(plateau.get('duration_minutes') or 0.0):.1f} minutes)"
                 ),
                 f"- memory drop from first to latest: `{wait_history['memory_drop_mib']} MiB`",
                 f"- latest sample passes gate: `{str(wait_history['latest_gate_passed']).lower()}`",
@@ -463,12 +471,14 @@ def _wait_history(path: Path) -> dict[str, Any]:
     latest = samples[-1]
     min_memory = min(samples, key=lambda item: item["memory_used_mib"])
     max_memory = max(samples, key=lambda item: item["memory_used_mib"])
+    latest_plateau = _latest_memory_plateau(samples)
     return {
         "sample_count": len(samples),
         "first": first,
         "latest": latest,
         "min_memory": min_memory,
         "max_memory": max_memory,
+        "latest_memory_plateau": latest_plateau,
         "min_utilization_pct": min(item["utilization_pct"] for item in samples),
         "max_utilization_pct": max(item["utilization_pct"] for item in samples),
         "memory_drop_mib": first["memory_used_mib"] - latest["memory_used_mib"],
@@ -476,6 +486,41 @@ def _wait_history(path: Path) -> dict[str, Any]:
         "latest_gate_passed": latest["memory_used_mib"] <= threshold["memory_used_mib"]
         and latest["utilization_pct"] <= threshold["utilization_pct"],
     }
+
+
+def _latest_memory_plateau(samples: list[dict[str, Any]]) -> dict[str, Any]:
+    latest = samples[-1]
+    latest_memory = latest["memory_used_mib"]
+    plateau = []
+    for sample in reversed(samples):
+        if sample["memory_used_mib"] != latest_memory:
+            break
+        plateau.append(sample)
+    first_plateau_sample = plateau[-1]
+    return {
+        "memory_used_mib": latest_memory,
+        "sample_count": len(plateau),
+        "first_seen_utc": first_plateau_sample["timestamp_utc"],
+        "latest_seen_utc": latest["timestamp_utc"],
+        "duration_minutes": _minutes_between(
+            first_plateau_sample["timestamp_utc"], latest["timestamp_utc"]
+        ),
+    }
+
+
+def _minutes_between(start_utc: str, end_utc: str) -> float:
+    start = _parse_utc_timestamp(start_utc)
+    end = _parse_utc_timestamp(end_utc)
+    if start is None or end is None:
+        return 0.0
+    return max(0.0, (end - start).total_seconds() / 60.0)
+
+
+def _parse_utc_timestamp(timestamp: str) -> datetime | None:
+    try:
+        return datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
+    except ValueError:
+        return None
 
 
 def _parse_wait_threshold(line: str) -> dict[str, int] | None:

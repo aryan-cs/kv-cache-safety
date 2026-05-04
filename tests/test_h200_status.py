@@ -7,6 +7,7 @@ from report_h200_status import (
     _artifact_status,
     _gpu_gate_likely_blocked,
     _is_status_probe_process,
+    _latest_memory_plateau,
     _nvidia_device_holders,
     _parse_accounted_app_line,
     _parse_compute_app_line,
@@ -88,7 +89,44 @@ def test_wait_history_summarizes_launcher_memory_trend(tmp_path: Path) -> None:
     assert history["min_memory"]["memory_used_mib"] == 19000
     assert history["memory_drop_mib"] == 123461
     assert history["gate_threshold"] == {"memory_used_mib": 20000, "utilization_pct": 20}
+    assert history["latest_memory_plateau"] == {
+        "memory_used_mib": 19000,
+        "sample_count": 1,
+        "first_seen_utc": "2026-05-04T04:04:11Z",
+        "latest_seen_utc": "2026-05-04T04:04:11Z",
+        "duration_minutes": 0.0,
+    }
     assert history["latest_gate_passed"] is True
+
+
+def test_latest_memory_plateau_tracks_repeated_latest_memory() -> None:
+    plateau = _latest_memory_plateau(
+        [
+            {
+                "timestamp_utc": "2026-05-04T03:54:11Z",
+                "memory_used_mib": 142461,
+                "utilization_pct": 100,
+            },
+            {
+                "timestamp_utc": "2026-05-04T03:59:11Z",
+                "memory_used_mib": 82139,
+                "utilization_pct": 95,
+            },
+            {
+                "timestamp_utc": "2026-05-04T04:04:11Z",
+                "memory_used_mib": 82139,
+                "utilization_pct": 100,
+            },
+        ]
+    )
+
+    assert plateau == {
+        "memory_used_mib": 82139,
+        "sample_count": 2,
+        "first_seen_utc": "2026-05-04T03:59:11Z",
+        "latest_seen_utc": "2026-05-04T04:04:11Z",
+        "duration_minutes": 5.0,
+    }
 
 
 def test_wait_history_uses_custom_gate_threshold(tmp_path: Path) -> None:
@@ -209,6 +247,13 @@ def test_render_markdown_summarizes_blocked_launcher() -> None:
                     },
                     "memory_drop_mib": 60322,
                     "gate_threshold": {"memory_used_mib": 20000, "utilization_pct": 20},
+                    "latest_memory_plateau": {
+                        "memory_used_mib": 82139,
+                        "sample_count": 2,
+                        "first_seen_utc": "2026-05-04T03:59:11Z",
+                        "latest_seen_utc": "2026-05-04T04:04:11Z",
+                        "duration_minutes": 5.0,
+                    },
                     "latest_gate_passed": False,
                 },
             },
@@ -223,6 +268,7 @@ def test_render_markdown_summarizes_blocked_launcher() -> None:
     assert "NVIDIA PIDS Query" in text
     assert "Wait History" in text
     assert "gate threshold: memory `<= 20000 MiB`, utilization `<= 20%`" in text
+    assert "latest memory plateau: `82139 MiB` for `2` samples" in text
     assert "memory drop from first to latest: `60322 MiB`" in text
     assert "release or restart the notebook allocation" in text
     assert "`results/h200_qwen_full_sweep`: missing" in text

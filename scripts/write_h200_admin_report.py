@@ -94,6 +94,7 @@ def admin_report(status: dict[str, Any]) -> str:
         latest = wait_history["latest"]
         minimum = wait_history["min_memory"]
         threshold = wait_history.get("gate_threshold") or {}
+        plateau = wait_history.get("latest_memory_plateau") or {}
         lines.extend(
             [
                 "## Wait History",
@@ -114,6 +115,12 @@ def admin_report(status: dict[str, Any]) -> str:
                 (
                     f"- Minimum memory observed: `{minimum['memory_used_mib']} MiB` "
                     f"at `{minimum['timestamp_utc']}`"
+                ),
+                (
+                    f"- Latest memory plateau: `{plateau.get('memory_used_mib', 'unknown')} MiB` "
+                    f"for `{plateau.get('sample_count', 'unknown')}` samples "
+                    f"since `{plateau.get('first_seen_utc', 'unknown')}` "
+                    f"({float(plateau.get('duration_minutes') or 0.0):.1f} minutes)"
                 ),
                 f"- Memory drop from first to latest: `{wait_history['memory_drop_mib']} MiB`",
                 f"- Latest sample passes gate: `{_bool(wait_history['latest_gate_passed'])}`",
