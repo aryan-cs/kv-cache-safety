@@ -124,7 +124,12 @@ def post_h200_next_steps(status: dict[str, Any]) -> dict[str, Any]:
             "prepare_after_h200_fetch",
             complete=fetched_evidence_prepared,
             ready=primary_raw_complete and causal_raw_complete,
-            command="bash scripts/fetch_h200_results.sh && bash scripts/prepare_after_h200_fetch.sh",
+            command=(
+                "bash scripts/fetch_h200_results.sh "
+                "results/h200_qwen_full_sweep "
+                "results/h200_causal_patch_qwen7b && "
+                "bash scripts/prepare_after_h200_fetch.sh"
+            ),
             detail="Fetch raw H200 evidence, then reaggregate metrics, regenerate figures and paper tables, run readiness checks, and export audit templates from the current clean local checkout.",
         ),
         _step(

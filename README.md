@@ -190,19 +190,22 @@ Package arXiv-style source files:
 uv run python scripts/package_arxiv_submission.py
 ```
 
-After the guarded H200 launcher completes, fetch raw result evidence and blinded
-audit files into the local checkout with checksum verification:
+After the guarded H200 launcher completes, fetch raw result evidence into the
+local checkout with checksum verification, then regenerate publication assets
+locally from the current clean checkout:
 
 ```bash
-bash scripts/fetch_h200_results.sh
+bash scripts/fetch_h200_results.sh results/h200_qwen_full_sweep results/h200_causal_patch_qwen7b
+bash scripts/prepare_after_h200_fetch.sh
 ```
 
 This writes remote and local artifact manifests in `logs/h200/`, compares hashes
 and byte counts, and refuses paths outside `results/`, `paper/generated/`, and
 `paper/audit/`. It does not pull code or start jobs on the H200. The default
-fetch intentionally excludes remote-generated paper tables and figures because
-they may have been produced by an older H200 checkout; regenerate publication
-assets locally from the fetched results on the current clean `master`.
+fetch also includes remote diagnostic and audit-export files when the full
+launcher has finished. For the publication preparation handoff, use the explicit
+primary and causal result directories above; `prepare_after_h200_fetch.sh`
+regenerates publication-valid audit sheets locally.
 
 If you need only an intermediate run or want to archive remote-generated debug
 artifacts, pass explicit artifact paths, for example:
@@ -215,7 +218,7 @@ To include all remote-generated H200 paper/debug artifacts in the default fetch,
 set `FETCH_H200_REMOTE_GENERATED=1`; do this only when you are intentionally
 archiving those files rather than preparing final paper assets.
 
-Regenerate publication-valid audit sheets from the fetched completed runs:
+Regenerate publication-valid audit sheets from already fetched completed runs:
 
 ```bash
 bash scripts/prepare_after_h200_fetch.sh
