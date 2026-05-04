@@ -66,6 +66,7 @@ def test_publication_status_can_ignore_pdf_when_prechecking_complete_build(tmp_p
     )
 
     assert status["publication_ready"] is True
+    assert status["release_ready"] is False
     assert status["paper_pdf_required"] is False
     assert "paper_pdf_exists" not in status["blockers"]
     assert "paper_pdf_valid" not in status["blockers"]
@@ -119,8 +120,10 @@ def test_publication_status_accepts_complete_real_artifacts(tmp_path: Path) -> N
     )
 
     assert status["publication_ready"] is True
+    assert status["release_ready"] is False
     assert status["blockers"] == []
     assert "Publication ready: `true`" in render_markdown(status)
+    assert "Release ready: `false`" in render_markdown(status)
 
 
 def test_publication_status_rejects_non_pdf_final_paper(tmp_path: Path) -> None:
@@ -219,6 +222,7 @@ def test_publication_status_requires_complete_arxiv_bundle_when_requested(tmp_pa
     )
 
     assert status["publication_ready"] is True
+    assert status["release_ready"] is True
     assert status["gates"]["arxiv_bundle_ready"] is True
 
 

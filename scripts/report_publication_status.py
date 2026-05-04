@@ -245,6 +245,8 @@ def publication_status(
     if require_arxiv_bundle:
         gates["arxiv_bundle_ready"] = arxiv["complete"]
     blockers = [gate for gate, passed in gates.items() if not passed]
+    release_gates = {**gates, "arxiv_bundle_ready": arxiv["complete"]}
+    release_blockers = [gate for gate, passed in release_gates.items() if not passed]
     evidence_gate_names = [
         "primary_results_complete",
         "causal_results_complete",
@@ -257,6 +259,8 @@ def publication_status(
         "schema_version": 1,
         "publication_ready": not blockers,
         "blockers": blockers,
+        "release_ready": not release_blockers,
+        "release_blockers": release_blockers,
         "evidence_ready": not evidence_blockers,
         "evidence_blockers": evidence_blockers,
         "gates": gates,
@@ -277,6 +281,7 @@ def render_markdown(status: dict[str, Any]) -> str:
         "# Publication Status",
         "",
         f"Publication ready: `{str(status['publication_ready']).lower()}`",
+        f"Release ready: `{str(status.get('release_ready', False)).lower()}`",
         "",
         "| Gate | Status |",
         "| --- | --- |",
