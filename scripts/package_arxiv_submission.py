@@ -50,6 +50,11 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Build an arXiv-friendly LaTeX source bundle.")
     parser.add_argument("--output-dir", type=Path, default=Path("paper/build/arxiv_source"))
     parser.add_argument("--archive", type=Path, default=Path("paper/build/arxiv_source.tar.gz"))
+    parser.add_argument(
+        "--allow-missing",
+        action="store_true",
+        help="Allow missing empirical assets for draft bundles. Publication builds should not use this.",
+    )
     args = parser.parse_args()
 
     source_dir = args.output_dir
@@ -89,21 +94,27 @@ def main() -> None:
         shutil.copytree(source_path, target_path)
         copied_audit.append(str(target_path))
 
-    write_json(
-        source_dir / "manifest.json",
-        {
-            "schema_version": 1,
-            "main_tex_sha256": file_sha256(source_dir / "main.tex"),
-            "references_sha256": file_sha256(source_dir / "references.bib"),
-            "copied_figures": copied_figures,
-            "missing_figures": missing_figures,
-            "copied_generated": copied_generated,
-            "missing_generated": missing_generated,
-            "copied_audit": copied_audit,
-            "missing_audit": missing_audit,
-            "note": "Missing figures are allowed for pre-results drafts; main.tex renders placeholders via IfFileExists.",
-        },
-    )
+    manifest = {
+        "schema_version": 1,
+        "main_tex_sha256": file_sha256(source_dir / "main.tex"),
+        "references_sha256": file_sha256(source_dir / "references.bib"),
+        "copied_figures": copied_figures,
+        "missing_figures": missing_figures,
+        "copied_generated": copied_generated,
+        "missing_generated": missing_generated,
+        "copied_audit": copied_audit,
+        "missing_audit": missing_audit,
+        "allow_missing": args.allow_missing,
+    }
+    write_json(source_dir / "manifest.json", manifest)
+    missing_inputs = _missing_inputs(manifest)
+    if missing_inputs and not args.allow_missing:
+        for path in missing_inputs:
+            print(f"Missing required arXiv input: {path}")
+        raise SystemExit(
+            "Refusing to package publication arXiv bundle with missing empirical inputs. "
+            "Use --allow-missing only for draft/pre-results bundles."
+        )
 
     args.archive.parent.mkdir(parents=True, exist_ok=True)
     with tarfile.open(args.archive, "w:gz") as archive:
@@ -119,6 +130,14 @@ def _rewrite_main_tex_for_arxiv(text: str) -> str:
     for output_name, source_path in FIGURE_SOURCES.items():
         text = text.replace(str(Path("../..") / source_path), f"figures/{output_name}")
     return text
+
+
+def _missing_inputs(manifest: dict) -> list[str]:
+    return [
+        *manifest.get("missing_figures", []),
+        *manifest.get("missing_generated", []),
+        *manifest.get("missing_audit", []),
+    ]
 
 
 if __name__ == "__main__":

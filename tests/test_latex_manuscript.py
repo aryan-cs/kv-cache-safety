@@ -4,7 +4,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path("scripts").resolve()))
 
 from check_latex_placeholders import missing_placeholder_artifacts
-from package_arxiv_submission import GENERATED_DIRS, _rewrite_main_tex_for_arxiv
+from package_arxiv_submission import GENERATED_DIRS, _missing_inputs, _rewrite_main_tex_for_arxiv
 
 
 def test_latex_manuscript_is_formal_registered_protocol() -> None:
@@ -83,6 +83,20 @@ def test_arxiv_rewrite_uses_local_bibliography_and_figures() -> None:
         "../audit/h200_qwen_full_sweep_summary/human_audit_summary_table.tex"
     )
     assert "../../results" not in rewritten
+
+
+def test_arxiv_packager_treats_missing_inputs_as_publication_blockers() -> None:
+    manifest = {
+        "missing_figures": ["missing_figure.pdf"],
+        "missing_generated": ["paper/generated/missing"],
+        "missing_audit": ["paper/audit/missing"],
+    }
+
+    assert _missing_inputs(manifest) == [
+        "missing_figure.pdf",
+        "paper/generated/missing",
+        "paper/audit/missing",
+    ]
 
 
 def test_latex_placeholder_checker_reports_missing_artifacts(tmp_path: Path) -> None:
