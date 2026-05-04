@@ -205,7 +205,8 @@ and byte counts, and refuses paths outside `results/`, `paper/generated/`, and
 fetch also includes remote diagnostic and audit-export files when the full
 launcher has finished. For the publication preparation handoff, use the explicit
 primary and causal result directories above; `prepare_after_h200_fetch.sh`
-regenerates publication-valid audit sheets locally.
+requires that passing checksum manifest before regenerating publication-valid
+audit sheets locally.
 
 If you need only an intermediate run or want to archive remote-generated debug
 artifacts, pass explicit artifact paths, for example:

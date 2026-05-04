@@ -63,6 +63,10 @@ def test_post_h200_next_steps_prepares_fetched_raw_results_before_audits() -> No
     assert report["steps"][0]["state"] == "complete"
     assert report["steps"][1]["state"] == "ready"
     assert report["steps"][2]["state"] == "blocked"
+    assert (
+        "fetch_h200_results.sh results/h200_qwen_full_sweep "
+        "results/h200_causal_patch_qwen7b"
+    ) in report["steps"][1]["command"]
     assert "prepare_after_h200_fetch.sh" in rendered
 
 

@@ -210,6 +210,9 @@ def test_prepare_after_h200_fetch_regenerates_assets_before_audits() -> None:
     readme = Path("README.md").read_text(encoding="utf-8")
 
     assert "scripts/fetch_h200_results.sh" in script
+    assert "scripts/check_h200_fetch_manifest.py" in script
+    assert 'H200_FETCH_MANIFEST:-logs/h200/h200_artifact_manifest_local.json' in script
+    assert 'H200_FETCH_COMPARE_REPORT:-logs/h200/h200_artifact_manifest_compare.json' in script
     assert "Refusing to prepare paper evidence from a dirty git working tree." in script
     assert "require_raw_result_artifacts" in script
     assert "config.resolved.yaml" in script

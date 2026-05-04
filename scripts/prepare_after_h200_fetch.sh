@@ -10,6 +10,8 @@ causal_generated_dir="${CAUSAL_GENERATED_DIR:-paper/generated/h200_causal_patch_
 publication_status_dir="${PUBLICATION_STATUS_DIR:-paper/build}"
 arxiv_source_dir="${ARXIV_SOURCE_DIR:-paper/build/arxiv_source}"
 arxiv_archive="${ARXIV_ARCHIVE:-paper/build/arxiv_source.tar.gz}"
+fetch_manifest="${H200_FETCH_MANIFEST:-logs/h200/h200_artifact_manifest_local.json}"
+fetch_compare_report="${H200_FETCH_COMPARE_REPORT:-logs/h200/h200_artifact_manifest_compare.json}"
 target_ci_width="${TARGET_CI_WIDTH:-0.08}"
 causal_ci_width="${CAUSAL_CI_WIDTH:-0.12}"
 
@@ -122,6 +124,11 @@ write_publication_status() {
 }
 
 uv sync --frozen --extra dev
+uv run python scripts/check_h200_fetch_manifest.py \
+  --local-manifest "$fetch_manifest" \
+  --compare-report "$fetch_compare_report" \
+  --required-path "$primary_results" \
+  --required-path "$causal_results"
 uv run ruff check .
 uv run pytest -q
 
