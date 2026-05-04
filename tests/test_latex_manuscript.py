@@ -166,8 +166,12 @@ def test_arxiv_packager_records_file_provenance(tmp_path: Path) -> None:
     assert archive.exists()
     assert any(row["kind"] == "latex_main" and row["direct_copy"] is False for row in provenance)
     assert any(row["source_path"] == "paper/references.bib" for row in provenance)
+    assert all(not Path(row["bundle_path"]).is_absolute() for row in provenance)
     assert all(row.get("source_sha256") for row in provenance)
     assert all(row.get("bundle_sha256") for row in provenance)
+    assert all(not Path(path).is_absolute() for path in manifest["copied_figures"])
+    assert all(not Path(path).is_absolute() for path in manifest["copied_generated"])
+    assert all(not Path(path).is_absolute() for path in manifest["copied_audit"])
 
 
 def test_latex_placeholder_checker_reports_missing_artifacts(tmp_path: Path) -> None:

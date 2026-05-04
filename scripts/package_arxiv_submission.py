@@ -66,13 +66,20 @@ def main() -> None:
     (source_dir / "figures").mkdir(parents=True)
 
     main_tex = Path("paper/latex/main.tex").read_text(encoding="utf-8")
-    (source_dir / "main.tex").write_text(_rewrite_main_tex_for_arxiv(main_tex), encoding="utf-8")
+    rewritten_main_tex = _rewrite_main_tex_for_arxiv(main_tex)
+    rewrite_failures = _rewrite_failures(rewritten_main_tex)
+    if rewrite_failures:
+        for failure in rewrite_failures:
+            print(f"Unrewritten LaTeX source path: {failure}")
+        raise SystemExit("Refusing to package arXiv source with repo-local paths in main.tex.")
+    (source_dir / "main.tex").write_text(rewritten_main_tex, encoding="utf-8")
     shutil.copyfile("paper/references.bib", source_dir / "references.bib")
     copied_file_provenance = [
         _file_provenance(
             kind="latex_main",
             source_path=Path("paper/latex/main.tex"),
             bundle_path=source_dir / "main.tex",
+            bundle_root=source_dir,
             direct_copy=False,
             transform="rewrite_main_tex_for_arxiv",
         ),
@@ -80,6 +87,7 @@ def main() -> None:
             kind="bibliography",
             source_path=Path("paper/references.bib"),
             bundle_path=source_dir / "references.bib",
+            bundle_root=source_dir,
         ),
     ]
 
@@ -93,12 +101,13 @@ def main() -> None:
                 invalid_figures.append(str(source_path))
                 continue
             shutil.copyfile(source_path, target_path)
-            copied_figures.append(str(target_path))
+            copied_figures.append(_bundle_manifest_path(source_dir, target_path))
             copied_file_provenance.append(
                 _file_provenance(
                     kind="figure",
                     source_path=source_path,
                     bundle_path=target_path,
+                    bundle_root=source_dir,
                 )
             )
         else:
@@ -111,7 +120,7 @@ def main() -> None:
             continue
         target_path = source_dir / "generated" / source_path.name
         shutil.copytree(source_path, target_path)
-        copied_generated.append(str(target_path))
+        copied_generated.append(_bundle_manifest_path(source_dir, target_path))
         copied_file_provenance.extend(_directory_provenance("generated", source_path, target_path))
     skipped_optional_generated = []
     for source_path in OPTIONAL_GENERATED_DIRS:
@@ -120,7 +129,7 @@ def main() -> None:
             continue
         target_path = source_dir / "generated" / source_path.name
         shutil.copytree(source_path, target_path)
-        copied_generated.append(str(target_path))
+        copied_generated.append(_bundle_manifest_path(source_dir, target_path))
         copied_file_provenance.extend(_directory_provenance("generated", source_path, target_path))
     copied_audit = []
     missing_audit = []
@@ -130,7 +139,7 @@ def main() -> None:
             continue
         target_path = source_dir / "audit" / source_path.name
         shutil.copytree(source_path, target_path)
-        copied_audit.append(str(target_path))
+        copied_audit.append(_bundle_manifest_path(source_dir, target_path))
         copied_file_provenance.extend(_directory_provenance("audit", source_path, target_path))
 
     manifest = {
@@ -178,6 +187,18 @@ def _rewrite_main_tex_for_arxiv(text: str) -> str:
     return text
 
 
+def _rewrite_failures(text: str) -> list[str]:
+    markers = [
+        "../generated/",
+        "../audit/",
+        "../references",
+        "../../results/",
+        "/Users/aryan/Desktop/projects/llm-safety",
+        "/home/aryang9/sandbox/llm-safety",
+    ]
+    return [marker for marker in markers if marker in text]
+
+
 def _missing_inputs(manifest: dict) -> list[str]:
     return [
         *manifest.get("missing_figures", []),
@@ -198,7 +219,12 @@ def _directory_provenance(kind: str, source_dir: Path, bundle_dir: Path) -> list
     for source_file in sorted(path for path in source_dir.rglob("*") if path.is_file()):
         bundle_file = bundle_dir / source_file.relative_to(source_dir)
         rows.append(
-            _file_provenance(kind=kind, source_path=source_file, bundle_path=bundle_file)
+            _file_provenance(
+                kind=kind,
+                source_path=source_file,
+                bundle_path=bundle_file,
+                bundle_root=bundle_dir.parent.parent,
+            )
         )
     return rows
 
@@ -208,15 +234,19 @@ def _file_provenance(
     kind: str,
     source_path: Path,
     bundle_path: Path,
+    bundle_root: Path | None = None,
     direct_copy: bool = True,
     transform: str | None = None,
 ) -> dict[str, object]:
+    manifest_bundle_path = (
+        _bundle_manifest_path(bundle_root, bundle_path) if bundle_root is not None else str(bundle_path)
+    )
     row: dict[str, object] = {
         "kind": kind,
         "source_path": str(source_path),
         "source_sha256": file_sha256(source_path),
         "source_bytes": source_path.stat().st_size if source_path.exists() else None,
-        "bundle_path": str(bundle_path),
+        "bundle_path": manifest_bundle_path,
         "bundle_sha256": file_sha256(bundle_path),
         "bundle_bytes": bundle_path.stat().st_size if bundle_path.exists() else None,
         "direct_copy": direct_copy,
@@ -224,6 +254,10 @@ def _file_provenance(
     if transform is not None:
         row["transform"] = transform
     return row
+
+
+def _bundle_manifest_path(source_dir: Path, path: Path) -> str:
+    return path.resolve().relative_to(source_dir.resolve()).as_posix()
 
 
 if __name__ == "__main__":

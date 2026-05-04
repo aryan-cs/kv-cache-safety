@@ -746,12 +746,19 @@ def _write_arxiv_bundle(
         figure.write_text("not a pdf\n", encoding="utf-8")
     generated_files = [
         source_dir / "generated" / "h200_qwen_full_sweep" / "main_results_table.tex",
+        source_dir / "generated" / "h200_qwen_full_sweep" / "suite_level_effects_table.tex",
+        source_dir / "generated" / "h200_qwen_full_sweep" / "result_macros.tex",
         source_dir / "generated" / "h200_causal_patch_qwen7b" / "causal_restoration_table.tex",
+        source_dir / "generated" / "h200_causal_patch_qwen7b" / "result_macros.tex",
+        source_dir / "generated" / "claim_assessment" / "abstract_status_sentence.tex",
         source_dir / "generated" / "claim_assessment" / "claim_assessment_table.tex",
+        source_dir / "generated" / "claim_assessment" / "claim_interpretation.tex",
     ]
     audit_files = [
         source_dir / "audit" / "h200_qwen_full_sweep_summary" / "human_audit_summary_table.tex",
+        source_dir / "audit" / "h200_qwen_full_sweep_summary" / "human_audit_deltas_table.tex",
         source_dir / "audit" / "h200_causal_patch_qwen7b_summary" / "human_audit_summary_table.tex",
+        source_dir / "audit" / "h200_causal_patch_qwen7b_summary" / "human_audit_deltas_table.tex",
     ]
     for path in [*generated_files, *audit_files]:
         path.write_text(f"{path.name}\n", encoding="utf-8")

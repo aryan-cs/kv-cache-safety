@@ -35,6 +35,20 @@ REQUIRED_AUDIT_ARTIFACTS = [
     "human_audit_summary_table.tex",
     "human_audit_deltas_table.tex",
 ]
+REQUIRED_ARXIV_BUNDLE_FILES = [
+    "generated/h200_qwen_full_sweep/main_results_table.tex",
+    "generated/h200_qwen_full_sweep/suite_level_effects_table.tex",
+    "generated/h200_qwen_full_sweep/result_macros.tex",
+    "generated/h200_causal_patch_qwen7b/causal_restoration_table.tex",
+    "generated/h200_causal_patch_qwen7b/result_macros.tex",
+    "generated/claim_assessment/abstract_status_sentence.tex",
+    "generated/claim_assessment/claim_assessment_table.tex",
+    "generated/claim_assessment/claim_interpretation.tex",
+    "audit/h200_qwen_full_sweep_summary/human_audit_summary_table.tex",
+    "audit/h200_qwen_full_sweep_summary/human_audit_deltas_table.tex",
+    "audit/h200_causal_patch_qwen7b_summary/human_audit_summary_table.tex",
+    "audit/h200_causal_patch_qwen7b_summary/human_audit_deltas_table.tex",
+]
 
 
 def main() -> None:
@@ -441,8 +455,11 @@ def _arxiv_status(source_dir: Path, archive: Path) -> dict[str, Any]:
                 failures.append(f"invalid_copied_figure_pdf:{copied_path}:{figure_failure}")
         for key in ["copied_figures", "copied_generated", "copied_audit"]:
             for copied_path in manifest.get(key, []):
-                if not Path(str(copied_path)).exists():
+                if not _resolve_bundle_path(source_dir, copied_path).exists():
                     failures.append(f"missing_copied_path:{copied_path}")
+        for required_file in REQUIRED_ARXIV_BUNDLE_FILES:
+            if not (source_dir / required_file).exists():
+                failures.append(f"missing_required_bundle_file:{required_file}")
         failures.extend(_copied_file_provenance_failures(source_dir, manifest))
     if archive.exists():
         if archive.stat().st_size <= 0:
@@ -502,9 +519,9 @@ def _manifest_copied_files(
     files: list[Path] = []
     for key in ["copied_figures", "copied_generated", "copied_audit"]:
         for raw_path in manifest.get(key, []):
-            path = Path(str(raw_path))
+            path = _resolve_bundle_path(source_dir, raw_path)
             try:
-                path.relative_to(source_dir)
+                path.resolve().relative_to(source_dir.resolve())
             except ValueError:
                 failures.append(f"copied_path_outside_source:{raw_path}")
                 continue
@@ -527,7 +544,7 @@ def _copied_file_provenance_failures(source_dir: Path, manifest: dict[str, Any])
             failures.append(f"malformed_copied_file_provenance:{idx}")
             continue
         source_path = Path(str(row.get("source_path", "")))
-        bundle_path = Path(str(row.get("bundle_path", "")))
+        bundle_path = _resolve_bundle_path(source_dir, row.get("bundle_path", ""))
         label = str(row.get("bundle_path") or idx)
         if not source_path.exists():
             failures.append(f"provenance_source_missing:{label}")
@@ -536,7 +553,7 @@ def _copied_file_provenance_failures(source_dir: Path, manifest: dict[str, Any])
             failures.append(f"provenance_bundle_missing:{label}")
             continue
         try:
-            bundle_path.relative_to(source_dir)
+            bundle_path.resolve().relative_to(source_dir.resolve())
         except ValueError:
             failures.append(f"provenance_bundle_outside_source:{label}")
         source_sha = file_sha256(source_path)
@@ -548,6 +565,13 @@ def _copied_file_provenance_failures(source_dir: Path, manifest: dict[str, Any])
         if row.get("direct_copy") is not False and source_sha != bundle_sha:
             failures.append(f"provenance_direct_copy_mismatch:{label}")
     return failures
+
+
+def _resolve_bundle_path(source_dir: Path, raw_path: Any) -> Path:
+    path = Path(str(raw_path))
+    if path.is_absolute():
+        return path
+    return source_dir / path
 
 
 def _sha256_bytes(data: bytes) -> str:
