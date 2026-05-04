@@ -92,7 +92,7 @@ Inference systems increasingly compress, evict, or quantize key-value (KV) cache
 
 \section{Introduction}
 
-Safety evaluations usually treat a deployed language model as a fixed pair of weights and prompts. Real serving systems are less static. KV-cache eviction, quantization, paged attention, batching, and long-context memory management alter the transient state through which a model attends to prior tokens. If aligned behavior depends on transient cache state, then a throughput optimization can also become an unintentional safety intervention.
+Safety evaluations usually treat a deployed language model as a fixed pair of weights and prompts. Real serving systems are less static. KV-cache eviction, quantization, paged attention, batching, and long-context memory management alter the transient state through which a model attends to prior tokens \citep{kwon2023pagedattention}. If aligned behavior depends on transient cache state, then a throughput optimization can also become an unintentional safety intervention.
 
 This paper asks whether inference-time KV-cache optimizations can erase or weaken refusal behavior more than they degrade ordinary capability. The motivating observation is not merely that compression can hurt language-model quality. Prior work already shows that cache compression can produce uneven degradation, instruction-following failures, and system-prompt leakage \citep{chen2025pitfalls,ananthanarayanan2026physics,yang2024notoken}. The stronger question is whether safety behavior is selectively fragile and causally recoverable by preserving or restoring policy-relevant cache state.
 
@@ -123,7 +123,7 @@ Refusal behavior can be steered through activation directions and may not reduce
 Subliminal learning, token entanglement, and emergent misalignment are examples of safety results that became important because they identified surprising mechanisms rather than only new benchmarks \citep{cloud2025subliminal,zur2025token,betley2025emergent}. Cache-mediated safety erasure aims for the same standard: a specific, falsifiable phenomenon with controls that rule out simple performance degradation.
 
 \paragraph{Evaluation anchors.}
-The evaluation suite uses public safety and capability anchors, including HarmBench, JailbreakBench, XSTest, IFEval, RULER, and LongBench-style controls where feasible \citep{mazeika2024harmbench,chao2024jailbreakbench,rottger2023xstest,zhou2023ifeval,hsieh2024ruler,bai2024longbench}. Primary experiments target Qwen2.5 Instruct models because they are open-weight and available at 7B, 14B, and 32B scales \citep{qwen2024qwen25}.
+The registered primary sweep requires public prompt-injection, harmful-request, XSTest-safe, benign-instruction, and ARC capability suites. Broader anchors such as HarmBench, IFEval, RULER, and LongBench define extension analyses only when their corresponding artifacts are present \citep{mazeika2024harmbench,chao2024jailbreakbench,rottger2023xstest,zhou2023ifeval,hsieh2024ruler,bai2024longbench}. Primary experiments target Qwen2.5 Instruct models because they are open-weight and available at 7B, 14B, and 32B scales \citep{qwen2024qwen25}.
 
 \section{Hypotheses}
 
@@ -148,7 +148,7 @@ For length-preserving perturbations such as simulated KV quantization, restoring
 
 The primary model family is Qwen2.5 Instruct at 7B, 14B, and 32B parameters. The core behavioral evaluation uses a mid-scale instruct model, with smaller models used for causal diagnostics and larger models used as a scale check. A general model-family claim requires at least one non-Qwen open instruct model; otherwise, claims must be limited to the tested Qwen-family setting.
 
-All experiments use open or free tooling only. Model loading uses bfloat16 weights, \texttt{safetensors}, and explicit cache-state access so that the evaluated interventions are visible in the generation loop rather than hidden inside opaque serving infrastructure.
+All experiments use open-weight models, public datasets, and local evaluation code. Model loading uses bfloat16 weights, \texttt{safetensors}, and explicit cache-state access so that the evaluated interventions are visible in the generation loop rather than delegated to external serving systems.
 
 \subsection{Cache Policies}
 
@@ -222,7 +222,7 @@ Automated safety labels are coarse. The analysis therefore includes a blinded au
 
 \section{Visualization Strategy}
 
-The main figures are designed to make the proposed phenomenon visually legible, rather than only reporting aggregate scatterplots or bar charts. We use four figure families.
+The main figures are designed to make the proposed phenomenon interpretable at the level of prompt, policy, and token role, rather than only reporting aggregate scatterplots or bar charts. We use four figure families.
 
 \paragraph{Cache-state fingerprints.}
 For each policy-budget condition, the analysis renders a layer-by-token retention map with token roles on the horizontal axis and layers on the vertical axis. System, developer, user, template, and generated spans are shown as separate bands. A safety-specific erasure pattern should appear as a visible break or thinning in policy-token access, not merely as a lower scalar score.
@@ -233,7 +233,7 @@ Instead of a static scatterplot alone, each policy traces a trajectory through s
 \paragraph{Restoration flow diagrams.}
 Causal patching is shown as a flow from baseline to compressed decoding to system-patched, matched-user-patched, and policy-pinned conditions. The diagnostic pattern is a restoration stream returning toward the baseline only when policy-relevant cache slices are restored or protected.
 
-\paragraph{Prompt-level effect constellations.}
+\paragraph{Prompt-level effect maps.}
 For audited prompts, the analysis embeds each prompt-condition pair using open embeddings or metric vectors and draws paired edges from baseline to compressed generations. Clusters of long, directionally consistent edges identify families of prompts where cache interventions produce coherent safety shifts.
 
 \section{Figures and Tables}
@@ -255,7 +255,7 @@ For audited prompts, the analysis embeds each prompt-condition pair using open e
 \begin{figure}[t]
   \centering
   \maybeincludegraphic{../../results/h200_qwen_full_sweep/figures/prompt_effect_constellation.pdf}{0.92\linewidth}{Prompt-level baseline-to-treatment effect vectors by suite and policy.}
-  \caption{Prompt-level effect constellation. Each arrow starts at baseline and points toward the compressed condition in a metric-derived effect space. Coherent clusters indicate prompt families where cache interventions create similar behavioral shifts.}
+  \caption{Prompt-level effect map. Each arrow starts at baseline and points toward the compressed condition in a metric-derived effect space. Coherent clusters indicate prompt families where cache interventions create similar behavioral shifts.}
   \label{fig:constellation}
 \end{figure}
 
@@ -314,7 +314,7 @@ If only selective degradation appears, the contribution is still useful but narr
 
 \section{Limitations}
 
-The study uses only open models, open datasets, and free tooling. This improves reproducibility but limits comparisons against closed deployed systems. Automated refusal and leakage metrics are imperfect, so final safety claims require human audit or an open local judge with documented calibration. Simulated KV quantization is not a faithful implementation of every production quantizer. Attention-based retention policies require access to attention statistics and may be less comparable to production implementations than eviction and quantization interventions. Finally, unless non-Qwen models are added, the paper must not claim model-family universality.
+The study uses open models, public datasets, and local evaluation code. This improves reproducibility but limits comparisons against closed deployed systems. Automated refusal and leakage metrics are imperfect, so final safety claims require human audit or an open local judge with documented calibration. Simulated KV quantization is not a faithful implementation of every production quantizer. Attention-based retention policies require access to attention statistics and may be less comparable to production implementations than eviction and quantization interventions. Finally, unless non-Qwen models are added, the paper must not claim model-family universality.
 
 \section{Ethics and Safety}
 
@@ -326,7 +326,7 @@ The experiments evaluate refusal and leakage behavior without publishing procedu
 \toprule
 Requirement & Implementation \\
 \midrule
-Open/free dependencies & Open models, public datasets, local metrics, no paid judges. \\
+Open dependencies & Open models, public datasets, local metrics, no proprietary judges. \\
 Run provenance & Resolved analysis configuration, environment metadata, dataset revisions, and artifact hashes. \\
 Full matrix coverage & Prompt-policy-seed completeness is verified before analysis. \\
 Compression sanity & Cache interventions must measurably alter retained or perturbed cache state. \\
@@ -338,7 +338,7 @@ Human audit & Blinded condition labels with post-annotation metadata joining. \\
 
 \section{Conclusion}
 
-Cache-mediated safety erasure is a high-value hypothesis only if it survives causal controls. Novelty must therefore be earned empirically: safety behavior must degrade selectively, policy-relevant cache restoration must outperform matched controls, and mitigation must preserve safety without globally disabling cache compression. If the evidence supports those claims, the result would show that alignment behavior can depend on the transient inference state created by cache management. If the evidence does not support them, the study still constrains future claims about safety-specific cache fragility.
+Cache-mediated safety erasure is warranted as a positive empirical claim only if it survives causal controls. Novelty must therefore be earned empirically: safety behavior must degrade selectively, policy-relevant cache restoration must outperform matched controls, and mitigation must preserve safety without globally disabling cache compression. If the evidence supports those claims, the result would show that alignment behavior can depend on the transient inference state created by cache management. If the evidence does not support them, the study still constrains future claims about safety-specific cache fragility.
 
 \bibliographystyle{plainnat}
 \bibliography{../references}

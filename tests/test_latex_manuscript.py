@@ -25,6 +25,9 @@ def test_latex_manuscript_is_formal_registered_protocol() -> None:
     assert "H200" not in tex
     assert "cgroup" not in tex
     assert "MacBook" not in tex
+    assert "free tooling" not in tex
+    assert "opaque serving infrastructure" not in tex
+    assert "high-value hypothesis" not in tex
     assert "dirty-tree" not in tex
     assert "mock-model" not in tex
     assert "Replace this box" not in tex
@@ -38,6 +41,7 @@ def test_latex_references_cover_primary_model_and_cache_work() -> None:
         "qwen2024qwen25",
         "chen2025pitfalls",
         "ananthanarayanan2026physics",
+        "kwon2023pagedattention",
         "wang2025cacheprune",
         "arditi2024refusal",
         "zhang2026anydepth",
