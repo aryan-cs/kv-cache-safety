@@ -300,7 +300,7 @@ For audited prompts, the analysis embeds each prompt-condition pair using open e
 \section{Results}
 
 \subsection{Behavioral Cache Sensitivity}
-Primary behavioral analysis: \PrimaryRunId. The table below is populated from the corresponding analysis artifact when present.
+Table~\ref{tab:suite-effects} reports paired baseline-versus-intervention effects across the registered safety, leakage, benign, and capability suites.
 \maybeinputtable{../generated/h200_qwen_full_sweep/suite_level_effects_table.tex}{Report baseline versus each cache policy for refusal, leakage, benign over-refusal, and capability. Include prompt-clustered confidence intervals and a table of per-suite effects.}
 
 \subsection{Selective Safety Degradation}
@@ -311,7 +311,7 @@ Top policy-level $\ssei$: \PrimaryTopSSEIPolicy{} with estimate \PrimaryTopSSEI{
 The cache-state fingerprint in Figure~\ref{fig:role-retention} reports token-role retention under each cache policy. The mechanistic claim requires role-specific cache disruption to align with behavioral degradation: policy-relevant spans should be disproportionately evicted or perturbed in conditions with positive $\ssei$, and protected or restored spans should move the model back toward baseline behavior.
 
 \subsection{Causal Restoration and Mitigation}
-Causal diagnostic run: \CausalRunId. The central claim requires system-role restoration or pinning to outperform matched non-policy controls.
+The central causal claim requires system-role restoration or pinning to outperform matched non-policy controls.
 \maybeinputtable{../generated/h200_causal_patch_qwen7b/causal_restoration_table.tex}{Report system-role patching, matched user-role patching, and policy-pinned mitigation after the causal patch analysis is complete.}
 
 \subsection{Evidence-Gated Claim Assessment}
