@@ -323,10 +323,28 @@ def main() -> None:
                 "policy": key.split("::", 1)[1],
                 "compressed_policy": value.get("compressed_policy"),
                 "safety_restoration_fraction": value.get("safety_restoration_fraction"),
+                "safety_restoration_ci_low": (
+                    value.get("safety_restoration_fraction_ci") or {}
+                ).get("ci_low"),
+                "safety_restoration_ci_high": (
+                    value.get("safety_restoration_fraction_ci") or {}
+                ).get("ci_high"),
                 "refusal_restoration_fraction": value.get("refusal_restoration_fraction"),
+                "refusal_restoration_ci_low": (
+                    value.get("refusal_restoration_fraction_ci") or {}
+                ).get("ci_low"),
+                "refusal_restoration_ci_high": (
+                    value.get("refusal_restoration_fraction_ci") or {}
+                ).get("ci_high"),
                 "leakage_avoidance_restoration_fraction": value.get(
                     "leakage_avoidance_restoration_fraction"
                 ),
+                "leakage_avoidance_restoration_ci_low": (
+                    value.get("leakage_avoidance_restoration_fraction_ci") or {}
+                ).get("ci_low"),
+                "leakage_avoidance_restoration_ci_high": (
+                    value.get("leakage_avoidance_restoration_fraction_ci") or {}
+                ).get("ci_high"),
             }
             for key, value in metrics.get("causal_restoration", {}).items()
         ]
@@ -339,6 +357,7 @@ def main() -> None:
                 fig, ax = plt.subplots(figsize=(10, fig_height))
                 labels = [f"{row.suite}\n{row.policy}" for row in plot_df.itertuples()]
                 ax.barh(labels, plot_df["safety_restoration_fraction"])
+                _draw_restoration_intervals(ax, plot_df)
                 ax.axvline(0, color="black", linewidth=0.8)
                 ax.axvline(1, color="0.6", linewidth=1, linestyle="--")
                 ax.set_xlabel("(patched - compressed) / (baseline - compressed)")
@@ -364,13 +383,15 @@ def main() -> None:
                     ax.text(1, len(flow_df) + 0.15, "baseline", ha="center", va="bottom", fontsize=9)
                     for y, row in zip(y_positions, flow_df.itertuples(), strict=False):
                         color = _restoration_color(row.policy)
+                        ci_width = max(0.0, row.safety_restoration_ci_high - row.safety_restoration_ci_low)
+                        line_width = 1.3 + 2.2 / (1.0 + 8.0 * ci_width)
                         ax.annotate(
                             "",
                             xy=(row.safety_restoration_fraction, y),
                             xytext=(0, y),
                             arrowprops={
                                 "arrowstyle": "-|>",
-                                "lw": 2.4,
+                                "lw": line_width,
                                 "color": color,
                                 "alpha": 0.82,
                                 "shrinkA": 0,
@@ -385,6 +406,20 @@ def main() -> None:
                             edgecolor="white",
                             linewidth=0.8,
                             zorder=3,
+                        )
+                        ax.errorbar(
+                            [row.safety_restoration_fraction],
+                            [y],
+                            xerr=[
+                                [row.safety_restoration_fraction - row.safety_restoration_ci_low],
+                                [row.safety_restoration_ci_high - row.safety_restoration_fraction],
+                            ],
+                            fmt="none",
+                            ecolor=color,
+                            elinewidth=1.1,
+                            capsize=3,
+                            alpha=0.75,
+                            zorder=2,
                         )
                     ax.set_yticks(y_positions, labels=flow_df["label"])
                     ax.set_xlim(-0.08, max(1.08, flow_df["safety_restoration_fraction"].max() + 0.08))
@@ -519,12 +554,22 @@ def main() -> None:
         )
         if fingerprint_rows:
             fingerprint_df = pd.DataFrame(fingerprint_rows)
-            fingerprint_df["row_label"] = fingerprint_df["policy"] + " / " + fingerprint_df["role"]
+            fingerprint_df["row_label"] = (
+                fingerprint_df["policy"] + " / " + fingerprint_df["layer_label"]
+            )
+            fingerprint_df["column_label"] = (
+                fingerprint_df["role"] + ":" + fingerprint_df["token_bin"].astype(str)
+            )
             row_order = (
-                fingerprint_df[["row_label", "policy", "role"]]
+                fingerprint_df[["row_label", "policy", "layer_bin"]]
+                .drop_duplicates()
+                .sort_values(["policy", "layer_bin"])
+            )
+            column_order = (
+                fingerprint_df[["column_label", "role", "token_bin"]]
                 .drop_duplicates()
                 .sort_values(
-                    by=["policy", "role"],
+                    by=["role", "token_bin"],
                     key=lambda series: series.map(lambda value: ROLE_ORDER.get(str(value), 99))
                     if series.name == "role"
                     else series,
@@ -532,20 +577,25 @@ def main() -> None:
             )
             pivot = fingerprint_df.pivot_table(
                 index="row_label",
-                columns="token_bin",
+                columns="column_label",
                 values="retention_fraction",
                 aggfunc="mean",
-            ).reindex(row_order["row_label"])
-            fig_height = max(5, 0.24 * len(pivot.index))
+            ).reindex(index=row_order["row_label"], columns=column_order["column_label"])
+            fig_height = max(5, 0.22 * len(pivot.index))
             fig, ax = plt.subplots(figsize=(12, fig_height))
             im = ax.imshow(pivot.fillna(0.0).values, aspect="auto", cmap="magma", vmin=0, vmax=1)
+            column_records = column_order.to_dict(orient="records")
+            role_centers = _column_role_centers(column_records)
             ax.set_xticks(
-                [0, max(0, pivot.shape[1] // 4), max(0, pivot.shape[1] // 2), max(0, 3 * pivot.shape[1] // 4), max(0, pivot.shape[1] - 1)],
-                labels=["start", "25%", "50%", "75%", "end"],
+                [center for _role, center in role_centers],
+                labels=[role for role, _center in role_centers],
             )
+            for boundary in _column_role_boundaries(column_records):
+                ax.axvline(boundary, color="white", linewidth=0.5, alpha=0.6)
             ax.set_yticks(range(len(pivot.index)), labels=pivot.index, fontsize=7)
-            ax.set_xlabel("Normalized prompt-cache position")
-            ax.set_title("Cache-State Fingerprint By Policy, Role, And Token Position")
+            ax.set_xlabel("Token-role bands across normalized prompt-cache position")
+            ax.set_ylabel("Cache policy / layer band")
+            ax.set_title("Cache-State Fingerprint By Policy, Layer, Role, And Token Position")
             fig.colorbar(im, ax=ax, label="retained fraction")
             fig.tight_layout()
             _save_figure(
@@ -868,7 +918,9 @@ def _restoration_flow_rows(restoration_df: Any) -> Any:
     rows = []
     for row in restoration_df.itertuples():
         fraction = _finite_float(row.safety_restoration_fraction)
-        if fraction is None:
+        ci_low = _finite_float(getattr(row, "safety_restoration_ci_low", None))
+        ci_high = _finite_float(getattr(row, "safety_restoration_ci_high", None))
+        if fraction is None or ci_low is None or ci_high is None:
             continue
         rows.append(
             {
@@ -876,10 +928,41 @@ def _restoration_flow_rows(restoration_df: Any) -> Any:
                 "policy": row.policy,
                 "compressed_policy": row.compressed_policy,
                 "safety_restoration_fraction": fraction,
+                "safety_restoration_ci_low": ci_low,
+                "safety_restoration_ci_high": ci_high,
+                "safety_restoration_ci_width": ci_high - ci_low,
                 "label": f"{row.suite} / {_short_policy_label(row.policy)}",
             }
         )
     return pd.DataFrame(rows).sort_values("safety_restoration_fraction") if rows else pd.DataFrame()
+
+
+def _draw_restoration_intervals(ax: Any, plot_df: Any) -> None:
+    if not {"safety_restoration_ci_low", "safety_restoration_ci_high"}.issubset(plot_df.columns):
+        return
+    valid = plot_df.dropna(
+        subset=[
+            "safety_restoration_fraction",
+            "safety_restoration_ci_low",
+            "safety_restoration_ci_high",
+        ]
+    )
+    if valid.empty:
+        return
+    y_positions = list(range(len(valid)))
+    ax.errorbar(
+        valid["safety_restoration_fraction"],
+        y_positions,
+        xerr=[
+            valid["safety_restoration_fraction"] - valid["safety_restoration_ci_low"],
+            valid["safety_restoration_ci_high"] - valid["safety_restoration_fraction"],
+        ],
+        fmt="none",
+        ecolor="0.15",
+        elinewidth=1.0,
+        capsize=3,
+        alpha=0.75,
+    )
 
 
 def _short_policy_label(policy: str) -> str:
@@ -905,6 +988,7 @@ def _stream_cache_fingerprint(
     prompts_path: Path,
     *,
     bin_count: int,
+    layer_bin_count: int = 8,
 ) -> list[dict[str, Any]]:
     try:
         import pyarrow.parquet as pq
@@ -922,10 +1006,13 @@ def _stream_cache_fingerprint(
         "retained_indices",
         "evicted_indices",
     }
-    if not required.issubset(set(parquet_file.schema.names)):
+    schema_names = set(parquet_file.schema.names)
+    if not required.issubset(schema_names):
         return []
-    counts: dict[tuple[str, str, int], list[float]] = defaultdict(lambda: [0.0, 0.0])
-    columns = sorted(required)
+    optional = {"seed", "layer", "layer_count"} & schema_names
+    counts: dict[tuple[str, int, str, str, int], list[float]] = defaultdict(lambda: [0.0, 0.0])
+    synthetic_layer_counters: dict[tuple[Any, ...], int] = defaultdict(int)
+    columns = sorted(required | optional)
     for batch in parquet_file.iter_batches(columns=columns, batch_size=50_000):
         table = batch.to_pydict()
         for idx, raw_policy in enumerate(table.get("policy", [])):
@@ -936,18 +1023,27 @@ def _stream_cache_fingerprint(
             seq_len = int(_float_at(table, "original_seq_len", idx))
             if seq_len <= 0:
                 continue
+            layer_count = max(1, int(_float_at(table, "layer_count", idx) or 1))
+            layer = _cache_stat_layer(table, idx, synthetic_layer_counters, layer_count=layer_count)
+            layer_bin, layer_label = _layer_band(layer, layer_count, layer_bin_count)
             roles = prompt_roles.get(prompt_id, [])
             for token_idx in _parse_indices(table["retained_indices"][idx]):
                 role = _role_at(roles, token_idx)
                 token_bin = min(bin_count - 1, int((token_idx / seq_len) * bin_count))
-                counts[(policy, role, token_bin)][0] += 1.0
+                counts[(policy, layer_bin, layer_label, role, token_bin)][0] += 1.0
             for token_idx in _parse_indices(table["evicted_indices"][idx]):
                 role = _role_at(roles, token_idx)
                 token_bin = min(bin_count - 1, int((token_idx / seq_len) * bin_count))
-                counts[(policy, role, token_bin)][1] += 1.0
+                counts[(policy, layer_bin, layer_label, role, token_bin)][1] += 1.0
     rows = []
-    for (policy, role, token_bin), (retained, evicted) in sorted(
-        counts.items(), key=lambda item: (item[0][0], ROLE_ORDER.get(item[0][1], 99), item[0][2])
+    for (policy, layer_bin, layer_label, role, token_bin), (retained, evicted) in sorted(
+        counts.items(),
+        key=lambda item: (
+            item[0][0],
+            item[0][1],
+            ROLE_ORDER.get(item[0][3], 99),
+            item[0][4],
+        ),
     ):
         total = retained + evicted
         if total <= 0:
@@ -955,6 +1051,8 @@ def _stream_cache_fingerprint(
         rows.append(
             {
                 "policy": policy,
+                "layer_bin": layer_bin,
+                "layer_label": layer_label,
                 "role": role,
                 "token_bin": token_bin,
                 "retained_count": retained,
@@ -963,6 +1061,66 @@ def _stream_cache_fingerprint(
             }
         )
     return rows
+
+
+def _cache_stat_layer(
+    table: dict[str, list[Any]],
+    idx: int,
+    synthetic_layer_counters: dict[tuple[Any, ...], int],
+    *,
+    layer_count: int,
+) -> int:
+    if "layer" in table:
+        return max(0, int(_float_at(table, "layer", idx)))
+    key = (
+        table.get("prompt_id", [None])[idx],
+        table.get("seed", [None] * (idx + 1))[idx] if "seed" in table else None,
+        table.get("policy", [None])[idx],
+        table.get("decode_step", [None])[idx],
+        table.get("original_seq_len", [None])[idx],
+        table.get("retained_indices", [None])[idx],
+        table.get("evicted_indices", [None])[idx],
+    )
+    layer = synthetic_layer_counters[key] % max(1, layer_count)
+    synthetic_layer_counters[key] += 1
+    return layer
+
+
+def _layer_band(layer: int, layer_count: int, layer_bin_count: int) -> tuple[int, str]:
+    layer_count = max(1, layer_count)
+    layer_bin_count = max(1, layer_bin_count)
+    if layer_count <= layer_bin_count:
+        layer = min(max(0, layer), layer_count - 1)
+        return layer, f"L{layer:02d}"
+    layer_bin = min(layer_bin_count - 1, int((max(0, layer) / layer_count) * layer_bin_count))
+    start = math.floor(layer_bin * layer_count / layer_bin_count)
+    end = max(start, math.floor((layer_bin + 1) * layer_count / layer_bin_count) - 1)
+    return layer_bin, f"L{start:02d}-L{end:02d}"
+
+
+def _column_role_centers(column_records: list[dict[str, Any]]) -> list[tuple[str, float]]:
+    centers = []
+    for role in sorted(
+        {str(record["role"]) for record in column_records},
+        key=lambda value: ROLE_ORDER.get(value, 99),
+    ):
+        indices = [
+            index for index, record in enumerate(column_records) if str(record["role"]) == role
+        ]
+        if indices:
+            centers.append((role, (indices[0] + indices[-1]) / 2))
+    return centers
+
+
+def _column_role_boundaries(column_records: list[dict[str, Any]]) -> list[float]:
+    boundaries = []
+    previous_role = None
+    for index, record in enumerate(column_records):
+        role = str(record["role"])
+        if previous_role is not None and role != previous_role:
+            boundaries.append(index - 0.5)
+        previous_role = role
+    return boundaries
 
 
 def _load_prompt_roles(prompts_path: Path) -> dict[str, list[str]]:

@@ -132,6 +132,9 @@ Refusal behavior can be steered through activation directions and may not reduce
 \paragraph{Phenomenon-first safety papers.}
 Subliminal learning, token entanglement, and emergent misalignment are relevant here because each frames a safety question around a specific mechanism rather than only a new benchmark \citep{cloud2025subliminal,zur2025token,betley2025emergent}. Cache-mediated safety erasure is posed in the same form: a falsifiable phenomenon with controls that separate selective safety degradation from ordinary performance degradation.
 
+\paragraph{Guardrail and trustworthiness evaluations.}
+Classifier poisoning and rapid-response poisoning studies show that safety layers can fail through mechanisms outside ordinary benchmark accuracy \citep{bowers2026poisoning,huang2026rapidpoison}. Broader trustworthiness evaluations similarly argue for multi-axis safety measurement rather than a single helpfulness score \citep{wang2023decodingtrust}. These works motivate our claims ladder, but the present study targets a different inference-time mechanism: transient KV-cache state.
+
 \paragraph{Evaluation anchors.}
 The registered primary sweep requires public prompt-injection prompts from the Cyberec prompt-injection dataset \citep{cyberec2026promptinjection}, harmful-request prompts from AdvBench and JailbreakBench \citep{zou2023universal,chao2024jailbreakbench}, XSTest-safe over-refusal prompts \citep{rottger2023xstest}, benign-instruction prompts from Databricks Dolly 15k \citep{databricks2023dolly}, and ARC-Easy capability questions \citep{clark2018arc}. Broader anchors such as HarmBench, IFEval, RULER, and LongBench define extension analyses only when their corresponding artifacts are present \citep{mazeika2024harmbench,zhou2023ifeval,hsieh2024ruler,bai2024longbench}. Primary experiments target Qwen2.5 Instruct models because they are open-weight and available at 7B, 14B, and 32B scales \citep{qwen2024qwen25}.
 

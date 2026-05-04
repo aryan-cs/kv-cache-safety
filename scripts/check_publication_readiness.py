@@ -37,6 +37,8 @@ REQUIRED_FIGURE_DATA_COLUMNS = {
     },
     "cache_state_fingerprint": {
         "policy",
+        "layer_bin",
+        "layer_label",
         "role",
         "token_bin",
         "retention_fraction",
@@ -53,12 +55,17 @@ REQUIRED_FIGURE_DATA_COLUMNS = {
         "policy",
         "compressed_policy",
         "safety_restoration_fraction",
+        "safety_restoration_ci_low",
+        "safety_restoration_ci_high",
     },
     "causal_restoration_flow": {
         "suite",
         "policy",
         "compressed_policy",
         "safety_restoration_fraction",
+        "safety_restoration_ci_low",
+        "safety_restoration_ci_high",
+        "safety_restoration_ci_width",
         "label",
     },
 }

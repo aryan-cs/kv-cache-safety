@@ -2157,6 +2157,8 @@ def _figure_csv_content() -> str:
         "y",
         "effect_magnitude",
         "label",
+        "layer_bin",
+        "layer_label",
         "token_bin",
         "role",
         "retention_fraction",
@@ -2166,6 +2168,9 @@ def _figure_csv_content() -> str:
         "system_retention_fraction",
         "user_retention_fraction",
         "safety_restoration_fraction",
+        "safety_restoration_ci_low",
+        "safety_restoration_ci_high",
+        "safety_restoration_ci_width",
     ]
     return ",".join(columns) + "\n" + ",".join("1" for _ in columns) + "\n"
 

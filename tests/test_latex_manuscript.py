@@ -1,4 +1,5 @@
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -119,6 +120,20 @@ def test_latex_references_cover_primary_model_and_cache_work() -> None:
         "cyberec2026promptinjection",
     ]:
         assert f"{{{key}," in bib
+
+
+def test_latex_citations_and_bibliography_are_consistent() -> None:
+    tex = Path("paper/latex/main.tex").read_text(encoding="utf-8")
+    bib = Path("paper/references.bib").read_text(encoding="utf-8")
+    bib_keys = set(re.findall(r"@\w+\{([^,]+),", bib))
+    cited_keys = {
+        key.strip()
+        for citation in re.findall(r"\\cite[tp]\{([^}]+)\}", tex)
+        for key in citation.split(",")
+    }
+
+    assert cited_keys <= bib_keys
+    assert bib_keys <= cited_keys
 
 
 def test_arxiv_rewrite_uses_local_bibliography_and_figures() -> None:
