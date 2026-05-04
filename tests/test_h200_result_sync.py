@@ -55,6 +55,9 @@ def test_fetch_h200_results_script_is_guarded_and_checksum_verified() -> None:
     assert "/home/aryang9/sandbox/llm-safety" in script
     assert "safe_artifact_path" in script
     assert "results/*|paper/generated/*|paper/audit/*" in script
+    default_block = script.split("remote_generated_paths=", maxsplit=1)[0]
+    assert "paper/generated/h200_qwen_full_sweep" not in default_block
+    assert "FETCH_H200_REMOTE_GENERATED" in script
     assert "paper/generated/preliminary_claim_assessment" in script
     assert "paper/generated/claim_assessment" not in script
     assert "h200_qwen_full_sweep_audit_key.jsonl" in script

@@ -14,13 +14,6 @@ default_paths=(
   "results/h200_qwen_full_sweep"
   "results/h200_causal_patch_qwen7b"
   "results/h200_attention_diagnostic_qwen7b_primary"
-  "paper/generated/h200_qwen_full_sweep"
-  "paper/generated/h200_causal_patch_qwen7b"
-  "paper/generated/h200_attention_diagnostic_qwen7b"
-  "paper/generated/preliminary_claim_assessment"
-  "paper/generated/preliminary_followup_plan"
-  "paper/generated/post_h200_next_steps.json"
-  "paper/generated/post_h200_next_steps.md"
   "paper/audit/h200_qwen_full_sweep_audit_blinded.csv"
   "paper/audit/h200_qwen_full_sweep_audit_blinded_annotator_01.csv"
   "paper/audit/h200_qwen_full_sweep_audit_blinded_annotator_02.csv"
@@ -32,6 +25,20 @@ default_paths=(
   "paper/audit/h200_causal_patch_qwen7b_audit_export_manifest.json"
   "paper/audit/h200_causal_patch_qwen7b_audit_key.jsonl"
 )
+
+remote_generated_paths=(
+  "paper/generated/h200_qwen_full_sweep"
+  "paper/generated/h200_causal_patch_qwen7b"
+  "paper/generated/h200_attention_diagnostic_qwen7b"
+  "paper/generated/preliminary_claim_assessment"
+  "paper/generated/preliminary_followup_plan"
+  "paper/generated/post_h200_next_steps.json"
+  "paper/generated/post_h200_next_steps.md"
+)
+
+if [[ "${FETCH_H200_REMOTE_GENERATED:-0}" == "1" ]]; then
+  default_paths+=("${remote_generated_paths[@]}")
+fi
 
 if [[ "$#" -gt 0 ]]; then
   paths=("$@")
