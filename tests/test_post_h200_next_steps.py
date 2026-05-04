@@ -346,7 +346,8 @@ def test_post_h200_next_steps_requires_audits_before_claims() -> None:
     assert report["steps"][2]["state"] == "complete"
     assert report["steps"][3]["state"] == "ready"
     assert report["steps"][4]["state"] == "blocked"
-    assert report["steps"][3]["command"] == "bash scripts/aggregate_publication_human_audits.sh"
+    assert "bash scripts/aggregate_publication_human_audits.sh" in report["steps"][3]["command"]
+    assert "PRIMARY_RUN_ID=h200_qwen_full_sweep" in report["steps"][3]["command"]
     assert "open local judge workflow" in report["steps"][3]["detail"]
 
 
@@ -370,3 +371,37 @@ def test_post_h200_next_steps_marks_publication_bundle_ready_after_claims() -> N
     assert report["next_step"] == "build_publication_bundle"
     assert report["steps"][-1]["state"] == "ready"
     assert "build_publication_artifacts.sh" in render_markdown(report)
+
+
+def test_post_h200_next_steps_commands_follow_selected_paths() -> None:
+    report = post_h200_next_steps(
+        {
+            "publication_ready": False,
+            "blockers": ["primary_human_audit_complete"],
+            "gates": {
+                "primary_results_complete": True,
+                "causal_results_complete": True,
+                "primary_human_audit_complete": False,
+                "causal_human_audit_complete": False,
+                "claim_assessment_passed": False,
+                "paper_pdf_exists": True,
+                "arxiv_bundle_ready": False,
+            },
+            "primary_results": {"path": "results/h200_qwen_full_sweep_plus_ci_extension"},
+            "causal_results": {"path": "results/h200_causal_patch_qwen7b"},
+            "primary_human_audit": {
+                "path": "paper/audit/h200_qwen_full_sweep_plus_ci_extension_summary"
+            },
+            "causal_human_audit": {"path": "paper/audit/h200_causal_patch_qwen7b_summary"},
+            "claim_assessment": {"path": "paper/generated/claim_assessment/claim_assessment.json"},
+        }
+    )
+    rendered = render_markdown(report)
+
+    assert "h200_qwen_full_sweep_plus_ci_extension" in rendered
+    assert "PRIMARY_RUN_ID=h200_qwen_full_sweep_plus_ci_extension" in rendered
+    assert "paper/generated/h200_qwen_full_sweep_plus_ci_extension" in rendered
+    assert (
+        "paper/audit/h200_qwen_full_sweep_plus_ci_extension_summary/"
+        "human_audit_summary.json"
+    ) in rendered

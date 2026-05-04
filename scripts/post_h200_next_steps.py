@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import shlex
 from pathlib import Path
 from typing import Any
 
@@ -103,6 +104,34 @@ def main() -> None:
 
 def post_h200_next_steps(status: dict[str, Any]) -> dict[str, Any]:
     gates = status.get("gates") or {}
+    primary_results_path = _status_path(
+        status,
+        "primary_results",
+        "results/h200_qwen_full_sweep",
+    )
+    causal_results_path = _status_path(
+        status,
+        "causal_results",
+        "results/h200_causal_patch_qwen7b",
+    )
+    primary_audit_path = _status_path(
+        status,
+        "primary_human_audit",
+        f"paper/audit/{Path(primary_results_path).name}_summary",
+    )
+    causal_audit_path = _status_path(
+        status,
+        "causal_human_audit",
+        f"paper/audit/{Path(causal_results_path).name}_summary",
+    )
+    claim_assessment_path = _status_path(
+        status,
+        "claim_assessment",
+        "paper/generated/claim_assessment/claim_assessment.json",
+    )
+    primary_generated_path = f"paper/generated/{Path(primary_results_path).name}"
+    causal_generated_path = f"paper/generated/{Path(causal_results_path).name}"
+    claim_generated_path = str(Path(claim_assessment_path).parent)
     primary_raw_complete = bool(gates.get("primary_results_complete")) or _raw_result_available(
         status.get("primary_results")
     )
@@ -131,8 +160,12 @@ def post_h200_next_steps(status: dict[str, Any]) -> dict[str, Any]:
             ready=primary_raw_complete and causal_raw_complete,
             command=(
                 "bash scripts/fetch_h200_results.sh "
-                "results/h200_qwen_full_sweep "
-                "results/h200_causal_patch_qwen7b && "
+                f"{_q(primary_results_path)} "
+                f"{_q(causal_results_path)} && "
+                f"PRIMARY_RESULTS_DIR={_q(primary_results_path)} "
+                f"CAUSAL_RESULTS_DIR={_q(causal_results_path)} "
+                f"PRIMARY_GENERATED_DIR={_q(primary_generated_path)} "
+                f"CAUSAL_GENERATED_DIR={_q(causal_generated_path)} "
                 "bash scripts/prepare_after_h200_fetch.sh"
             ),
             detail="Fetch raw H200 evidence, then reaggregate metrics, regenerate figures and paper tables, run readiness checks, and export audit templates from the current clean local checkout.",
@@ -141,7 +174,10 @@ def post_h200_next_steps(status: dict[str, Any]) -> dict[str, Any]:
             "resolve_ci_width",
             complete=not ci_width_blocked,
             ready=fetched_evidence_prepared and ci_width_blocked,
-            command="bash scripts/run_h200_ci_extension.sh",
+            command=(
+                f"PRIMARY_RESULTS_DIR={_q(primary_results_path)} "
+                "bash scripts/run_h200_ci_extension.sh"
+            ),
             detail=(
                 "Run the registered CI extension before publication if completed result artifacts "
                 "are otherwise valid but confidence intervals exceed the configured width gate. "
@@ -153,7 +189,16 @@ def post_h200_next_steps(status: dict[str, Any]) -> dict[str, Any]:
             complete=bool(gates.get("primary_human_audit_complete"))
             and bool(gates.get("causal_human_audit_complete")),
             ready=fetched_evidence_prepared and not ci_width_blocked,
-            command="bash scripts/aggregate_publication_human_audits.sh",
+            command=(
+                f"PRIMARY_RUN_ID={_q(Path(primary_results_path).name)} "
+                f"CAUSAL_RUN_ID={_q(Path(causal_results_path).name)} "
+                f"PRIMARY_RESULTS_DIR={_q(primary_results_path)} "
+                f"CAUSAL_RESULTS_DIR={_q(causal_results_path)} "
+                f"PRIMARY_AUDIT_SUMMARY_DIR={_q(primary_audit_path)} "
+                f"CAUSAL_AUDIT_SUMMARY_DIR={_q(causal_audit_path)} "
+                "AUDIT_SOURCE=open_judge "
+                "bash scripts/aggregate_publication_human_audits.sh"
+            ),
             detail=(
                 "Complete the leakage-capable blinded annotator CSVs, or run the documented "
                 "open local judge workflow before aggregation. Require result-source, "
@@ -168,7 +213,15 @@ def post_h200_next_steps(status: dict[str, Any]) -> dict[str, Any]:
             and bool(gates.get("causal_results_complete"))
             and bool(gates.get("primary_human_audit_complete"))
             and bool(gates.get("causal_human_audit_complete")),
-            command="uv run python scripts/assess_claims.py --primary-results-dir results/h200_qwen_full_sweep --causal-results-dir results/h200_causal_patch_qwen7b --primary-audit-summary paper/audit/h200_qwen_full_sweep_summary/human_audit_summary.json --causal-audit-summary paper/audit/h200_causal_patch_qwen7b_summary/human_audit_summary.json --output-dir paper/generated/claim_assessment --require-human-audit-support --require-cache-mediated-claim",
+            command=(
+                "uv run python scripts/assess_claims.py "
+                f"--primary-results-dir {_q(primary_results_path)} "
+                f"--causal-results-dir {_q(causal_results_path)} "
+                f"--primary-audit-summary {_q(str(Path(primary_audit_path) / 'human_audit_summary.json'))} "
+                f"--causal-audit-summary {_q(str(Path(causal_audit_path) / 'human_audit_summary.json'))} "
+                f"--output-dir {_q(claim_generated_path)} "
+                "--require-human-audit-support --require-cache-mediated-claim"
+            ),
             detail="Gate the manuscript claim on H1, H2, H3, and declared audit support; do not rewrite thresholds after seeing results.",
         ),
         _step(
@@ -179,7 +232,16 @@ def post_h200_next_steps(status: dict[str, Any]) -> dict[str, Any]:
             and bool(gates.get("primary_human_audit_complete"))
             and bool(gates.get("causal_human_audit_complete"))
             and bool(gates.get("claim_assessment_passed")),
-            command="bash scripts/build_publication_artifacts.sh",
+            command=(
+                f"PRIMARY_RESULTS_DIR={_q(primary_results_path)} "
+                f"CAUSAL_RESULTS_DIR={_q(causal_results_path)} "
+                f"PRIMARY_GENERATED_DIR={_q(primary_generated_path)} "
+                f"CAUSAL_GENERATED_DIR={_q(causal_generated_path)} "
+                f"PRIMARY_AUDIT_SUMMARY_DIR={_q(primary_audit_path)} "
+                f"CAUSAL_AUDIT_SUMMARY_DIR={_q(causal_audit_path)} "
+                f"CLAIM_GENERATED_DIR={_q(claim_generated_path)} "
+                "bash scripts/build_publication_artifacts.sh"
+            ),
             detail="Regenerate metrics, figures, tables, final PDF, and arXiv source bundle from recorded evidence.",
         ),
     ]
@@ -192,6 +254,18 @@ def post_h200_next_steps(status: dict[str, Any]) -> dict[str, Any]:
         "next_step": next_step["name"] if next_step else "done",
         "steps": steps,
     }
+
+
+def _status_path(status: dict[str, Any], artifact_name: str, default: str) -> str:
+    artifact = status.get(artifact_name)
+    if not isinstance(artifact, dict):
+        return default
+    path = artifact.get("path")
+    return str(path) if path else default
+
+
+def _q(value: str) -> str:
+    return shlex.quote(value)
 
 
 def _raw_result_available(artifact: object) -> bool:
