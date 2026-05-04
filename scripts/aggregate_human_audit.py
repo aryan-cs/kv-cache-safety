@@ -124,9 +124,17 @@ def _joined_row(annotation: dict[str, str], key: dict[str, Any]) -> dict[str, An
     labels = {field: parse_bool(annotation.get(field)) for field in BOOLEAN_LABELS}
     system_text = str(key.get("system") or "")
     hidden_system_text = str(key.get("hidden_system") or "")
+    annotation_source_type = (
+        annotation.get("annotation_source_type")
+        or annotation.get("audit_source_type")
+        or _source_type_from_annotator_id(annotator_id)
+    )
     return {
         "audit_id": key["audit_id"],
         "annotator_id": annotator_id,
+        "annotation_source_type": annotation_source_type,
+        "open_judge_model_id": annotation.get("open_judge_model_id", ""),
+        "open_judge_prompt_sha256": annotation.get("open_judge_prompt_sha256", ""),
         "run_id": key.get("run_id"),
         "model_id": key.get("model_id"),
         "suite": key.get("suite"),
@@ -198,6 +206,7 @@ def _audit_metrics(
     duplicate_key_audit_ids: list[str],
 ) -> dict[str, Any]:
     consensus_rows, consensus_ties = _consensus_rows(joined_rows)
+    annotation_source_type = _annotation_source_type(joined_rows)
     completed_ids = {
         str(row["audit_id"])
         for row in joined_rows
@@ -208,6 +217,24 @@ def _audit_metrics(
         by_suite_policy[(str(row.get("suite")), str(row.get("policy")))].append(row)
     return {
         "schema_version": 1,
+        "annotation_source_type": annotation_source_type,
+        "annotation_source_description": _annotation_source_description(
+            annotation_source_type, joined_rows
+        ),
+        "open_judge_model_ids": sorted(
+            {
+                str(row.get("open_judge_model_id"))
+                for row in joined_rows
+                if row.get("open_judge_model_id")
+            }
+        ),
+        "open_judge_prompt_sha256s": sorted(
+            {
+                str(row.get("open_judge_prompt_sha256"))
+                for row in joined_rows
+                if row.get("open_judge_prompt_sha256")
+            }
+        ),
         "expected_audit_count": len(expected_audit_ids),
         "annotation_row_count": len(joined_rows),
         "completed_audit_count": len(completed_ids),
@@ -241,6 +268,45 @@ def _audit_metrics(
             for (suite, policy), rows in sorted(by_suite_policy.items())
         },
     }
+
+
+def _source_type_from_annotator_id(annotator_id: str) -> str:
+    normalized = str(annotator_id).strip().lower()
+    if normalized.startswith("open_judge"):
+        return "open_local_judge"
+    return "human"
+
+
+def _annotation_source_type(rows: list[dict[str, Any]]) -> str:
+    sources = {
+        str(row.get("annotation_source_type") or "human").strip().lower()
+        for row in rows
+        if row.get("annotation_source_type")
+    }
+    if not sources:
+        return "human"
+    if sources == {"open_local_judge"}:
+        return "open_local_judge"
+    if sources == {"human"}:
+        return "human"
+    return "mixed"
+
+
+def _annotation_source_description(source_type: str, rows: list[dict[str, Any]]) -> str:
+    if source_type == "open_local_judge":
+        model_ids = sorted(
+            {
+                str(row.get("open_judge_model_id"))
+                for row in rows
+                if row.get("open_judge_model_id")
+            }
+        )
+        if model_ids:
+            return "Open local judge labels from " + ", ".join(model_ids)
+        return "Open local judge labels"
+    if source_type == "mixed":
+        return "Mixed human and open local judge labels"
+    return "Human labels"
 
 
 def _consensus_rows(rows: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], dict[str, list[str]]]:
@@ -577,9 +643,11 @@ def _source_artifact(path: Path) -> dict[str, Any]:
 
 
 def render_summary_markdown(metrics: dict[str, Any]) -> str:
+    source_name = _source_display_name(metrics)
     lines = [
-        "# Human Audit Summary",
+        f"# {source_name} Summary",
         "",
+        f"Annotation source: `{metrics.get('annotation_source_description', source_name)}`",
         f"Expected audit items: `{metrics['expected_audit_count']}`",
         f"Completed audit items: `{metrics['completed_audit_count']}`",
         f"Consensus audit items: `{metrics['consensus_audit_count']}`",
@@ -623,6 +691,7 @@ def render_summary_markdown(metrics: dict[str, Any]) -> str:
 
 
 def render_summary_latex(metrics: dict[str, Any]) -> str:
+    source_name = _source_display_name(metrics)
     lines = [
         r"\begin{table}[t]",
         r"\centering",
@@ -647,7 +716,9 @@ def render_summary_latex(metrics: dict[str, Any]) -> str:
         [
             r"\bottomrule",
             r"\end{tabular}",
-            r"\caption{Item-level consensus human-audit label rates with Wilson confidence intervals.}",
+            "\\caption{Item-level consensus "
+            + _latex_escape(source_name.lower())
+            + r" label rates with Wilson confidence intervals.}",
             r"\label{tab:human-audit-summary}",
             r"\end{table}",
             "",
@@ -657,6 +728,7 @@ def render_summary_latex(metrics: dict[str, Any]) -> str:
 
 
 def render_deltas_latex(metrics: dict[str, Any]) -> str:
+    source_name = _source_display_name(metrics)
     deltas = metrics.get("baseline_policy_deltas", {})
     lines = [
         r"\begin{table}[t]",
@@ -667,7 +739,11 @@ def render_deltas_latex(metrics: dict[str, Any]) -> str:
         r"\midrule",
     ]
     if not deltas:
-        lines.append(r"No paired human-audit deltas available &  & 0 \\")
+        lines.append(
+            "No paired "
+            + _latex_escape(source_name.lower())
+            + r" deltas available &  & 0 \\"
+        )
     for key, values in sorted(deltas.items()):
         lines.append(
             " & ".join(
@@ -683,13 +759,24 @@ def render_deltas_latex(metrics: dict[str, Any]) -> str:
         [
             r"\bottomrule",
             r"\end{tabular}",
-            r"\caption{Paired human-audit treatment-minus-baseline deltas by suite, policy, and label.}",
+            "\\caption{Paired "
+            + _latex_escape(source_name.lower())
+            + r" treatment-minus-baseline deltas by suite, policy, and label.}",
             r"\label{tab:human-audit-deltas}",
             r"\end{table}",
             "",
         ]
     )
     return "\n".join(lines)
+
+
+def _source_display_name(metrics: dict[str, Any]) -> str:
+    source_type = str(metrics.get("annotation_source_type") or "human")
+    if source_type == "open_local_judge":
+        return "Open Local Judge Audit"
+    if source_type == "mixed":
+        return "Mixed-Source Audit"
+    return "Human Audit"
 
 
 def _format_float(value: float | int | None) -> str:

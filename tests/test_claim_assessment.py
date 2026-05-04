@@ -49,6 +49,26 @@ def test_claim_assessment_passes_with_aligned_human_audit_support() -> None:
     assert assessment["human_audit_support"]["best_causal_restoration_delta"]["support"] > 0
 
 
+def test_claim_assessment_names_open_judge_support_honestly() -> None:
+    primary_audit = _audit_positive_metrics()
+    causal_audit = _causal_audit_positive_metrics()
+    primary_audit["annotation_source_type"] = "open_local_judge"
+    causal_audit["annotation_source_type"] = "open_local_judge"
+
+    assessment = assess_claims(
+        _primary_positive_metrics(),
+        _causal_positive_metrics(),
+        primary_audit_metrics=primary_audit,
+        causal_audit_metrics=causal_audit,
+        require_human_audit_support=True,
+    )
+
+    assert assessment["publication_gate"]["passed"] is True
+    assert assessment["human_audit_support"]["source_type"] == "open_local_judge"
+    assert "Open local judge audit gate passed" in assessment["human_audit_support"]["summary"]
+    assert "open local judge audit gate" in assessment["recommended_framing"]
+
+
 def test_claim_assessment_rejects_human_audit_that_contradicts_direction() -> None:
     audit = _audit_positive_metrics()
     audit["baseline_policy_deltas"] = {

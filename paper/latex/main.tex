@@ -199,7 +199,7 @@ The safety metrics include refusal-string detection, unsafe-compliance proxies f
 Capability is tracked with exact-match or multiple-choice accuracy where labels exist. Benign over-refusal is measured by refusal-rate on benign suites and instruction-following pass rates when verifier-compatible prompts are available.
 
 \paragraph{Statistical uncertainty.}
-The primary uncertainty report uses prompt-clustered confidence intervals. Main tables include paired safety degradation intervals by prompt and seed. The strongest claims require narrow intervals, complete prompt-policy coverage, and agreement between automated metrics and the human audit.
+The primary uncertainty report uses prompt-clustered confidence intervals. Main tables include paired safety degradation intervals by prompt and seed. The strongest claims require narrow intervals, complete prompt-policy coverage, and agreement between automated metrics and the declared audit source.
 
 \subsection{Causal Restoration}
 
@@ -227,8 +227,8 @@ The empirical study is ordered to reduce false positives:
   \item test whether the strongest effects reproduce across model scale and, where feasible, model family.
 \end{itemize}
 
-\paragraph{Human audit.}
-Automated safety labels are coarse. The analysis therefore includes a blinded audit of high-impact slices: baseline versus strongest compressed policies, safety suites where unsafe-compliance proxies increase, and examples where system-role patching changes behavior. Condition labels are hidden during annotation and joined to experimental metadata only after labeling.
+\paragraph{Blinded audit.}
+Automated safety labels are coarse. The analysis therefore includes a blinded audit of high-impact slices: baseline versus strongest compressed policies, safety suites where unsafe-compliance proxies increase, and examples where system-role patching changes behavior. Condition labels are hidden during annotation and joined to experimental metadata only after labeling. The audit source is reported explicitly as either human annotation or a documented open local judge; open-judge labels are not described as human labels.
 
 \section{Visualization Strategy}
 
@@ -318,11 +318,11 @@ The central causal claim requires system-role restoration or pinning to outperfo
 \maybeinputtable{../generated/claim_assessment/claim_assessment_table.tex}{Report the claims ladder assessment after primary and causal runs are complete. The cache-mediated safety erasure claim requires all registered criteria to pass.}
 \maybeinputtable{../generated/claim_assessment/claim_interpretation.tex}{Report evidence-gated interpretation text after the claim assessment is complete.}
 
-\subsection{Human Audit and Failure Modes}
-\maybeinputtable{../audit/h200_qwen_full_sweep_summary/human_audit_summary_table.tex}{Report blinded human-audit label rates before making safety claims.}
-\maybeinputtable{../audit/h200_qwen_full_sweep_summary/human_audit_deltas_table.tex}{Report paired baseline-versus-treatment human-audit deltas for unsafe compliance, refusal correctness, leakage, and benign over-refusal.}
-\maybeinputtable{../audit/h200_causal_patch_qwen7b_summary/human_audit_summary_table.tex}{Report blinded causal-diagnostic human-audit label rates before making restoration claims.}
-\maybeinputtable{../audit/h200_causal_patch_qwen7b_summary/human_audit_deltas_table.tex}{Report paired causal-diagnostic human-audit deltas for system-role patching, matched non-policy patching, and policy-pinned mitigation.}
+\subsection{Audit Support and Failure Modes}
+\maybeinputtable{../audit/h200_qwen_full_sweep_summary/human_audit_summary_table.tex}{Report blinded audit label rates before making safety claims.}
+\maybeinputtable{../audit/h200_qwen_full_sweep_summary/human_audit_deltas_table.tex}{Report paired baseline-versus-treatment audit deltas for unsafe compliance, refusal correctness, leakage, and benign over-refusal.}
+\maybeinputtable{../audit/h200_causal_patch_qwen7b_summary/human_audit_summary_table.tex}{Report blinded causal-diagnostic audit label rates before making restoration claims.}
+\maybeinputtable{../audit/h200_causal_patch_qwen7b_summary/human_audit_deltas_table.tex}{Report paired causal-diagnostic audit deltas for system-role patching, matched non-policy patching, and policy-pinned mitigation.}
 Qualitative examples are summarized at the category level rather than reproduced verbatim when they contain procedural harmful details.
 
 \section{Discussion}
@@ -351,7 +351,7 @@ Full matrix coverage & Prompt-policy-seed completeness is verified before analys
 Compression sanity & Cache interventions must measurably alter retained or perturbed cache state. \\
 Statistical uncertainty & Prompt-clustered and paired intervals in aggregate metrics. \\
 Paper artifacts & Figure and table manifests with SHA256 hashes. \\
-Human audit & Blinded condition labels with post-annotation metadata joining. \\
+Audit support & Blinded condition labels with post-annotation metadata joining and explicit source reporting. \\
 \bottomrule
 \end{tabularx}
 

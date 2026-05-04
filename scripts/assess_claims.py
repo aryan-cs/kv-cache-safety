@@ -120,17 +120,18 @@ def assess_claims(
         min_human_audit_delta=min_human_audit_delta,
         required=require_human_audit_support,
     )
+    audit_source_label = _audit_gate_label_for_framing(audit_support)
     passed_claims = [claim for claim in [h1, h2, h3] if claim["passed"]]
     gate_passed = h1["passed"] and h2["passed"] and h3["passed"] and audit_support["passed"]
     if gate_passed:
         framing = (
             "The completed metrics support the cache-mediated safety erasure claim under "
-            "the configured thresholds and human-audit gate."
+            f"the configured thresholds and {audit_source_label.lower()} gate."
         )
     elif h1["passed"] and h2["passed"] and h3["passed"]:
         framing = (
             "The automated metrics support the cache-mediated safety erasure claim, but the "
-            "human-audit gate has not cleared; the paper must not present the positive claim "
+            f"{audit_source_label.lower()} gate has not cleared; the paper must not present the positive claim "
             "as publication-ready."
         )
     elif h1["passed"] and h2["passed"]:
@@ -217,8 +218,11 @@ def render_latex_table(assessment: dict[str, Any]) -> str:
             f"{_latex_escape(claim['summary'])} \\\\"
         )
     audit_support = assessment.get("human_audit_support", {})
+    audit_row_label = _latex_escape(
+        _audit_gate_label_for_framing(audit_support).replace("-", " ").capitalize()
+    )
     lines.append(
-        "Human audit & "
+        f"{audit_row_label} & "
         f"{_latex_escape('Pass' if audit_support.get('passed') else 'Fail')} & "
         f"{_latex_escape(audit_support.get('summary', 'No human-audit summary available.'))} \\\\"
     )
@@ -270,17 +274,18 @@ def render_abstract_status_latex(assessment: dict[str, Any]) -> str:
     h2 = claims.get("H2_selective_safety_degradation", {})
     h3 = claims.get("H3_causal_safety_state_erasure", {})
     audit = assessment.get("human_audit_support", {})
+    audit_label = _audit_gate_label_for_framing(audit)
     if assessment.get("publication_gate", {}).get("passed"):
         sentence = (
             "We report a completed open-model study whose behavioral, selective, causal, "
-            "and human-audit gates support the cache-mediated safety erasure claim under "
+            f"and {audit_label} gates support the cache-mediated safety erasure claim under "
             "the registered criteria; all empirical claims are limited to the tested models, "
             "public prompt suites, cache interventions, and confidence intervals."
         )
     elif h1.get("passed") and h2.get("passed") and h3.get("passed") and not audit.get("passed"):
         sentence = (
             "The automated analyses clear the behavioral, selective, and causal gates, "
-            "but the human-audit gate has not cleared; the manuscript must therefore avoid "
+            f"but the {audit_label} gate has not cleared; the manuscript must therefore avoid "
             "publication-ready positive safety claims until audited labels support them."
         )
     elif h1.get("passed") and h2.get("passed"):
@@ -311,6 +316,7 @@ def _interpretation_parts(assessment: dict[str, Any]) -> dict[str, str]:
     h2 = claims.get("H2_selective_safety_degradation", {})
     h3 = claims.get("H3_causal_safety_state_erasure", {})
     audit_support = assessment.get("human_audit_support", {})
+    audit_label = _audit_gate_label_for_framing(audit_support)
     summaries = "; ".join(
         claim.get("summary", "No summary available.")
         for claim in [h1, h2, h3]
@@ -323,17 +329,17 @@ def _interpretation_parts(assessment: dict[str, Any]) -> dict[str, str]:
             "to the tested models, datasets, cache policies, and confidence intervals."
         )
         next_action = (
-            "Report the effect sizes, confidence intervals, human-audit agreement, and "
+            "Report the effect sizes, confidence intervals, audit-source agreement, and "
             "causal restoration margins before making broader mechanistic claims."
         )
     elif h1.get("passed") and h2.get("passed") and h3.get("passed") and not audit_support.get("passed"):
         claim_scope = (
-            "Automated behavioral, selective, and causal gates passed, but the human-audit "
+            f"Automated behavioral, selective, and causal gates passed, but the {audit_label} "
             "gate did not. The manuscript must not describe the result as publication-ready "
             "cache-mediated safety erasure."
         )
         next_action = (
-            "Complete or repair the blinded human audit, then rerun claim assessment before "
+            "Complete or repair the blinded audit, then rerun claim assessment before "
             "using unsafe-compliance or leakage labels as final evidence."
         )
     elif h1.get("passed") and h2.get("passed"):
@@ -592,11 +598,13 @@ def _assess_human_audit_support(
     min_human_audit_delta: float,
     required: bool,
 ) -> dict[str, Any]:
+    source_label = _audit_support_source_label(primary_audit_metrics, causal_audit_metrics)
     if not required and primary_audit_metrics is None and causal_audit_metrics is None:
         return {
             "required": False,
             "passed": True,
-            "summary": "Human-audit support was not required for this assessment.",
+            "source_type": "none",
+            "summary": "Audit support was not required for this assessment.",
             "failures": [],
             "best_primary_delta": None,
         }
@@ -647,13 +655,53 @@ def _assess_human_audit_support(
     passed = not failures
     return {
         "required": required,
+        "source_type": _audit_support_source_type(primary_audit_metrics, causal_audit_metrics),
         "passed": passed,
         "failures": failures,
         "best_primary_delta": best_primary_delta,
         "best_causal_delta": best_causal_delta,
         "best_causal_restoration_delta": best_causal_delta,
-        "summary": _summarize_human_audit_support(best_primary_delta, best_causal_delta, failures),
+        "summary": _summarize_human_audit_support(
+            best_primary_delta, best_causal_delta, failures, source_label=source_label
+        ),
     }
+
+
+def _audit_support_source_type(
+    primary_audit_metrics: dict[str, Any] | None,
+    causal_audit_metrics: dict[str, Any] | None,
+) -> str:
+    sources = {
+        str(metrics.get("annotation_source_type") or "human")
+        for metrics in [primary_audit_metrics, causal_audit_metrics]
+        if metrics is not None
+    }
+    if not sources:
+        return "none"
+    if len(sources) == 1:
+        return next(iter(sources))
+    return "mixed"
+
+
+def _audit_support_source_label(
+    primary_audit_metrics: dict[str, Any] | None,
+    causal_audit_metrics: dict[str, Any] | None,
+) -> str:
+    source_type = _audit_support_source_type(primary_audit_metrics, causal_audit_metrics)
+    if source_type == "open_local_judge":
+        return "Open local judge audit"
+    if source_type == "mixed":
+        return "Mixed-source audit"
+    return "Human audit"
+
+
+def _audit_gate_label_for_framing(audit_support: dict[str, Any]) -> str:
+    source_type = str(audit_support.get("source_type") or "human")
+    if source_type == "open_local_judge":
+        return "open local judge audit"
+    if source_type == "mixed":
+        return "mixed-source audit"
+    return "human-audit"
 
 
 def _audit_readiness_failures(label: str, metrics: dict[str, Any] | None) -> list[str]:
@@ -851,18 +899,20 @@ def _summarize_human_audit_support(
     best_delta: dict[str, Any] | None,
     best_causal_delta: dict[str, Any] | None,
     failures: list[str],
+    *,
+    source_label: str = "Human audit",
 ) -> str:
     if failures:
         detail = "; ".join(failures[:3])
         if len(failures) > 3:
             detail += f"; plus {len(failures) - 3} more"
-        return f"Human-audit gate failed: {detail}."
+        return f"{source_label} gate failed: {detail}."
     if best_delta is None:
-        return "Human-audit gate failed: no aligned safety delta was available."
+        return f"{source_label} gate failed: no aligned safety delta was available."
     if best_causal_delta is None:
-        return "Human-audit gate failed: no causal restoration audit delta was available."
+        return f"{source_label} gate failed: no causal restoration audit delta was available."
     return (
-        "Human-audit gate passed. Best aligned safety delta: "
+        f"{source_label} gate passed. Best aligned safety delta: "
         f"{best_delta['key']} treatment-minus-baseline "
         f"{_fmt(best_delta['treatment_minus_baseline'])} "
         f"(support {_fmt(best_delta['support'])}, n={best_delta['n']}); "
