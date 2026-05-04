@@ -28,6 +28,14 @@ if [[ -n "$(git status --short)" ]]; then
   exit 1
 fi
 
+clear_stale_publication_pdfs() {
+  rm -f \
+    paper/cache_mediated_safety_erasure.pdf \
+    paper/cache_mediated_safety_erasure.pdf.manifest.json \
+    paper/build/cache_mediated_safety_erasure.pdf \
+    paper/build/cache_mediated_safety_erasure.pdf.manifest.json
+}
+
 result_artifacts_complete() {
   local results_dir="$1"
   for required in manifest.json generations.jsonl metrics.json cache_stats.parquet; do
@@ -224,6 +232,7 @@ write_publication_status() {
 uv sync --frozen --extra dev
 uv run ruff check .
 uv run pytest -q
+clear_stale_publication_pdfs
 write_publication_status
 
 require_human_audit_artifacts "$primary_audit_summary" "$primary_results"
@@ -235,8 +244,6 @@ require_human_audit_artifacts "$primary_audit_summary" "$primary_results"
 require_human_audit_artifacts "$causal_audit_summary" "$causal_results"
 assess_claims
 rebuild_qwen32_if_present
-
-rm -f paper/cache_mediated_safety_erasure.pdf
 PRIMARY_RESULTS_DIR="$primary_results" \
 CAUSAL_RESULTS_DIR="$causal_results" \
 PRIMARY_PAPER_DIR="$primary_generated_dir" \

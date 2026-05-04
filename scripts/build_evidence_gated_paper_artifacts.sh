@@ -22,6 +22,14 @@ require_file() {
   fi
 }
 
+clear_stale_publication_pdfs() {
+  rm -f \
+    paper/cache_mediated_safety_erasure.pdf \
+    paper/cache_mediated_safety_erasure.pdf.manifest.json \
+    paper/build/cache_mediated_safety_erasure.pdf \
+    paper/build/cache_mediated_safety_erasure.pdf.manifest.json
+}
+
 for path in \
   "$primary_results/manifest.json" \
   "$primary_results/metrics.json" \
@@ -43,6 +51,8 @@ for path in \
   "$causal_audit_summary/human_audit_deltas_table.tex"; do
   require_file "$path"
 done
+
+clear_stale_publication_pdfs
 
 uv run python scripts/check_latex_placeholders.py --tex paper/latex/main.tex
 uv run python scripts/check_paper_asset_freshness.py \

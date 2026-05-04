@@ -288,6 +288,8 @@ def test_publication_artifact_builder_fails_without_real_results() -> None:
     assert "REQUIRE_COMPLETE_PAPER=1" in script
     assert "bash scripts/build_paper_pdf.sh" in script
     assert "publication_status.md" in script
+    assert "clear_stale_publication_pdfs" in script
+    assert "paper/cache_mediated_safety_erasure.pdf.manifest.json" in script
     assert "--require-cache-mediated-claim" in script
     assert "--require-human-audit-support" in script
     assert (
@@ -298,7 +300,7 @@ def test_publication_artifact_builder_fails_without_real_results() -> None:
         'assess_claims'
     ) in script
     assert "--fail-if-not-ready" in script
-    assert "rm -f paper/cache_mediated_safety_erasure.pdf" in script
+    assert "rm -f \\" in script
     assert script.index("write_publication_status --fail-if-not-ready") < script.index(
         "uv run python scripts/package_arxiv_submission.py"
     )
@@ -360,6 +362,8 @@ def test_evidence_gated_paper_builder_allows_nonpassing_claim_pdf() -> None:
 
     assert "ALLOW_NONPASSING_CLAIM_PAPER=1" in script
     assert "REQUIRE_COMPLETE_PAPER=1" in script
+    assert "clear_stale_publication_pdfs" in script
+    assert "paper/cache_mediated_safety_erasure.pdf.manifest.json" in script
     assert "scripts/package_arxiv_submission.py" in script
     assert "--require-arxiv-bundle" in script
     assert "build_evidence_gated_paper_artifacts.sh" in finalizer
