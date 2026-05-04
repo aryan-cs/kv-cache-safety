@@ -10,6 +10,7 @@ from make_figures import (
     _phase_portrait_rows,
     _prompt_effect_constellation_rows,
     _safety_state_atlas_rows,
+    _selective_rows_for_figures,
     _stream_cache_fingerprint,
     _stream_cache_summaries,
 )
@@ -145,6 +146,98 @@ def test_phase_portrait_rows_parse_policy_budgets() -> None:
             "safety_degradation": 0.3,
             "capability_degradation": 0.1,
             "selective_safety_erasure_index": 0.2,
+        }
+    ]
+
+
+def test_selective_rows_for_figures_falls_back_to_policy_level_contrasts() -> None:
+    rows = _selective_rows_for_figures(
+        {
+            "selective_safety_erasure": {
+                "public_refusal_safety::kv_int4_sim": {
+                    "safety_degradation": 0.12,
+                    "capability_degradation": None,
+                    "selective_safety_erasure_index": None,
+                }
+            },
+            "policy_level_contrasts": {
+                "kv_int4_sim": {
+                    "safety_degradation_ci": {
+                        "mean": 0.12,
+                        "ci_low": 0.08,
+                        "ci_high": 0.16,
+                        "n": 200,
+                    },
+                    "capability_degradation_ci": {
+                        "mean": 0.02,
+                        "ci_low": 0.0,
+                        "ci_high": 0.04,
+                        "n": 100,
+                    },
+                    "selective_safety_erasure_index": 0.10,
+                    "selective_safety_erasure_index_ci": {
+                        "ci_low": 0.04,
+                        "ci_high": 0.15,
+                        "n_safety": 200,
+                        "n_capability": 100,
+                    },
+                }
+            },
+        }
+    )
+
+    assert rows == [
+        {
+            "suite_policy": "global_policy_contrast::kv_int4_sim",
+            "suite": "global_policy_contrast",
+            "policy": "kv_int4_sim",
+            "contrast_scope": "policy_level",
+            "index": 0.10,
+            "selective_safety_erasure_index": 0.10,
+            "safety_degradation": 0.12,
+            "capability_degradation": 0.02,
+            "safety_ci_low": 0.08,
+            "safety_ci_high": 0.16,
+            "capability_ci_low": 0.0,
+            "capability_ci_high": 0.04,
+            "selective_safety_erasure_index_ci_low": 0.04,
+            "selective_safety_erasure_index_ci_high": 0.15,
+            "safety_n": 200,
+            "capability_n": 100,
+        }
+    ]
+
+
+def test_selective_rows_for_figures_prefers_suite_level_ssei() -> None:
+    rows = _selective_rows_for_figures(
+        {
+            "selective_safety_erasure": {
+                "joint_suite::kv_int4_sim": {
+                    "safety_degradation": 0.12,
+                    "capability_degradation": 0.02,
+                    "selective_safety_erasure_index": 0.10,
+                }
+            },
+            "policy_level_contrasts": {
+                "kv_int4_sim": {
+                    "safety_degradation_ci": {"mean": 0.5},
+                    "capability_degradation_ci": {"mean": 0.1},
+                    "selective_safety_erasure_index": 0.4,
+                }
+            },
+        }
+    )
+
+    assert rows == [
+        {
+            "suite_policy": "joint_suite::kv_int4_sim",
+            "suite": "joint_suite",
+            "policy": "kv_int4_sim",
+            "contrast_scope": "suite",
+            "index": 0.10,
+            "selective_safety_erasure_index": 0.10,
+            "safety_degradation": 0.12,
+            "capability_degradation": 0.02,
         }
     ]
 

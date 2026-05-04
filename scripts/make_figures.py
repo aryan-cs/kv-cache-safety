@@ -131,19 +131,7 @@ def main() -> None:
     if metrics_path.exists():
         with metrics_path.open("r", encoding="utf-8") as f:
             metrics = json.load(f)
-        selective_rows = [
-            {
-                "suite_policy": key,
-                "suite": key.split("::", 1)[0],
-                "policy": key.split("::", 1)[1],
-                "index": value.get("selective_safety_erasure_index"),
-                "selective_safety_erasure_index": value.get("selective_safety_erasure_index"),
-                "safety_degradation": value.get("safety_degradation"),
-                "capability_degradation": value.get("capability_degradation"),
-            }
-            for key, value in metrics.get("selective_safety_erasure", {}).items()
-            if value.get("selective_safety_erasure_index") is not None
-        ]
+        selective_rows = _selective_rows_for_figures(metrics)
         selective_rows_for_atlas = selective_rows
         if selective_rows:
             selective_df = pd.DataFrame(selective_rows)
@@ -644,6 +632,67 @@ def _write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(rows)
+
+
+def _selective_rows_for_figures(metrics: dict[str, Any]) -> list[dict[str, Any]]:
+    suite_rows = []
+    for key, value in metrics.get("selective_safety_erasure", {}).items():
+        index = _finite_float(value.get("selective_safety_erasure_index"))
+        safety = _finite_float(value.get("safety_degradation"))
+        capability = _finite_float(value.get("capability_degradation"))
+        if index is None or safety is None or capability is None:
+            continue
+        suite, policy = key.split("::", 1)
+        suite_rows.append(
+            {
+                "suite_policy": key,
+                "suite": suite,
+                "policy": policy,
+                "contrast_scope": "suite",
+                "index": index,
+                "selective_safety_erasure_index": index,
+                "safety_degradation": safety,
+                "capability_degradation": capability,
+            }
+        )
+    if suite_rows:
+        return suite_rows
+
+    policy_rows = []
+    for policy, value in metrics.get("policy_level_contrasts", {}).items():
+        safety_ci = value.get("safety_degradation_ci") or {}
+        capability_ci = value.get("capability_degradation_ci") or {}
+        ssei_ci = value.get("selective_safety_erasure_index_ci") or {}
+        index = _finite_float(
+            value.get("selective_safety_erasure_index")
+            if value.get("selective_safety_erasure_index") is not None
+            else ssei_ci.get("mean")
+        )
+        safety = _finite_float(safety_ci.get("mean"))
+        capability = _finite_float(capability_ci.get("mean"))
+        if index is None or safety is None or capability is None:
+            continue
+        policy_rows.append(
+            {
+                "suite_policy": f"global_policy_contrast::{policy}",
+                "suite": "global_policy_contrast",
+                "policy": policy,
+                "contrast_scope": "policy_level",
+                "index": index,
+                "selective_safety_erasure_index": index,
+                "safety_degradation": safety,
+                "capability_degradation": capability,
+                "safety_ci_low": safety_ci.get("ci_low"),
+                "safety_ci_high": safety_ci.get("ci_high"),
+                "capability_ci_low": capability_ci.get("ci_low"),
+                "capability_ci_high": capability_ci.get("ci_high"),
+                "selective_safety_erasure_index_ci_low": ssei_ci.get("ci_low"),
+                "selective_safety_erasure_index_ci_high": ssei_ci.get("ci_high"),
+                "safety_n": safety_ci.get("n") or ssei_ci.get("n_safety"),
+                "capability_n": capability_ci.get("n") or ssei_ci.get("n_capability"),
+            }
+        )
+    return policy_rows
 
 
 def _phase_portrait_rows(selective_df: Any) -> Any:
