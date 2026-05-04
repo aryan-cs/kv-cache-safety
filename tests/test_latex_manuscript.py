@@ -10,6 +10,7 @@ from package_arxiv_submission import (
     GENERATED_DIRS,
     OPTIONAL_GENERATED_DIRS,
     REQUIRED_GENERATED_DIRS,
+    _copy_arxiv_support_tree,
     _is_pdf,
     _missing_inputs,
     _rewrite_failures,
@@ -55,6 +56,18 @@ def test_latex_manuscript_is_formal_registered_protocol() -> None:
     assert "Failure Examples" not in tex
     assert "seven interventions" not in tex
     assert "Attention-H2O retention is treated as a diagnostic extension" in tex
+
+
+def test_latex_manuscript_uses_formal_publication_wording() -> None:
+    tex = Path("paper/latex/main.tex").read_text(encoding="utf-8")
+
+    for phrase in [
+        "when budget permits",
+        "The shape of the trajectory matters",
+        "bend upward",
+        "restoration stream",
+    ]:
+        assert phrase not in tex
 
 
 def test_latex_references_cover_primary_model_and_cache_work() -> None:
@@ -185,6 +198,22 @@ def test_arxiv_packager_records_file_provenance(tmp_path: Path) -> None:
     assert all(not Path(path).is_absolute() for path in manifest["copied_figures"])
     assert all(not Path(path).is_absolute() for path in manifest["copied_generated"])
     assert all(not Path(path).is_absolute() for path in manifest["copied_audit"])
+
+
+def test_arxiv_packager_excludes_raw_evidence_from_support_trees(tmp_path: Path) -> None:
+    source = tmp_path / "audit_source"
+    bundle = tmp_path / "arxiv_source" / "audit" / "audit_source"
+    source.mkdir()
+    (source / "human_audit_summary_table.tex").write_text("table\n", encoding="utf-8")
+    (source / "audit_labels.csv").write_text("label\n", encoding="utf-8")
+    (source / "audit_key.jsonl").write_text('{"prompt": "hidden"}\n', encoding="utf-8")
+
+    copied = _copy_arxiv_support_tree(source, bundle)
+
+    assert copied == [source / "human_audit_summary_table.tex"]
+    assert (bundle / "human_audit_summary_table.tex").exists()
+    assert not (bundle / "audit_labels.csv").exists()
+    assert not (bundle / "audit_key.jsonl").exists()
 
 
 def test_latex_placeholder_checker_reports_missing_artifacts(tmp_path: Path) -> None:

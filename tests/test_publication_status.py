@@ -7,7 +7,11 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path("scripts").resolve()))
 
-from report_publication_status import publication_status, render_markdown
+from report_publication_status import (
+    REQUIRED_ARXIV_FIGURE_FILES,
+    publication_status,
+    render_markdown,
+)
 
 REQUIRED_AUDIT_LABELS = [
     "human_refusal_correct",
@@ -284,7 +288,7 @@ def test_publication_status_rejects_stale_arxiv_provenance_source(
     _write_audit(primary_audit, primary)
     _write_audit(causal_audit, causal)
     _write_arxiv_bundle(arxiv_dir, archive)
-    copied_figure = arxiv_dir / "figures" / "figure.pdf"
+    copied_figure = arxiv_dir / REQUIRED_ARXIV_FIGURE_FILES[0]
     copied_figure.write_bytes(b"%PDF-1.7\nchanged\n")
     claim_path = tmp_path / "claim_assessment.json"
     claim_path.write_text(
@@ -393,7 +397,10 @@ def test_publication_status_rejects_arxiv_archive_missing_manifest_assets(
 
     assert status["publication_ready"] is False
     assert status["gates"]["arxiv_bundle_ready"] is False
-    assert "archive_missing:figures/figure.pdf" in status["arxiv_bundle"]["failures"]
+    assert (
+        f"archive_missing:{REQUIRED_ARXIV_FIGURE_FILES[0]}"
+        in status["arxiv_bundle"]["failures"]
+    )
     assert (
         "archive_missing:generated/h200_qwen_full_sweep/main_results_table.tex"
         in status["arxiv_bundle"]["failures"]
@@ -492,6 +499,236 @@ def test_publication_status_rejects_unmanifested_empirical_archive_files(
         "generated/h200_qwen_full_sweep/unmanifested_extra.tex"
         in status["arxiv_bundle"]["failures"]
     )
+
+
+def test_publication_status_requires_named_arxiv_figures(tmp_path: Path) -> None:
+    primary = tmp_path / "primary"
+    causal = tmp_path / "causal"
+    primary_audit = tmp_path / "primary_audit"
+    causal_audit = tmp_path / "causal_audit"
+    arxiv_dir = tmp_path / "arxiv_source"
+    archive = tmp_path / "arxiv_source.tar.gz"
+    _write_run(primary)
+    _write_run(causal)
+    _write_audit(primary_audit, primary)
+    _write_audit(causal_audit, causal)
+    _write_arxiv_bundle(arxiv_dir, archive)
+    missing_figure = arxiv_dir / REQUIRED_ARXIV_FIGURE_FILES[0]
+    missing_figure.unlink()
+    _rewrite_arxiv_archive(arxiv_dir, archive)
+    claim_path = tmp_path / "claim_assessment.json"
+    claim_path.write_text(
+        json.dumps(_passing_claim_assessment(primary, causal, primary_audit, causal_audit)),
+        encoding="utf-8",
+    )
+    pdf_path = tmp_path / "paper.pdf"
+    pdf_path.write_bytes(b"%PDF-1.7\n")
+
+    status = publication_status(
+        primary_results_dir=primary,
+        causal_results_dir=causal,
+        primary_audit_dir=primary_audit,
+        causal_audit_dir=causal_audit,
+        claim_assessment_path=claim_path,
+        paper_pdf=pdf_path,
+        arxiv_source_dir=arxiv_dir,
+        arxiv_archive=archive,
+        require_arxiv_bundle=True,
+    )
+
+    assert status["publication_ready"] is False
+    assert (
+        f"missing_required_bundle_file:{REQUIRED_ARXIV_FIGURE_FILES[0]}"
+        in status["arxiv_bundle"]["failures"]
+    )
+
+
+def test_publication_status_rejects_arxiv_main_with_repo_local_paths(
+    tmp_path: Path,
+) -> None:
+    primary = tmp_path / "primary"
+    causal = tmp_path / "causal"
+    primary_audit = tmp_path / "primary_audit"
+    causal_audit = tmp_path / "causal_audit"
+    arxiv_dir = tmp_path / "arxiv_source"
+    archive = tmp_path / "arxiv_source.tar.gz"
+    _write_run(primary)
+    _write_run(causal)
+    _write_audit(primary_audit, primary)
+    _write_audit(causal_audit, causal)
+    _write_arxiv_bundle(arxiv_dir, archive)
+    main_tex = arxiv_dir / "main.tex"
+    main_tex.write_text(
+        r"\includegraphics{../../results/h200_qwen_full_sweep/figures/safety_state_atlas.pdf}",
+        encoding="utf-8",
+    )
+    manifest = json.loads((arxiv_dir / "manifest.json").read_text(encoding="utf-8"))
+    manifest["main_tex_sha256"] = _sha256(main_tex)
+    for row in manifest["copied_file_provenance"]:
+        if Path(row["bundle_path"]).name == "main.tex":
+            row["source_sha256"] = _sha256(main_tex)
+            row["bundle_sha256"] = _sha256(main_tex)
+            row["source_bytes"] = main_tex.stat().st_size
+            row["bundle_bytes"] = main_tex.stat().st_size
+    (arxiv_dir / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+    _rewrite_arxiv_archive(arxiv_dir, archive)
+    claim_path = tmp_path / "claim_assessment.json"
+    claim_path.write_text(
+        json.dumps(_passing_claim_assessment(primary, causal, primary_audit, causal_audit)),
+        encoding="utf-8",
+    )
+    pdf_path = tmp_path / "paper.pdf"
+    pdf_path.write_bytes(b"%PDF-1.7\n")
+
+    status = publication_status(
+        primary_results_dir=primary,
+        causal_results_dir=causal,
+        primary_audit_dir=primary_audit,
+        causal_audit_dir=causal_audit,
+        claim_assessment_path=claim_path,
+        paper_pdf=pdf_path,
+        arxiv_source_dir=arxiv_dir,
+        arxiv_archive=archive,
+        require_arxiv_bundle=True,
+    )
+
+    assert status["publication_ready"] is False
+    assert "main_tex_repo_local_path:../../results/" in status["arxiv_bundle"]["failures"]
+
+
+def test_publication_status_rejects_missing_required_bundle_provenance(
+    tmp_path: Path,
+) -> None:
+    primary = tmp_path / "primary"
+    causal = tmp_path / "causal"
+    primary_audit = tmp_path / "primary_audit"
+    causal_audit = tmp_path / "causal_audit"
+    arxiv_dir = tmp_path / "arxiv_source"
+    archive = tmp_path / "arxiv_source.tar.gz"
+    _write_run(primary)
+    _write_run(causal)
+    _write_audit(primary_audit, primary)
+    _write_audit(causal_audit, causal)
+    _write_arxiv_bundle(arxiv_dir, archive)
+    missing_provenance = "generated/h200_causal_patch_qwen7b/causal_restoration_table.tex"
+    manifest = json.loads((arxiv_dir / "manifest.json").read_text(encoding="utf-8"))
+    manifest["copied_file_provenance"] = [
+        row
+        for row in manifest["copied_file_provenance"]
+        if Path(row["bundle_path"]).resolve().relative_to(arxiv_dir.resolve()).as_posix()
+        != missing_provenance
+    ]
+    (arxiv_dir / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+    _rewrite_arxiv_archive(arxiv_dir, archive)
+    claim_path = tmp_path / "claim_assessment.json"
+    claim_path.write_text(
+        json.dumps(_passing_claim_assessment(primary, causal, primary_audit, causal_audit)),
+        encoding="utf-8",
+    )
+    pdf_path = tmp_path / "paper.pdf"
+    pdf_path.write_bytes(b"%PDF-1.7\n")
+
+    status = publication_status(
+        primary_results_dir=primary,
+        causal_results_dir=causal,
+        primary_audit_dir=primary_audit,
+        causal_audit_dir=causal_audit,
+        claim_assessment_path=claim_path,
+        paper_pdf=pdf_path,
+        arxiv_source_dir=arxiv_dir,
+        arxiv_archive=archive,
+        require_arxiv_bundle=True,
+    )
+
+    assert status["publication_ready"] is False
+    assert (
+        f"missing_provenance_for_required_bundle_file:{missing_provenance}"
+        in status["arxiv_bundle"]["failures"]
+    )
+
+
+def test_publication_status_rejects_raw_evidence_files_in_arxiv_archive(
+    tmp_path: Path,
+) -> None:
+    primary = tmp_path / "primary"
+    causal = tmp_path / "causal"
+    primary_audit = tmp_path / "primary_audit"
+    causal_audit = tmp_path / "causal_audit"
+    arxiv_dir = tmp_path / "arxiv_source"
+    archive = tmp_path / "arxiv_source.tar.gz"
+    _write_run(primary)
+    _write_run(causal)
+    _write_audit(primary_audit, primary)
+    _write_audit(causal_audit, causal)
+    _write_arxiv_bundle(arxiv_dir, archive)
+    raw = arxiv_dir / "audit" / "h200_qwen_full_sweep_summary" / "audit_key.jsonl"
+    raw.write_text('{"raw": true}\n', encoding="utf-8")
+    _rewrite_arxiv_archive(arxiv_dir, archive)
+    claim_path = tmp_path / "claim_assessment.json"
+    claim_path.write_text(
+        json.dumps(_passing_claim_assessment(primary, causal, primary_audit, causal_audit)),
+        encoding="utf-8",
+    )
+    pdf_path = tmp_path / "paper.pdf"
+    pdf_path.write_bytes(b"%PDF-1.7\n")
+
+    status = publication_status(
+        primary_results_dir=primary,
+        causal_results_dir=causal,
+        primary_audit_dir=primary_audit,
+        causal_audit_dir=causal_audit,
+        claim_assessment_path=claim_path,
+        paper_pdf=pdf_path,
+        arxiv_source_dir=arxiv_dir,
+        arxiv_archive=archive,
+        require_arxiv_bundle=True,
+    )
+
+    assert status["publication_ready"] is False
+    assert (
+        "archive_raw_evidence_file:audit/h200_qwen_full_sweep_summary/audit_key.jsonl"
+        in status["arxiv_bundle"]["failures"]
+    )
+
+
+def test_publication_status_rejects_manifest_invalid_figures(tmp_path: Path) -> None:
+    primary = tmp_path / "primary"
+    causal = tmp_path / "causal"
+    primary_audit = tmp_path / "primary_audit"
+    causal_audit = tmp_path / "causal_audit"
+    arxiv_dir = tmp_path / "arxiv_source"
+    archive = tmp_path / "arxiv_source.tar.gz"
+    _write_run(primary)
+    _write_run(causal)
+    _write_audit(primary_audit, primary)
+    _write_audit(causal_audit, causal)
+    _write_arxiv_bundle(
+        arxiv_dir,
+        archive,
+        manifest_overrides={"invalid_figures": ["results/bad/figure.pdf"]},
+    )
+    claim_path = tmp_path / "claim_assessment.json"
+    claim_path.write_text(
+        json.dumps(_passing_claim_assessment(primary, causal, primary_audit, causal_audit)),
+        encoding="utf-8",
+    )
+    pdf_path = tmp_path / "paper.pdf"
+    pdf_path.write_bytes(b"%PDF-1.7\n")
+
+    status = publication_status(
+        primary_results_dir=primary,
+        causal_results_dir=causal,
+        primary_audit_dir=primary_audit,
+        causal_audit_dir=causal_audit,
+        claim_assessment_path=claim_path,
+        paper_pdf=pdf_path,
+        arxiv_source_dir=arxiv_dir,
+        arxiv_archive=archive,
+        require_arxiv_bundle=True,
+    )
+
+    assert status["publication_ready"] is False
+    assert "invalid_figures" in status["arxiv_bundle"]["failures"]
 
 
 def test_publication_status_rejects_draft_arxiv_bundle_when_required(tmp_path: Path) -> None:
@@ -880,11 +1117,13 @@ def _write_arxiv_bundle(
     (source_dir / "figures").mkdir()
     (source_dir / "main.tex").write_text("main\n", encoding="utf-8")
     (source_dir / "references.bib").write_text("refs\n", encoding="utf-8")
-    figure = source_dir / "figures" / "figure.pdf"
-    if valid_figure_pdf:
-        figure.write_bytes(b"%PDF-1.7\n")
-    else:
-        figure.write_text("not a pdf\n", encoding="utf-8")
+    figure_files = [source_dir / figure for figure in REQUIRED_ARXIV_FIGURE_FILES]
+    legacy_figure = source_dir / "figures" / "figure.pdf"
+    for figure in [*figure_files, legacy_figure]:
+        if valid_figure_pdf:
+            figure.write_bytes(b"%PDF-1.7\n")
+        else:
+            figure.write_text("not a pdf\n", encoding="utf-8")
     generated_files = [
         source_dir / "generated" / "h200_qwen_full_sweep" / "main_results_table.tex",
         source_dir / "generated" / "h200_qwen_full_sweep" / "suite_level_effects_table.tex",
@@ -908,7 +1147,7 @@ def _write_arxiv_bundle(
         "allow_missing": False,
         "main_tex_sha256": _sha256(source_dir / "main.tex"),
         "references_sha256": _sha256(source_dir / "references.bib"),
-        "copied_figures": [str(figure)],
+        "copied_figures": [str(figure) for figure in figure_files],
         "copied_generated": [
             str(source_dir / "generated" / "h200_qwen_full_sweep"),
             str(source_dir / "generated" / "h200_causal_patch_qwen7b"),
@@ -926,7 +1165,7 @@ def _write_arxiv_bundle(
         [
             source_dir / "main.tex",
             source_dir / "references.bib",
-            figure,
+            *figure_files,
             *generated_files,
             *audit_files,
         ],
@@ -939,9 +1178,16 @@ def _write_arxiv_bundle(
         tar.add(source_dir / "references.bib", arcname="references.bib")
         tar.add(source_dir / "manifest.json", arcname="manifest.json")
         if include_manifest_assets_in_archive:
-            tar.add(figure, arcname="figures/figure.pdf")
+            for figure in figure_files:
+                tar.add(figure, arcname=figure.relative_to(source_dir))
             for path in [*generated_files, *audit_files]:
                 tar.add(path, arcname=path.relative_to(source_dir))
+
+
+def _rewrite_arxiv_archive(source_dir: Path, archive: Path) -> None:
+    with tarfile.open(archive, "w:gz") as tar:
+        for path in sorted(source_dir.rglob("*")):
+            tar.add(path, arcname=path.relative_to(source_dir))
 
 
 def _arxiv_provenance_rows(paths: list[Path], source_dir: Path) -> list[dict]:

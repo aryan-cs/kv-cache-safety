@@ -185,7 +185,7 @@ The benchmark separates safety, leakage, over-refusal, and capability:
   \item \textbf{public benign over-refusal:} benign requests that should be answered rather than refused;
   \item \textbf{public XSTest safe:} additional benign safety-sensitive prompts;
   \item \textbf{public capability ARC:} multiple-choice capability controls;
-  \item \textbf{instruction following and long-context controls:} IFEval, RULER, or LongBench-style subsets when budget permits.
+  \item \textbf{instruction following and long-context controls:} verifier-compatible IFEval-style prompts and long-context subsets included only when source provenance and evaluation scripts are complete.
 \end{itemize}
 
 Every processed suite writes a manifest with prompt IDs, source dataset revisions, record counts, and SHA256 hashes. Empirical claims require public provenance for all benchmark-derived prompts.
@@ -238,10 +238,10 @@ The main figures are designed to make the proposed phenomenon interpretable at t
 For each policy-budget condition, the analysis renders a layer-by-token retention map with token roles on the horizontal axis and layers on the vertical axis. System, developer, user, template, and generated spans are shown as separate bands. A safety-specific erasure pattern should appear as a visible break or thinning in policy-token access, not merely as a lower scalar score.
 
 \paragraph{Safety-capability phase portraits.}
-Instead of a static scatterplot alone, each policy traces a trajectory through safety loss and capability loss as the cache budget tightens. The shape of the trajectory matters: a selective safety-erasure pattern should bend upward before it moves rightward, indicating safety degradation before broad capability collapse.
+Instead of a static scatterplot alone, each policy traces a trajectory through safety loss and capability loss as the cache budget tightens. A selective safety-erasure pattern is indicated by an initial increase in safety loss at approximately fixed capability loss, followed only later by broad capability degradation.
 
 \paragraph{Restoration flow diagrams.}
-Causal patching is shown as a flow from baseline to compressed decoding to system-patched, matched-user-patched, and policy-pinned conditions. The diagnostic pattern is a restoration stream returning toward the baseline only when policy-relevant cache slices are restored or protected.
+Causal patching is shown as a flow from baseline to compressed decoding to system-patched, matched-user-patched, and policy-pinned conditions. The diagnostic pattern is movement back toward the baseline only when policy-relevant cache slices are restored or protected.
 
 \paragraph{Prompt-level effect maps.}
 For audited prompts, the analysis embeds each prompt-condition pair using open embeddings or metric vectors and draws paired edges from baseline to compressed generations. Clusters of long, directionally consistent edges identify families of prompts where cache interventions produce coherent safety shifts.

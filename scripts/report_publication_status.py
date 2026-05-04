@@ -15,6 +15,7 @@ from check_human_audit_readiness import (
     check_audit_input_source_match,
     check_human_audit_readiness,
 )
+from package_arxiv_submission import FIGURE_SOURCES, _rewrite_failures
 
 from cache_safety_erasure.utils.io import file_sha256, write_json
 
@@ -49,6 +50,16 @@ REQUIRED_ARXIV_BUNDLE_FILES = [
     "audit/h200_causal_patch_qwen7b_summary/human_audit_summary_table.tex",
     "audit/h200_causal_patch_qwen7b_summary/human_audit_deltas_table.tex",
 ]
+REQUIRED_ARXIV_FIGURE_FILES = [f"figures/{name}" for name in FIGURE_SOURCES]
+RAW_EVIDENCE_BASENAMES = {
+    "audit_key.jsonl",
+    "audit_labels.csv",
+    "audit_sample.jsonl",
+    "cache_stats.parquet",
+    "generations.jsonl",
+    "prompts.jsonl",
+}
+RAW_EVIDENCE_SUFFIXES = {".csv", ".jsonl", ".parquet"}
 
 
 def main() -> None:
@@ -424,7 +435,7 @@ def _arxiv_status(source_dir: Path, archive: Path) -> dict[str, Any]:
             failures.append("invalid_manifest_schema")
         if manifest.get("allow_missing"):
             failures.append("allow_missing_enabled")
-        for key in ["missing_figures", "missing_generated", "missing_audit"]:
+        for key in ["missing_figures", "invalid_figures", "missing_generated", "missing_audit"]:
             if manifest.get(key):
                 failures.append(key)
         for source_name, manifest_key in [
@@ -436,6 +447,10 @@ def _arxiv_status(source_dir: Path, archive: Path) -> dict[str, Any]:
                 failures.append(f"missing_source_file:{source_name}")
             elif manifest.get(manifest_key) != file_sha256(source_path):
                 failures.append(f"stale_source_hash:{source_name}")
+        main_tex_path = source_dir / "main.tex"
+        if main_tex_path.exists():
+            for marker in _rewrite_failures(main_tex_path.read_text(encoding="utf-8")):
+                failures.append(f"main_tex_repo_local_path:{marker}")
         copied_generated_names = {
             Path(str(path)).name for path in manifest.get("copied_generated", [])
         }
@@ -446,6 +461,15 @@ def _arxiv_status(source_dir: Path, archive: Path) -> dict[str, Any]:
         ]:
             if required_name not in copied_generated_names:
                 failures.append(f"missing_required_generated:{required_name}")
+        for required_figure in REQUIRED_ARXIV_FIGURE_FILES:
+            figure_path = source_dir / required_figure
+            if not figure_path.exists():
+                continue
+            figure_failure = _pdf_failure(figure_path)
+            if figure_failure:
+                failures.append(
+                    f"invalid_required_figure_pdf:{required_figure}:{figure_failure}"
+                )
         for copied_path in manifest.get("copied_figures", []):
             figure_path = _resolve_bundle_path(source_dir, copied_path)
             if not figure_path.exists():
@@ -457,9 +481,18 @@ def _arxiv_status(source_dir: Path, archive: Path) -> dict[str, Any]:
             for copied_path in manifest.get(key, []):
                 if not _resolve_bundle_path(source_dir, copied_path).exists():
                     failures.append(f"missing_copied_path:{copied_path}")
-        for required_file in REQUIRED_ARXIV_BUNDLE_FILES:
+        for required_file in [*REQUIRED_ARXIV_BUNDLE_FILES, *REQUIRED_ARXIV_FIGURE_FILES]:
             if not (source_dir / required_file).exists():
                 failures.append(f"missing_required_bundle_file:{required_file}")
+        provenance_members = _manifest_provenance_members(source_dir, manifest, failures)
+        for required_file in [
+            "main.tex",
+            "references.bib",
+            *REQUIRED_ARXIV_BUNDLE_FILES,
+            *REQUIRED_ARXIV_FIGURE_FILES,
+        ]:
+            if required_file not in provenance_members:
+                failures.append(f"missing_provenance_for_required_bundle_file:{required_file}")
         failures.extend(_copied_file_provenance_failures(source_dir, manifest))
     if archive.exists():
         if archive.stat().st_size <= 0:
@@ -493,6 +526,8 @@ def _arxiv_status(source_dir: Path, archive: Path) -> dict[str, Any]:
                     elif archive_sha != file_sha256(source_path):
                         failures.append(f"archive_stale:{member}")
                 for member in archive_hashes:
+                    if _is_raw_evidence_archive_member(member):
+                        failures.append(f"archive_raw_evidence_file:{member}")
                     if _is_empirical_archive_member(member) and member not in expected_archive_members:
                         failures.append(f"archive_unmanifested_empirical_file:{member}")
     return {
@@ -582,8 +617,32 @@ def _manifest_provenance_files(
     return files
 
 
+def _manifest_provenance_members(
+    source_dir: Path, manifest: dict[str, Any], failures: list[str]
+) -> set[str]:
+    provenance = manifest.get("copied_file_provenance")
+    if not isinstance(provenance, list):
+        return set()
+    members = set()
+    for idx, row in enumerate(provenance):
+        if not isinstance(row, dict):
+            failures.append(f"malformed_copied_file_provenance:{idx}")
+            continue
+        bundle_path = _resolve_bundle_path(source_dir, row.get("bundle_path", ""))
+        try:
+            members.add(bundle_path.resolve().relative_to(source_dir.resolve()).as_posix())
+        except ValueError:
+            failures.append(f"provenance_bundle_outside_source:{row.get('bundle_path') or idx}")
+    return members
+
+
 def _is_empirical_archive_member(member: str) -> bool:
     return member.startswith(("figures/", "generated/", "audit/"))
+
+
+def _is_raw_evidence_archive_member(member: str) -> bool:
+    path = Path(member)
+    return path.name in RAW_EVIDENCE_BASENAMES or path.suffix in RAW_EVIDENCE_SUFFIXES
 
 
 def _copied_file_provenance_failures(source_dir: Path, manifest: dict[str, Any]) -> list[str]:

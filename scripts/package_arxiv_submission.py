@@ -47,6 +47,7 @@ AUDIT_DIRS = [
     Path("paper/audit/h200_qwen_full_sweep_summary"),
     Path("paper/audit/h200_causal_patch_qwen7b_summary"),
 ]
+ARXIV_SAFE_SUPPORT_SUFFIXES = {".tex"}
 
 
 def main() -> None:
@@ -119,18 +120,22 @@ def main() -> None:
             missing_generated.append(str(source_path))
             continue
         target_path = source_dir / "generated" / source_path.name
-        shutil.copytree(source_path, target_path)
+        copied_files = _copy_arxiv_support_tree(source_path, target_path)
         copied_generated.append(_bundle_manifest_path(source_dir, target_path))
-        copied_file_provenance.extend(_directory_provenance("generated", source_path, target_path))
+        copied_file_provenance.extend(
+            _directory_provenance("generated", source_path, target_path, copied_files)
+        )
     skipped_optional_generated = []
     for source_path in OPTIONAL_GENERATED_DIRS:
         if not source_path.exists():
             skipped_optional_generated.append(str(source_path))
             continue
         target_path = source_dir / "generated" / source_path.name
-        shutil.copytree(source_path, target_path)
+        copied_files = _copy_arxiv_support_tree(source_path, target_path)
         copied_generated.append(_bundle_manifest_path(source_dir, target_path))
-        copied_file_provenance.extend(_directory_provenance("generated", source_path, target_path))
+        copied_file_provenance.extend(
+            _directory_provenance("generated", source_path, target_path, copied_files)
+        )
     copied_audit = []
     missing_audit = []
     for source_path in AUDIT_DIRS:
@@ -138,9 +143,11 @@ def main() -> None:
             missing_audit.append(str(source_path))
             continue
         target_path = source_dir / "audit" / source_path.name
-        shutil.copytree(source_path, target_path)
+        copied_files = _copy_arxiv_support_tree(source_path, target_path)
         copied_audit.append(_bundle_manifest_path(source_dir, target_path))
-        copied_file_provenance.extend(_directory_provenance("audit", source_path, target_path))
+        copied_file_provenance.extend(
+            _directory_provenance("audit", source_path, target_path, copied_files)
+        )
 
     manifest = {
         "schema_version": 1,
@@ -214,9 +221,27 @@ def _is_pdf(path: Path) -> bool:
         return False
 
 
-def _directory_provenance(kind: str, source_dir: Path, bundle_dir: Path) -> list[dict[str, object]]:
-    rows = []
+def _copy_arxiv_support_tree(source_dir: Path, bundle_dir: Path) -> list[Path]:
+    bundle_dir.mkdir(parents=True, exist_ok=True)
+    copied_files = []
     for source_file in sorted(path for path in source_dir.rglob("*") if path.is_file()):
+        if source_file.suffix not in ARXIV_SAFE_SUPPORT_SUFFIXES:
+            continue
+        bundle_file = bundle_dir / source_file.relative_to(source_dir)
+        bundle_file.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(source_file, bundle_file)
+        copied_files.append(source_file)
+    return copied_files
+
+
+def _directory_provenance(
+    kind: str, source_dir: Path, bundle_dir: Path, copied_files: list[Path] | None = None
+) -> list[dict[str, object]]:
+    rows = []
+    source_files = copied_files
+    if source_files is None:
+        source_files = sorted(path for path in source_dir.rglob("*") if path.is_file())
+    for source_file in source_files:
         bundle_file = bundle_dir / source_file.relative_to(source_dir)
         rows.append(
             _file_provenance(
