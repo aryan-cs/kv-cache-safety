@@ -28,6 +28,17 @@ uv run python scripts/prepare_data.py --source hf --suite public_refusal_combo -
 uv run python scripts/prepare_data.py --source hf --suite dolly_benign --limit "$ci_prompt_limit" --output-suite public_benign_overrefusal
 uv run python scripts/prepare_data.py --source hf --suite xstest_safe --limit "$ci_prompt_limit" --output-suite public_xstest_safe
 uv run python scripts/prepare_data.py --source hf --suite arc_easy --limit "$ci_prompt_limit" --output-suite public_capability_arc
+uv run python scripts/check_prepared_suites.py \
+  --min-records 600 \
+  --suite-min-records system_leakage=2 \
+  --suite-min-records public_xstest_safe=200 \
+  --require-public-provenance \
+  --suite system_leakage \
+  --suite public_system_leakage \
+  --suite public_refusal_safety \
+  --suite public_benign_overrefusal \
+  --suite public_xstest_safe \
+  --suite public_capability_arc
 
 uv run python scripts/preflight_h200.py \
   --config configs/experiments/h200_qwen14b_ci_extension.yaml

@@ -146,7 +146,7 @@ For length-preserving perturbations such as simulated KV quantization, restoring
 
 \subsection{Models}
 
-The primary model family is Qwen2.5 Instruct at 7B, 14B, and 32B parameters. The core behavioral evaluation uses a mid-scale instruct model, with smaller models used for causal diagnostics and larger models used as a scale check. A general model-family claim requires at least one non-Qwen open instruct model; otherwise, claims must be limited to the tested Qwen-family setting.
+The primary model family is Qwen2.5 Instruct at 7B and 14B parameters, with Qwen2.5-32B reserved as an extension analysis when the corresponding artifacts are present. The core behavioral evaluation uses a mid-scale instruct model, while smaller models support causal diagnostics. A general model-family claim requires at least one non-Qwen open instruct model; otherwise, claims must be limited to the tested Qwen-family setting.
 
 All experiments use open-weight models, public datasets, and local evaluation code. Model loading uses bfloat16 weights, \texttt{safetensors}, and explicit cache-state access so that the evaluated interventions are visible in the generation loop rather than delegated to external serving systems.
 

@@ -93,6 +93,9 @@ def test_h200_readiness_uses_paper_grade_prompt_thresholds() -> None:
     qwen32 = Path("scripts/run_qwen32b_followup.sh").read_text(encoding="utf-8")
     publication = Path("scripts/build_publication_artifacts.sh").read_text(encoding="utf-8")
 
+    for script in [primary, extension, qwen32]:
+        assert "scripts/check_prepared_suites.py" in script
+        assert "--require-public-provenance" in script
     for script in [primary, extension, qwen32, publication]:
         assert "--min-prompts-per-suite 600" in script
         assert "--suite-min-prompts system_leakage=2" in script
