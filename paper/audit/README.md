@@ -32,6 +32,14 @@ uv run python scripts/aggregate_human_audit.py \
 For the publication build, the expected summary directories are:
 
 ```bash
+bash scripts/export_publication_audit_samples.sh
+```
+
+This regenerates leakage-capable publication audit templates from the fetched
+primary and causal completed-run artifacts before annotation. Then aggregate the
+completed annotator files:
+
+```bash
 uv run python scripts/aggregate_human_audit.py \
   --audit-csv paper/audit/h200_qwen_full_sweep_audit_blinded_annotator_*.csv \
   --key-jsonl paper/audit/h200_qwen_full_sweep_audit_key.jsonl \

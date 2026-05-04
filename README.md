@@ -207,6 +207,16 @@ If you need only an intermediate run, pass explicit artifact paths, for example:
 bash scripts/fetch_h200_results.sh results/h200_qwen_full_sweep paper/generated/h200_qwen_full_sweep
 ```
 
+Regenerate publication-valid audit sheets from the fetched completed runs:
+
+```bash
+bash scripts/export_publication_audit_samples.sh
+```
+
+This uses the current audit exporter, requires completed `metrics.json` files,
+creates duplicate annotator templates, and includes the hidden/system references
+needed for leakage labels while leaving model and policy identities blinded.
+
 Then rebuild all paper artifacts from recorded results:
 
 ```bash

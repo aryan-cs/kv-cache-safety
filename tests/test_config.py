@@ -179,6 +179,19 @@ def test_h200_scripts_export_multi_annotator_audit_templates() -> None:
         assert "--include-hidden-reference" in script
 
 
+def test_publication_audit_export_regenerates_leakage_capable_templates() -> None:
+    script = Path("scripts/export_publication_audit_samples.sh").read_text(encoding="utf-8")
+    readme = Path("README.md").read_text(encoding="utf-8")
+
+    assert "PRIMARY_RESULTS_DIR:-results/h200_qwen_full_sweep" in script
+    assert "CAUSAL_RESULTS_DIR:-results/h200_causal_patch_qwen7b" in script
+    assert "require_completed_results" in script
+    assert "metrics.json" in script
+    assert "--include-hidden-reference" in script
+    assert '--annotator-template-count "$audit_annotator_template_count"' in script
+    assert "bash scripts/export_publication_audit_samples.sh" in readme
+
+
 def test_publication_artifact_builder_fails_without_real_results() -> None:
     script = Path("scripts/build_publication_artifacts.sh").read_text(encoding="utf-8")
 
