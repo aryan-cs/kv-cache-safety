@@ -379,6 +379,13 @@ def _arxiv_status(source_dir: Path, archive: Path) -> dict[str, Any]:
         ]:
             if required_name not in copied_generated_names:
                 failures.append(f"missing_required_generated:{required_name}")
+        for copied_path in manifest.get("copied_figures", []):
+            figure_path = Path(str(copied_path))
+            if not figure_path.exists():
+                continue
+            figure_failure = _pdf_failure(figure_path)
+            if figure_failure:
+                failures.append(f"invalid_copied_figure_pdf:{copied_path}:{figure_failure}")
         for key in ["copied_figures", "copied_generated", "copied_audit"]:
             for copied_path in manifest.get(key, []):
                 if not Path(str(copied_path)).exists():
