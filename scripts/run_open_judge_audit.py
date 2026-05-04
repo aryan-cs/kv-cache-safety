@@ -59,6 +59,15 @@ def main() -> None:
     parser.add_argument("--annotator-id", default=None)
     parser.add_argument("--max-new-tokens", type=int, default=256)
     parser.add_argument("--limit", type=int, default=None)
+    parser.add_argument(
+        "--on-parse-error",
+        choices=["fail", "record_unlabeled"],
+        default="fail",
+        help=(
+            "Fail on malformed judge output, or record an unlabeled source-marked row so "
+            "downstream audit readiness fails honestly while preserving paper artifacts."
+        ),
+    )
     args = parser.parse_args()
 
     rows = _read_csv(args.audit_csv)
@@ -85,13 +94,16 @@ def main() -> None:
             prompt,
             max_new_tokens=args.max_new_tokens,
         )
+        raw_sha = hashlib.sha256(raw.encode("utf-8")).hexdigest()
         try:
             labels = parse_judge_json(raw)
         except ValueError as exc:
-            raise SystemExit(
-                f"Open-judge parse failure at row {idx} audit_id={row.get('audit_id')}: {exc}\n"
-                f"Raw judge output:\n{raw}"
-            ) from exc
+            if args.on_parse_error == "fail":
+                raise SystemExit(
+                    f"Open-judge parse failure at row {idx} audit_id={row.get('audit_id')}: {exc}\n"
+                    f"Raw judge output:\n{raw}"
+                ) from exc
+            labels = unlabeled_judge_labels(f"parse_error:{exc}")
         labeled_rows.append(
             _with_open_judge_labels(
                 row,
@@ -100,6 +112,7 @@ def main() -> None:
                 model_id=args.model_id,
                 prompt_sha256=prompt_sha,
                 prompt_variant=args.prompt_variant,
+                raw_output_sha256=raw_sha,
             )
         )
 
@@ -119,7 +132,7 @@ def parse_judge_json(raw_text: str) -> dict[str, Any]:
     normalized: dict[str, Any] = {}
     for judge_field, legacy_field in JUDGE_TO_LEGACY_LABEL.items():
         value = parsed.get(judge_field, parsed.get(legacy_field))
-        if judge_field == "judge_capability_correct" and value in {"", None}:
+        if judge_field == "judge_capability_correct" and _is_blank_capability_label(value):
             normalized[judge_field] = ""
         else:
             normalized[judge_field] = _normalize_bool_label(value, judge_field)
@@ -128,11 +141,15 @@ def parse_judge_json(raw_text: str) -> dict[str, Any]:
     return normalized
 
 
+def unlabeled_judge_labels(notes: str) -> dict[str, str]:
+    return {**{field: "" for field in JUDGE_LABEL_FIELDS}, "judge_notes": notes}
+
+
 def legacy_labels_from_judge(labels: dict[str, Any]) -> dict[str, Any]:
     legacy: dict[str, Any] = {}
     for judge_field, legacy_field in JUDGE_TO_LEGACY_LABEL.items():
         value = labels.get(judge_field)
-        if judge_field == "judge_capability_correct" and value in {"", None}:
+        if judge_field == "judge_capability_correct" and _is_blank_capability_label(value):
             legacy[legacy_field] = ""
         else:
             legacy[legacy_field] = value
@@ -163,6 +180,13 @@ def _normalize_bool_label(value: Any, field: str) -> str:
     raise ValueError(f"{field} must be boolean/yes/no, got {value!r}")
 
 
+def _is_blank_capability_label(value: Any) -> bool:
+    if value is None:
+        return True
+    normalized = str(value).strip().lower()
+    return normalized in {"", "null", "none", "n/a", "na", "not_applicable"}
+
+
 def _with_open_judge_labels(
     row: dict[str, str],
     labels: dict[str, Any],
@@ -171,6 +195,7 @@ def _with_open_judge_labels(
     model_id: str,
     prompt_sha256: str,
     prompt_variant: str,
+    raw_output_sha256: str,
 ) -> dict[str, str]:
     output = dict(row)
     for field in JUDGE_LABEL_FIELDS:
@@ -184,6 +209,7 @@ def _with_open_judge_labels(
     output["open_judge_model_id"] = model_id
     output["open_judge_prompt_sha256"] = prompt_sha256
     output["open_judge_prompt_variant"] = prompt_variant
+    output["open_judge_raw_output_sha256"] = raw_output_sha256
     return output
 
 
@@ -315,6 +341,7 @@ def _write_csv(path: Path, rows: list[dict[str, str]], *, base_fieldnames: list[
         "open_judge_model_id",
         "open_judge_prompt_sha256",
         "open_judge_prompt_variant",
+        "open_judge_raw_output_sha256",
     ]
     fieldnames = list(
         dict.fromkeys(

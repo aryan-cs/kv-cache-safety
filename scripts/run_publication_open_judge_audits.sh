@@ -11,6 +11,7 @@ judge_dtype="${OPEN_JUDGE_DTYPE:-bfloat16}"
 judge_device_map="${OPEN_JUDGE_DEVICE_MAP:-auto}"
 judge_max_new_tokens="${OPEN_JUDGE_MAX_NEW_TOKENS:-256}"
 judge_limit="${OPEN_JUDGE_LIMIT:-}"
+judge_parse_error_policy="${OPEN_JUDGE_PARSE_ERROR_POLICY:-record_unlabeled}"
 
 run_open_judge_variant() {
   local run_id="$1"
@@ -38,6 +39,7 @@ run_open_judge_variant() {
     --prompt-variant "$variant" \
     --annotator-id "open_judge_${variant}" \
     --max-new-tokens "$judge_max_new_tokens" \
+    --on-parse-error "$judge_parse_error_policy" \
     "${limit_args[@]}"
 }
 

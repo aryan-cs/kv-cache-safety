@@ -181,10 +181,17 @@ def _open_judge_provenance_failures(metrics: dict[str, Any]) -> list[str]:
     failures = []
     model_ids = metrics.get("open_judge_model_ids") or []
     prompt_hashes = metrics.get("open_judge_prompt_sha256s") or []
+    raw_hash_count = int(metrics.get("open_judge_raw_output_sha256_count") or 0)
+    annotation_row_count = int(metrics.get("annotation_row_count") or 0)
     if not isinstance(model_ids, list) or not model_ids:
         failures.append("open local judge audit lacks judge model provenance")
     if not isinstance(prompt_hashes, list) or not prompt_hashes:
         failures.append("open local judge audit lacks judge prompt-template hashes")
+    if annotation_row_count and raw_hash_count < annotation_row_count:
+        failures.append(
+            "open local judge audit lacks raw-output hashes for all annotation rows: "
+            f"{raw_hash_count}/{annotation_row_count}"
+        )
     return failures
 
 

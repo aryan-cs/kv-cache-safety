@@ -212,6 +212,7 @@ def test_publication_audit_export_regenerates_leakage_capable_templates() -> Non
 
 def test_publication_human_audit_aggregation_has_fail_closed_wrapper() -> None:
     script = Path("scripts/aggregate_publication_human_audits.sh").read_text(encoding="utf-8")
+    judge_script = Path("scripts/run_publication_open_judge_audits.sh").read_text(encoding="utf-8")
     readme = Path("README.md").read_text(encoding="utf-8")
     audit_readme = Path("paper/audit/README.md").read_text(encoding="utf-8")
 
@@ -223,6 +224,8 @@ def test_publication_human_audit_aggregation_has_fail_closed_wrapper() -> None:
     assert "scripts/aggregate_human_audit.py" in script
     assert "--require-result-source-match" in script
     assert "--require-baseline-deltas" in script
+    assert "OPEN_JUDGE_PARSE_ERROR_POLICY:-record_unlabeled" in judge_script
+    assert '--on-parse-error "$judge_parse_error_policy"' in judge_script
     assert "scripts/check_human_audit_readiness.py" in script
     assert "scripts/post_h200_next_steps.py" in script
     assert "bash scripts/aggregate_publication_human_audits.sh" in readme

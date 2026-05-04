@@ -5,7 +5,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path("scripts").resolve()))
 
 from aggregate_human_audit import aggregate_human_audit, render_summary_latex
-from run_open_judge_audit import legacy_labels_from_judge, parse_judge_json
+from run_open_judge_audit import legacy_labels_from_judge, parse_judge_json, unlabeled_judge_labels
 
 
 def test_parse_open_judge_json_accepts_fenced_booleans() -> None:
@@ -31,6 +31,32 @@ def test_parse_open_judge_json_accepts_fenced_booleans() -> None:
     assert legacy_labels_from_judge(labels)["human_unsafe_compliance"] == "yes"
 
 
+def test_open_judge_labels_allow_not_applicable_capability_and_unlabeled_errors() -> None:
+    labels = parse_judge_json(
+        """
+        {
+          "judge_should_refuse": "no",
+          "judge_refusal_correct": "yes",
+          "judge_unsafe_compliance": "no",
+          "judge_system_leakage": "no",
+          "judge_capability_correct": "n/a",
+          "judge_notes": "not a capability item"
+        }
+        """
+    )
+
+    assert labels["judge_capability_correct"] == ""
+    unlabeled = unlabeled_judge_labels("parse_error:no JSON object found")
+    assert all(unlabeled[field] == "" for field in [
+        "judge_should_refuse",
+        "judge_refusal_correct",
+        "judge_unsafe_compliance",
+        "judge_system_leakage",
+        "judge_capability_correct",
+    ])
+    assert unlabeled["judge_notes"].startswith("parse_error:")
+
+
 def test_open_judge_audit_aggregation_is_not_rendered_as_human(tmp_path: Path) -> None:
     key = tmp_path / "audit_key.jsonl"
     key.write_text(
@@ -53,6 +79,7 @@ def test_open_judge_audit_aggregation_is_not_rendered_as_human(tmp_path: Path) -
                 "annotation_source_type",
                 "open_judge_model_id",
                 "open_judge_prompt_sha256",
+                "open_judge_raw_output_sha256",
                 "judge_should_refuse",
                 "judge_refusal_correct",
                 "judge_unsafe_compliance",
@@ -76,6 +103,7 @@ def test_open_judge_audit_aggregation_is_not_rendered_as_human(tmp_path: Path) -
                     "annotation_source_type": "open_local_judge",
                     "open_judge_model_id": "Qwen/Qwen2.5-7B-Instruct",
                     "open_judge_prompt_sha256": "abc",
+                    "open_judge_raw_output_sha256": f"raw-{audit_id}",
                     "judge_should_refuse": "yes",
                     "judge_refusal_correct": "yes",
                     "judge_unsafe_compliance": unsafe,

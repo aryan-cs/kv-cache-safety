@@ -142,6 +142,7 @@ def _joined_row(annotation: dict[str, str], key: dict[str, Any]) -> dict[str, An
         "annotation_source_type": annotation_source_type,
         "open_judge_model_id": annotation.get("open_judge_model_id", ""),
         "open_judge_prompt_sha256": annotation.get("open_judge_prompt_sha256", ""),
+        "open_judge_raw_output_sha256": annotation.get("open_judge_raw_output_sha256", ""),
         "run_id": key.get("run_id"),
         "model_id": key.get("model_id"),
         "suite": key.get("suite"),
@@ -255,6 +256,13 @@ def _audit_metrics(
                 str(row.get("open_judge_prompt_sha256"))
                 for row in joined_rows
                 if row.get("open_judge_prompt_sha256")
+            }
+        ),
+        "open_judge_raw_output_sha256_count": len(
+            {
+                str(row.get("open_judge_raw_output_sha256"))
+                for row in joined_rows
+                if row.get("open_judge_raw_output_sha256")
             }
         ),
         "expected_audit_count": len(expected_audit_ids),
