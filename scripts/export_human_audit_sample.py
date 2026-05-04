@@ -12,7 +12,13 @@ from _path import add_src_to_path
 
 add_src_to_path()
 
-from cache_safety_erasure.utils.io import read_jsonl, write_jsonl
+from cache_safety_erasure.utils.io import (
+    file_sha256,
+    read_jsonl,
+    utc_timestamp,
+    write_json,
+    write_jsonl,
+)
 
 
 def main() -> None:
@@ -57,6 +63,7 @@ def main() -> None:
     args.output_dir.mkdir(parents=True, exist_ok=True)
     blinded_csv_path = args.output_dir / f"{run_id}_audit_blinded.csv"
     key_jsonl_path = args.output_dir / f"{run_id}_audit_key.jsonl"
+    export_manifest_path = args.output_dir / f"{run_id}_audit_export_manifest.json"
     _write_csv(blinded_csv_path, blinded_rows)
     write_jsonl(key_jsonl_path, key_rows)
     template_paths = _write_annotator_templates(
@@ -65,10 +72,26 @@ def main() -> None:
         blinded_rows,
         count=args.annotator_template_count,
     )
+    write_json(
+        export_manifest_path,
+        _export_manifest(
+            results_dir=args.results_dir,
+            run_id=run_id,
+            blinded_csv_path=blinded_csv_path,
+            key_jsonl_path=key_jsonl_path,
+            template_paths=template_paths,
+            sampled_rows=sample,
+            per_suite_policy=args.per_suite_policy,
+            strategy=args.strategy,
+            seed=args.seed,
+            include_hidden_reference=args.include_hidden_reference,
+        ),
+    )
     print(f"Wrote {len(blinded_rows)} blinded audit rows to {blinded_csv_path}")
     for path in template_paths:
         print(f"Wrote annotator template to {path}")
     print(f"Wrote audit key to {key_jsonl_path}")
+    print(f"Wrote audit export manifest to {export_manifest_path}")
 
 
 def _stratified_sample(
@@ -299,6 +322,65 @@ def _write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         writer = csv.DictWriter(f, fieldnames=list(rows[0]))
         writer.writeheader()
         writer.writerows(rows)
+
+
+def _export_manifest(
+    *,
+    results_dir: Path,
+    run_id: str,
+    blinded_csv_path: Path,
+    key_jsonl_path: Path,
+    template_paths: list[Path],
+    sampled_rows: list[dict[str, Any]],
+    per_suite_policy: int,
+    strategy: str,
+    seed: int,
+    include_hidden_reference: bool,
+) -> dict[str, Any]:
+    return {
+        "schema_version": 1,
+        "created_at_utc": utc_timestamp(),
+        "run_id": run_id,
+        "results_dir": str(results_dir),
+        "per_suite_policy": per_suite_policy,
+        "strategy": strategy,
+        "seed": seed,
+        "include_hidden_reference": include_hidden_reference,
+        "annotator_template_count": len(template_paths),
+        "sample_count": len(sampled_rows),
+        "sampled_suite_policy_counts": _suite_policy_counts(sampled_rows),
+        "source_artifacts": {
+            "results": _result_sources(results_dir),
+            "audit_csv": _source_artifact(blinded_csv_path),
+            "key_jsonl": _source_artifact(key_jsonl_path),
+            "annotator_templates": [_source_artifact(path) for path in template_paths],
+        },
+    }
+
+
+def _suite_policy_counts(rows: list[dict[str, Any]]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for row in rows:
+        key = f"{row.get('suite')}::{row.get('policy')}"
+        counts[key] = counts.get(key, 0) + 1
+    return dict(sorted(counts.items()))
+
+
+def _result_sources(results_dir: Path) -> dict[str, dict[str, Any]]:
+    sources = {}
+    for name in ["manifest.json", "generations.jsonl", "metrics.json"]:
+        path = results_dir / name
+        if path.exists():
+            sources[name] = _source_artifact(path)
+    return sources
+
+
+def _source_artifact(path: Path) -> dict[str, Any]:
+    return {
+        "path": str(path),
+        "sha256": file_sha256(path),
+        "bytes": path.stat().st_size if path.exists() else None,
+    }
 
 
 if __name__ == "__main__":

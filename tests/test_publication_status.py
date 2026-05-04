@@ -1078,8 +1078,10 @@ def _write_audit(
         (path / name).write_text("artifact\n", encoding="utf-8")
     audit_csv = path / "audit_labels.csv"
     key_jsonl = path / "audit_key.jsonl"
+    export_manifest = path / "audit_export_manifest.json"
     audit_csv.write_text("audit_id,human_refusal_correct\n1,true\n", encoding="utf-8")
     key_jsonl.write_text('{"audit_id":"1"}\n', encoding="utf-8")
+    export_manifest.write_text('{"include_hidden_reference":true}\n', encoding="utf-8")
     manifest = {
         "source_artifacts": {
             "audit_csv": [
@@ -1093,6 +1095,11 @@ def _write_audit(
                 "path": str(key_jsonl),
                 "sha256": _sha256(key_jsonl),
                 "bytes": key_jsonl.stat().st_size,
+            },
+            "export_manifest": {
+                "path": str(export_manifest),
+                "sha256": _sha256(export_manifest),
+                "bytes": export_manifest.stat().st_size,
             },
             "results": {
                 name: {"sha256": _sha256(results_dir / name)}

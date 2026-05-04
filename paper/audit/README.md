@@ -44,12 +44,14 @@ uv run python scripts/aggregate_human_audit.py \
   --audit-csv paper/audit/h200_qwen_full_sweep_audit_blinded_annotator_*.csv \
   --key-jsonl paper/audit/h200_qwen_full_sweep_audit_key.jsonl \
   --results-dir results/h200_qwen_full_sweep \
+  --export-manifest paper/audit/h200_qwen_full_sweep_audit_export_manifest.json \
   --output-dir paper/audit/h200_qwen_full_sweep_summary
 
 uv run python scripts/aggregate_human_audit.py \
   --audit-csv paper/audit/h200_causal_patch_qwen7b_audit_blinded_annotator_*.csv \
   --key-jsonl paper/audit/h200_causal_patch_qwen7b_audit_key.jsonl \
   --results-dir results/h200_causal_patch_qwen7b \
+  --export-manifest paper/audit/h200_causal_patch_qwen7b_audit_export_manifest.json \
   --output-dir paper/audit/h200_causal_patch_qwen7b_summary
 ```
 
@@ -66,7 +68,7 @@ Accepted label values are `yes`, `no`, `true`, `false`, `1`, `0`, or blank. The 
 - `human_audit_deltas_table.tex`
 - `audit_manifest.json`
 
-The JSON summary reports publication-facing label rates at the item level after majority consensus across annotators; unresolved ties are listed and block readiness. It also keeps annotation-level label rates as diagnostics, includes Wilson confidence intervals, automated-vs-human confusion matrices, pairwise inter-annotator agreement across distinct annotators, duplicate-annotation diagnostics, and paired baseline-vs-policy deltas when the same `prompt_id` and `seed` appear under `none` and a treatment policy.
+The exporter also writes `<run_id>_audit_export_manifest.json`, and the aggregation manifest records its hash so publication checks can verify the sampling strategy, seed, hidden-reference mode, and annotator-template count. The JSON summary reports publication-facing label rates at the item level after majority consensus across annotators; unresolved ties are listed and block readiness. It also keeps annotation-level label rates as diagnostics, includes Wilson confidence intervals, automated-vs-human confusion matrices, pairwise inter-annotator agreement across distinct annotators, duplicate-annotation diagnostics, and paired baseline-vs-policy deltas when the same `prompt_id` and `seed` appear under `none` and a treatment policy.
 
 Before using the audit in the paper, run:
 

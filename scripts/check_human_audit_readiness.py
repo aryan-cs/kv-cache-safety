@@ -190,6 +190,11 @@ def check_audit_input_source_match(audit_manifest: dict[str, Any]) -> list[str]:
         failures.append("audit manifest lacks key JSONL source artifact")
     else:
         failures.extend(_source_file_failures(key_source, "key JSONL source"))
+    export_manifest_source = source_artifacts.get("export_manifest")
+    if not isinstance(export_manifest_source, dict):
+        failures.append("audit manifest lacks audit export manifest source artifact")
+    else:
+        failures.extend(_source_file_failures(export_manifest_source, "audit export manifest source"))
     return failures
 
 

@@ -36,6 +36,7 @@ def main() -> None:
     parser.add_argument("--audit-csv", "--annotations", required=True, nargs="+", type=Path)
     parser.add_argument("--key-jsonl", "--key", required=True, type=Path)
     parser.add_argument("--results-dir", type=Path, default=None)
+    parser.add_argument("--export-manifest", type=Path, default=None)
     parser.add_argument("--output-dir", type=Path, default=Path("paper/audit"))
     args = parser.parse_args()
 
@@ -47,7 +48,13 @@ def main() -> None:
     _write_csv(args.output_dir / "human_audit_joined.csv", result["joined_rows"])
     write_json(
         args.output_dir / "audit_manifest.json",
-        _audit_manifest(args.audit_csv, args.key_jsonl, args.results_dir, result),
+        _audit_manifest(
+            args.audit_csv,
+            args.key_jsonl,
+            args.results_dir,
+            args.export_manifest,
+            result,
+        ),
     )
     (args.output_dir / "human_audit_summary.md").write_text(
         render_summary_markdown(result["metrics"]),
@@ -457,6 +464,7 @@ def _audit_manifest(
     audit_csv_paths: list[Path],
     key_jsonl_path: Path,
     results_dir: Path | None,
+    export_manifest_path: Path | None,
     result: dict[str, Any],
 ) -> dict[str, Any]:
     source_artifacts = {
@@ -482,6 +490,14 @@ def _audit_manifest(
                 "bytes": (results_dir / name).stat().st_size if (results_dir / name).exists() else None,
             }
             for name in ["manifest.json", "generations.jsonl", "metrics.json"]
+        }
+    if export_manifest_path is not None:
+        source_artifacts["export_manifest"] = {
+            "path": str(export_manifest_path),
+            "sha256": file_sha256(export_manifest_path),
+            "bytes": export_manifest_path.stat().st_size
+            if export_manifest_path.exists()
+            else None,
         }
     return {
         "schema_version": 1,

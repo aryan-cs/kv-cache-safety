@@ -174,8 +174,10 @@ def _audit_manifest_for(results_dir: Path, audit_dir: Path) -> dict:
     audit_dir.mkdir()
     labels = audit_dir / "labels.csv"
     key = audit_dir / "key.jsonl"
+    export_manifest = audit_dir / "export_manifest.json"
     labels.write_text("audit_id,human_refusal_correct\n1,true\n", encoding="utf-8")
     key.write_text('{"audit_id":"1"}\n', encoding="utf-8")
+    export_manifest.write_text('{"include_hidden_reference":true}\n', encoding="utf-8")
     return {
         "source_artifacts": {
             "audit_csv": [
@@ -187,6 +189,10 @@ def _audit_manifest_for(results_dir: Path, audit_dir: Path) -> dict:
             "key_jsonl": {
                 "path": str(key),
                 "sha256": hashlib.sha256(key.read_bytes()).hexdigest(),
+            },
+            "export_manifest": {
+                "path": str(export_manifest),
+                "sha256": hashlib.sha256(export_manifest.read_bytes()).hexdigest(),
             },
             "results": {
                 name: {"sha256": hashlib.sha256((results_dir / name).read_bytes()).hexdigest()}

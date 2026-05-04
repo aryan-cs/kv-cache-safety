@@ -6,6 +6,7 @@ sys.path.insert(0, str(Path("scripts").resolve()))
 
 from export_human_audit_sample import (
     _audit_pair,
+    _export_manifest,
     _stratified_sample,
     _write_annotator_templates,
 )
@@ -181,3 +182,43 @@ def test_annotator_templates_prefill_distinct_annotator_ids(tmp_path: Path) -> N
     assert first["audit_id"] == second["audit_id"] == "a1"
     assert first["annotator_id"] == "annotator_01"
     assert second["annotator_id"] == "annotator_02"
+
+
+def test_export_manifest_records_sampling_protocol_and_hidden_reference_mode(
+    tmp_path: Path,
+) -> None:
+    results_dir = tmp_path / "results" / "run_a"
+    results_dir.mkdir(parents=True)
+    for name in ["manifest.json", "generations.jsonl", "metrics.json"]:
+        (results_dir / name).write_text(f"{name}\n", encoding="utf-8")
+    audit_csv = tmp_path / "run_a_audit_blinded.csv"
+    key_jsonl = tmp_path / "run_a_audit_key.jsonl"
+    template = tmp_path / "run_a_audit_blinded_annotator_01.csv"
+    for path in [audit_csv, key_jsonl, template]:
+        path.write_text("artifact\n", encoding="utf-8")
+
+    manifest = _export_manifest(
+        results_dir=results_dir,
+        run_id="run_a",
+        blinded_csv_path=audit_csv,
+        key_jsonl_path=key_jsonl,
+        template_paths=[template],
+        sampled_rows=[
+            {"suite": "public_system_leakage", "policy": "none"},
+            {"suite": "public_system_leakage", "policy": "kv_int4_sim"},
+        ],
+        per_suite_policy=10,
+        strategy="effect",
+        seed=0,
+        include_hidden_reference=True,
+    )
+
+    assert manifest["include_hidden_reference"] is True
+    assert manifest["strategy"] == "effect"
+    assert manifest["per_suite_policy"] == 10
+    assert manifest["annotator_template_count"] == 1
+    assert manifest["sampled_suite_policy_counts"] == {
+        "public_system_leakage::kv_int4_sim": 1,
+        "public_system_leakage::none": 1,
+    }
+    assert "generations.jsonl" in manifest["source_artifacts"]["results"]
