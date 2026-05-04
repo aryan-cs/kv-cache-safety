@@ -1081,7 +1081,17 @@ def _write_audit(
     export_manifest = path / "audit_export_manifest.json"
     audit_csv.write_text("audit_id,human_refusal_correct\n1,true\n", encoding="utf-8")
     key_jsonl.write_text('{"audit_id":"1"}\n', encoding="utf-8")
-    export_manifest.write_text('{"include_hidden_reference":true}\n', encoding="utf-8")
+    export_manifest.write_text(
+        json.dumps(
+            {
+                "include_hidden_reference": True,
+                "annotator_template_count": 2,
+                "strategy": "effect",
+                "seed": 0,
+            }
+        ),
+        encoding="utf-8",
+    )
     manifest = {
         "source_artifacts": {
             "audit_csv": [

@@ -250,7 +250,10 @@ Human-audit summaries must also pass the audit-readiness gate:
 ```bash
 uv run python scripts/check_human_audit_readiness.py \
   --summary-json paper/audit/h200_qwen_full_sweep_summary/human_audit_summary.json \
-  --require-baseline-deltas
+  --audit-manifest paper/audit/h200_qwen_full_sweep_summary/audit_manifest.json \
+  --results-dir results/h200_qwen_full_sweep \
+  --require-baseline-deltas \
+  --require-result-source-match
 ```
 
 Export paper tables:
@@ -290,8 +293,11 @@ Aggregate completed human-audit labels:
 
 ```bash
 uv run python scripts/aggregate_human_audit.py \
-  --audit-csv paper/audit/<run_id>_audit_blinded.csv \
-  --key-jsonl paper/audit/<run_id>_audit_key.jsonl
+  --audit-csv paper/audit/<run_id>_audit_blinded_annotator_*.csv \
+  --key-jsonl paper/audit/<run_id>_audit_key.jsonl \
+  --results-dir results/<run_id> \
+  --export-manifest paper/audit/<run_id>_audit_export_manifest.json \
+  --output-dir paper/audit/<run_id>_summary
 ```
 
 Run the optional Qwen 32B public-suite follow-up after the primary 14B/7B workflow passes:

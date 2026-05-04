@@ -195,6 +195,33 @@ def check_audit_input_source_match(audit_manifest: dict[str, Any]) -> list[str]:
         failures.append("audit manifest lacks audit export manifest source artifact")
     else:
         failures.extend(_source_file_failures(export_manifest_source, "audit export manifest source"))
+        failures.extend(_export_manifest_protocol_failures(export_manifest_source))
+    return failures
+
+
+def _export_manifest_protocol_failures(source: dict[str, Any]) -> list[str]:
+    raw_path = source.get("path")
+    if not raw_path:
+        return []
+    path = Path(str(raw_path))
+    if not path.exists():
+        return []
+    try:
+        manifest = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        return [f"audit export manifest is invalid JSON: {exc}"]
+    failures = []
+    if manifest.get("include_hidden_reference") is not True:
+        failures.append("audit export manifest was not leakage-reference capable")
+    annotator_template_count = int(manifest.get("annotator_template_count") or 0)
+    if annotator_template_count < 2:
+        failures.append(
+            f"audit export manifest annotator_template_count={annotator_template_count}; need >= 2"
+        )
+    if not manifest.get("strategy"):
+        failures.append("audit export manifest lacks sampling strategy")
+    if "seed" not in manifest:
+        failures.append("audit export manifest lacks sampling seed")
     return failures
 
 

@@ -51,6 +51,8 @@ def test_post_h200_next_steps_requires_audits_before_claims() -> None:
     assert report["steps"][0]["state"] == "complete"
     assert report["steps"][1]["state"] == "ready"
     assert report["steps"][2]["state"] == "blocked"
+    assert "export_publication_audit_samples.sh" in report["steps"][1]["command"]
+    assert "--export-manifest" in report["steps"][1]["command"]
 
 
 def test_post_h200_next_steps_marks_publication_bundle_ready_after_claims() -> None:

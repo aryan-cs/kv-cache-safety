@@ -102,8 +102,8 @@ def post_h200_next_steps(status: dict[str, Any]) -> dict[str, Any]:
             and bool(gates.get("causal_human_audit_complete")),
             ready=bool(gates.get("primary_results_complete"))
             and bool(gates.get("causal_results_complete")),
-            command="uv run python scripts/aggregate_human_audit.py --audit-csv paper/audit/<run_id>_audit_blinded_annotator_*.csv --key-jsonl paper/audit/<run_id>_audit_key.jsonl --results-dir results/<run_id> --output-dir paper/audit/<run_id>_summary",
-            detail="Complete blinded annotations, aggregate them, and require result-source hashes to match the exact run artifacts.",
+            command="bash scripts/export_publication_audit_samples.sh && uv run python scripts/aggregate_human_audit.py --audit-csv paper/audit/<run_id>_audit_blinded_annotator_*.csv --key-jsonl paper/audit/<run_id>_audit_key.jsonl --results-dir results/<run_id> --export-manifest paper/audit/<run_id>_audit_export_manifest.json --output-dir paper/audit/<run_id>_summary",
+            detail="Regenerate leakage-capable blinded templates, complete annotations, aggregate them, and require result-source and export-protocol hashes to match the exact run artifacts.",
         ),
         _step(
             "assess_claims",

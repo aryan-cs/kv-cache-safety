@@ -177,7 +177,17 @@ def _audit_manifest_for(results_dir: Path, audit_dir: Path) -> dict:
     export_manifest = audit_dir / "export_manifest.json"
     labels.write_text("audit_id,human_refusal_correct\n1,true\n", encoding="utf-8")
     key.write_text('{"audit_id":"1"}\n', encoding="utf-8")
-    export_manifest.write_text('{"include_hidden_reference":true}\n', encoding="utf-8")
+    export_manifest.write_text(
+        json.dumps(
+            {
+                "include_hidden_reference": True,
+                "annotator_template_count": 2,
+                "strategy": "effect",
+                "seed": 0,
+            }
+        ),
+        encoding="utf-8",
+    )
     return {
         "source_artifacts": {
             "audit_csv": [
@@ -200,3 +210,38 @@ def _audit_manifest_for(results_dir: Path, audit_dir: Path) -> dict:
             }
         }
     }
+
+
+def test_audit_input_source_match_rejects_protocol_invalid_export_manifest(
+    tmp_path: Path,
+) -> None:
+    results_dir = _write_result_sources(tmp_path / "results")
+    audit_dir = tmp_path / "audit"
+    audit_manifest = _audit_manifest_for(results_dir, audit_dir)
+    export_manifest = Path(
+        audit_manifest["source_artifacts"]["export_manifest"]["path"]
+    )
+    export_manifest.write_text(
+        json.dumps(
+            {
+                "include_hidden_reference": False,
+                "annotator_template_count": 1,
+                "strategy": "",
+            }
+        ),
+        encoding="utf-8",
+    )
+    audit_manifest["source_artifacts"]["export_manifest"]["sha256"] = _sha256(export_manifest)
+
+    failures = check_audit_input_source_match(audit_manifest)
+
+    assert "audit export manifest was not leakage-reference capable" in failures
+    assert any("annotator_template_count=1" in failure for failure in failures)
+    assert "audit export manifest lacks sampling strategy" in failures
+    assert "audit export manifest lacks sampling seed" in failures
+
+
+def _sha256(path: Path) -> str:
+    import hashlib
+
+    return hashlib.sha256(path.read_bytes()).hexdigest()
