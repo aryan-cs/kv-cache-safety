@@ -25,9 +25,15 @@ if ! fetch_remote_report h200_admin_report_latest.md h200_admin_report.md; then
 fi
 fetch_remote_report h200_status_latest.md h200_status_latest.md
 fetch_remote_report h200_status_latest.json h200_status_latest.json
+fetch_remote_report h200_support_bundle_latest.tar.gz h200_support_bundle_latest.tar.gz
 
 echo "Fetched H200 reports into ${local_dir}:"
-ls -lh \
-  "${local_dir}/h200_admin_report.md" \
-  "${local_dir}/h200_status_latest.md" \
+report_files=(
+  "${local_dir}/h200_admin_report.md"
+  "${local_dir}/h200_status_latest.md"
   "${local_dir}/h200_status_latest.json"
+)
+if [[ -f "${local_dir}/h200_support_bundle_latest.tar.gz" ]]; then
+  report_files+=("${local_dir}/h200_support_bundle_latest.tar.gz")
+fi
+ls -lh "${report_files[@]}"

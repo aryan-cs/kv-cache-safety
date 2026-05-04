@@ -126,6 +126,7 @@ def test_h200_report_fetcher_copies_expected_reports() -> None:
     assert "h200_admin_report.md" in script
     assert "h200_status_latest.md" in script
     assert "h200_status_latest.json" in script
+    assert "h200_support_bundle_latest.tar.gz" in script
     assert "scp -q" in script
     assert "bash scripts/fetch_h200_reports.sh" in readme
     assert "scripts/package_h200_support_bundle.py" in readme
