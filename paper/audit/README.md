@@ -92,7 +92,7 @@ By default this requires complete annotations, no unknown audit IDs, no duplicat
 ## Open Local Judge Alternative
 
 If human annotators are not available, use a documented open local judge rather
-than filling the human-label columns by hand. The wrapper below runs two
+than filling the human-label columns by hand. The wrapper below runs three
 deterministic prompt variants and marks every row with
 `annotation_source_type=open_local_judge`, the judge model id, and the judge
 prompt hash:

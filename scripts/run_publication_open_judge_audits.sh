@@ -44,8 +44,10 @@ run_open_judge_variant() {
 uv sync --frozen --extra dev
 run_open_judge_variant "$primary_run_id" v1
 run_open_judge_variant "$primary_run_id" v2
+run_open_judge_variant "$primary_run_id" v3
 run_open_judge_variant "$causal_run_id" v1
 run_open_judge_variant "$causal_run_id" v2
+run_open_judge_variant "$causal_run_id" v3
 
 echo "Open local judge audit CSVs written to $audit_input_dir"
 echo "Aggregate them with scripts/aggregate_publication_human_audits.sh."
