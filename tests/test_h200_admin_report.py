@@ -96,9 +96,67 @@ def test_admin_report_summarizes_hidden_gpu_context_without_results() -> None:
     assert "Latest gate block window: `memory_used_and_utilization`" in report
     assert "Latest sample age: `15.0 minutes`" in report
     assert "Launcher log stale: `true`" in report
+    assert "Copy/Paste Support Request" in report
+    assert "hidden or stale GPU context" in report
+    assert "Please release/restart the notebook allocation" in report
+    assert "Support bundle: logs/h200/h200_support_bundle_latest.tar.gz" in report
+    assert "latest sample as stale" in report
     assert "release or restart the notebook allocation" in report
     assert "nvidia-smi --gpu-reset" in report
     assert "model generations" in report
+
+
+def test_admin_report_support_request_does_not_overclaim_visible_holders() -> None:
+    report = admin_report(
+        {
+            "created_at_utc": "20260504T000000Z",
+            "repo_dir": "/home/aryang9/sandbox/llm-safety",
+            "git": {"commit": "abc123"},
+            "experiment_running": False,
+            "launcher_waiting": True,
+            "gpu_gate_likely_blocked": True,
+            "gpu_gate_block_reasons": ["memory_used"],
+            "hidden_gpu_context_likely": True,
+            "gpu": {
+                "available": True,
+                "name": "NVIDIA H200 NVL",
+                "memory_used_mib": 40000,
+                "memory_total_mib": 143771,
+                "utilization_pct": 35,
+                "compute_apps": [{"pid": "123"}],
+                "accounted_apps": [],
+                "device_holders": [],
+                "pid_query": "Processes                             : 123",
+            },
+        }
+    )
+
+    assert "Copy/Paste Support Request" in report
+    assert "Visible GPU holders: 1" in report
+    assert "should not be treated as hidden-context evidence" in report
+    assert "Please release/restart the notebook allocation" not in report
+    assert "clear the stale GPU context" not in report
+
+
+def test_admin_report_support_request_handles_unavailable_gpu() -> None:
+    report = admin_report(
+        {
+            "created_at_utc": "20260504T000000Z",
+            "repo_dir": "/home/aryang9/sandbox/llm-safety",
+            "git": {"commit": "abc123"},
+            "experiment_running": False,
+            "launcher_waiting": True,
+            "gpu_gate_likely_blocked": False,
+            "gpu_gate_block_reasons": [],
+            "hidden_gpu_context_likely": False,
+            "gpu": {"available": False, "error": "nvidia-smi missing"},
+        }
+    )
+
+    assert "cannot reliably query the GPU" in report
+    assert "GPU status: unavailable (nvidia-smi missing)" in report
+    assert "allocation is attached and visible" in report
+    assert "clear the stale GPU context" not in report
 
 
 def test_admin_report_cli_reports_missing_status_json() -> None:
