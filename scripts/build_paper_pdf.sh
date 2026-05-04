@@ -46,4 +46,7 @@ if [[ -f "$build_dir/main.pdf" ]]; then
   mv "$build_dir/main.pdf" "$build_dir/cache_mediated_safety_erasure.pdf"
 fi
 
+cp "$build_dir/cache_mediated_safety_erasure.pdf" paper/cache_mediated_safety_erasure.pdf
+
 echo "Wrote $build_dir/cache_mediated_safety_erasure.pdf"
+echo "Wrote paper/cache_mediated_safety_erasure.pdf"

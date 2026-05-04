@@ -10,10 +10,11 @@ Build the readable PDF from the repository root:
 bash scripts/build_paper_pdf.sh
 ```
 
-The output PDF is written to:
+The output PDFs are written to:
 
 ```text
 paper/build/cache_mediated_safety_erasure.pdf
+paper/cache_mediated_safety_erasure.pdf
 ```
 
 The manuscript is intentionally marked as a pre-results draft. Do not submit it until the H200 sweeps, causal patch runs, human audit, figures, table manifests, and publication readiness checks have passed on a clean commit.

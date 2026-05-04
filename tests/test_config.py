@@ -200,6 +200,7 @@ def test_complete_paper_build_checks_publication_status_before_latex() -> None:
     assert "scripts/report_publication_status.py" in script
     assert "--allow-missing-paper-pdf" in script
     assert "--fail-if-not-ready" in script
+    assert 'cp "$build_dir/cache_mediated_safety_erasure.pdf" paper/cache_mediated_safety_erasure.pdf' in script
 
 
 def test_h200_scripts_use_composite_public_refusal_suite() -> None:
