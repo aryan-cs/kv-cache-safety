@@ -15,6 +15,7 @@ from check_human_audit_readiness import (
     check_audit_input_source_match,
     check_human_audit_readiness,
 )
+from check_publication_readiness import _check_figure_manifest
 from package_arxiv_submission import FIGURE_SOURCES, _rewrite_failures
 
 from cache_safety_erasure.utils.io import file_sha256, write_json
@@ -51,6 +52,23 @@ REQUIRED_ARXIV_BUNDLE_FILES = [
     "audit/h200_causal_patch_qwen7b_summary/human_audit_deltas_table.tex",
 ]
 REQUIRED_ARXIV_FIGURE_FILES = [f"figures/{name}" for name in FIGURE_SOURCES]
+PRIMARY_REQUIRED_FIGURES = [
+    "safety_capability_phase_portrait",
+    "selective_safety_erasure_heatmap",
+    "prompt_effect_constellation",
+    "cache_state_fingerprint",
+    "safety_state_atlas",
+]
+CAUSAL_REQUIRED_FIGURES = [
+    "causal_restoration_fraction",
+    "causal_restoration_flow",
+]
+EXPECTED_CLAIM_IDS = [
+    "H1_behavioral_cache_sensitivity",
+    "H2_selective_safety_degradation",
+    "H3_causal_safety_state_erasure",
+]
+EXPECTED_PUBLICATION_REQUIRED_CLAIMS = [*EXPECTED_CLAIM_IDS, "human_audit_support"]
 RAW_EVIDENCE_BASENAMES = {
     "audit_key.jsonl",
     "audit_labels.csv",
@@ -156,8 +174,8 @@ def publication_status(
     arxiv_archive: Path = Path("paper/build/arxiv_source.tar.gz"),
     require_arxiv_bundle: bool = False,
 ) -> dict[str, Any]:
-    primary = _run_status(primary_results_dir)
-    causal = _run_status(causal_results_dir)
+    primary = _run_status(primary_results_dir, profile="primary")
+    causal = _run_status(causal_results_dir, profile="causal")
     primary_audit = _audit_status(primary_audit_dir, primary_results_dir)
     causal_audit = _audit_status(causal_audit_dir, causal_results_dir)
     claim_assessment = _claim_status(
@@ -243,7 +261,7 @@ def render_markdown(status: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
-def _run_status(results_dir: Path) -> dict[str, Any]:
+def _run_status(results_dir: Path, *, profile: str) -> dict[str, Any]:
     missing = [name for name in REQUIRED_RUN_ARTIFACTS if not (results_dir / name).exists()]
     manifest = _read_json(results_dir / "manifest.json")
     metrics = _read_json(results_dir / "metrics.json")
@@ -260,7 +278,7 @@ def _run_status(results_dir: Path) -> dict[str, Any]:
             disqualifiers.append("tiny_model")
         if "smoke" in run_name.lower() or "smoke" in results_dir.name.lower():
             disqualifiers.append("smoke_run")
-    readiness_failures = _run_readiness_failures(results_dir, manifest)
+    readiness_failures = _run_readiness_failures(results_dir, manifest, profile=profile)
     return {
         "path": str(results_dir),
         "complete": not missing and not disqualifiers and not readiness_failures,
@@ -277,7 +295,9 @@ def _run_status(results_dir: Path) -> dict[str, Any]:
     }
 
 
-def _run_readiness_failures(results_dir: Path, manifest: dict[str, Any]) -> list[str]:
+def _run_readiness_failures(
+    results_dir: Path, manifest: dict[str, Any], *, profile: str
+) -> list[str]:
     if not manifest:
         return []
     failures = []
@@ -298,6 +318,7 @@ def _run_readiness_failures(results_dir: Path, manifest: dict[str, Any]) -> list
     if not manifest.get("prompt_counts"):
         failures.append("manifest_lacks_prompt_counts")
     failures.extend(_figure_source_failures(results_dir))
+    failures.extend(_figure_manifest_failures(results_dir, profile=profile))
     return failures
 
 
@@ -325,6 +346,19 @@ def _figure_source_failures(results_dir: Path) -> list[str]:
             continue
         if source.get("sha256") != file_sha256(source_path):
             failures.append(f"figures_manifest_source_hash_stale:{name}")
+    return failures
+
+
+def _figure_manifest_failures(results_dir: Path, *, profile: str) -> list[str]:
+    failures: list[str] = []
+    required_figures = PRIMARY_REQUIRED_FIGURES if profile == "primary" else CAUSAL_REQUIRED_FIGURES
+    _check_figure_manifest(
+        results_dir / "figures",
+        results_dir,
+        failures,
+        require_causal_patch=profile == "causal",
+        required_figures=required_figures,
+    )
     return failures
 
 
@@ -716,8 +750,50 @@ def _claim_failures(assessment: dict[str, Any], source_paths: dict[str, Path]) -
     if not assessment:
         return []
     failures = []
-    if not assessment.get("publication_gate", {}).get("passed"):
+    if assessment.get("schema_version") != 1:
+        failures.append("invalid_claim_schema")
+    thresholds = assessment.get("thresholds")
+    if not isinstance(thresholds, dict) or not thresholds:
+        failures.append("missing_claim_thresholds")
+    if not str(assessment.get("recommended_framing") or "").strip():
+        failures.append("missing_recommended_framing")
+    claims = assessment.get("claims")
+    if not isinstance(claims, dict):
+        failures.append("missing_claims")
+    else:
+        for claim_id in EXPECTED_CLAIM_IDS:
+            claim = claims.get(claim_id)
+            if not isinstance(claim, dict):
+                failures.append(f"missing_claim:{claim_id}")
+                continue
+            if claim.get("passed") is not True:
+                failures.append(f"claim_failed:{claim_id}")
+            evidence_count = _claim_evidence_count(claim_id, claim)
+            if evidence_count <= 0:
+                failures.append(f"claim_lacks_evidence:{claim_id}")
+            failures.extend(_claim_best_evidence_failures(claim_id, claim))
+    if assessment.get("passed_claim_count") != len(EXPECTED_CLAIM_IDS):
+        failures.append(
+            f"passed_claim_count={assessment.get('passed_claim_count')}; "
+            f"expected={len(EXPECTED_CLAIM_IDS)}"
+        )
+    publication_gate = assessment.get("publication_gate")
+    if not isinstance(publication_gate, dict):
+        failures.append("missing_publication_gate")
+    elif publication_gate.get("passed") is not True:
         failures.append("publication_gate_failed")
+    if isinstance(publication_gate, dict):
+        required_claims = publication_gate.get("required_claims")
+        if not isinstance(required_claims, list):
+            failures.append("publication_gate_lacks_required_claims")
+        else:
+            required_claim_set = {str(claim) for claim in required_claims}
+            for claim_id in EXPECTED_PUBLICATION_REQUIRED_CLAIMS:
+                if claim_id not in required_claim_set:
+                    failures.append(f"publication_gate_missing_required_claim:{claim_id}")
+            unexpected = sorted(required_claim_set - set(EXPECTED_PUBLICATION_REQUIRED_CLAIMS))
+            for claim_id in unexpected:
+                failures.append(f"publication_gate_unexpected_required_claim:{claim_id}")
     audit_support = assessment.get("human_audit_support")
     if not isinstance(audit_support, dict):
         failures.append("missing_human_audit_support")
@@ -726,8 +802,41 @@ def _claim_failures(assessment: dict[str, Any], source_paths: dict[str, Path]) -
             failures.append("human_audit_support_not_required")
         if audit_support.get("passed") is not True:
             failures.append("human_audit_support_failed")
+        if not isinstance(audit_support.get("best_primary_delta"), dict):
+            failures.append("human_audit_lacks_primary_delta")
+        causal_delta = audit_support.get("best_causal_delta") or audit_support.get(
+            "best_causal_restoration_delta"
+        )
+        if not isinstance(causal_delta, dict):
+            failures.append("human_audit_lacks_causal_restoration_delta")
     failures.extend(_claim_source_failures(assessment, source_paths))
     return failures
+
+
+def _claim_evidence_count(claim_id: str, claim: dict[str, Any]) -> int:
+    if claim_id == "H3_causal_safety_state_erasure":
+        raw_count = claim.get("eligible_comparison_count")
+    else:
+        raw_count = claim.get("eligible_evidence_count")
+    try:
+        return int(raw_count)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _claim_best_evidence_failures(claim_id: str, claim: dict[str, Any]) -> list[str]:
+    if claim_id == "H3_causal_safety_state_erasure":
+        comparison = claim.get("best_comparison")
+        if not isinstance(comparison, dict):
+            return [f"claim_lacks_best_comparison:{claim_id}"]
+        failures = []
+        for key in ["system_patch", "matched_user_control"]:
+            if not isinstance(comparison.get(key), dict):
+                failures.append(f"claim_lacks_best_comparison_{key}:{claim_id}")
+        return failures
+    if not isinstance(claim.get("best_evidence"), dict):
+        return [f"claim_lacks_best_evidence:{claim_id}"]
+    return []
 
 
 def _claim_source_failures(assessment: dict[str, Any], source_paths: dict[str, Path]) -> list[str]:

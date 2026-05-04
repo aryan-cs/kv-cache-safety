@@ -947,6 +947,60 @@ def test_publication_status_rejects_preliminary_claim_assessment_without_audit_g
     assert "human_audit_support_not_required" in status["claim_assessment"]["failures"]
 
 
+def test_publication_status_rejects_gate_only_claim_assessment(tmp_path: Path) -> None:
+    primary = tmp_path / "primary"
+    causal = tmp_path / "causal"
+    primary_audit = tmp_path / "primary_audit"
+    causal_audit = tmp_path / "causal_audit"
+    _write_run(primary)
+    _write_run(causal)
+    _write_audit(primary_audit, primary)
+    _write_audit(causal_audit, causal)
+    claim_path = tmp_path / "claim_assessment.json"
+    claim_path.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "publication_gate": {
+                    "passed": True,
+                    "required_claims": [
+                        "H1_behavioral_cache_sensitivity",
+                        "H2_selective_safety_degradation",
+                        "H3_causal_safety_state_erasure",
+                        "human_audit_support",
+                    ],
+                },
+                "passed_claim_count": 3,
+                "human_audit_support": {
+                    "required": True,
+                    "passed": True,
+                    "best_primary_delta": {"support": 0.1},
+                    "best_causal_restoration_delta": {"support": 0.1},
+                },
+                "source_artifacts": _claim_source_artifacts(
+                    primary, causal, primary_audit, causal_audit
+                ),
+            }
+        ),
+        encoding="utf-8",
+    )
+    pdf_path = tmp_path / "paper.pdf"
+    pdf_path.write_bytes(b"%PDF-1.7\n")
+
+    status = publication_status(
+        primary_results_dir=primary,
+        causal_results_dir=causal,
+        primary_audit_dir=primary_audit,
+        causal_audit_dir=causal_audit,
+        claim_assessment_path=claim_path,
+        paper_pdf=pdf_path,
+    )
+
+    assert status["publication_ready"] is False
+    assert "claim_assessment_passed" in status["blockers"]
+    assert "missing_claims" in status["claim_assessment"]["failures"]
+
+
 def test_publication_status_rejects_smoke_or_mock_runs(tmp_path: Path) -> None:
     primary = tmp_path / "primary_smoke"
     causal = tmp_path / "causal"
@@ -1006,6 +1060,44 @@ def test_publication_status_rejects_obvious_run_readiness_failures(tmp_path: Pat
     )
 
 
+def test_publication_status_rejects_empty_figure_manifest(tmp_path: Path) -> None:
+    primary = tmp_path / "primary"
+    causal = tmp_path / "causal"
+    primary_audit = tmp_path / "primary_audit"
+    causal_audit = tmp_path / "causal_audit"
+    _write_run(primary)
+    _write_run(causal)
+    _write_audit(primary_audit, primary)
+    _write_audit(causal_audit, causal)
+    figure_manifest_path = primary / "figures" / "manifest.json"
+    figure_manifest = json.loads(figure_manifest_path.read_text(encoding="utf-8"))
+    figure_manifest["figures"] = []
+    figure_manifest_path.write_text(json.dumps(figure_manifest), encoding="utf-8")
+    claim_path = tmp_path / "claim_assessment.json"
+    claim_path.write_text(
+        json.dumps(_passing_claim_assessment(primary, causal, primary_audit, causal_audit)),
+        encoding="utf-8",
+    )
+    pdf_path = tmp_path / "paper.pdf"
+    pdf_path.write_bytes(b"%PDF-1.7\n")
+
+    status = publication_status(
+        primary_results_dir=primary,
+        causal_results_dir=causal,
+        primary_audit_dir=primary_audit,
+        causal_audit_dir=causal_audit,
+        claim_assessment_path=claim_path,
+        paper_pdf=pdf_path,
+    )
+
+    assert status["publication_ready"] is False
+    assert "primary_results_complete" in status["blockers"]
+    assert (
+        "figures manifest has no figure entries"
+        in status["primary_results"]["readiness_failures"]
+    )
+
+
 def _write_run(path: Path, manifest_overrides: dict | None = None) -> None:
     (path / "figures").mkdir(parents=True)
     manifest = {
@@ -1029,7 +1121,34 @@ def _write_run(path: Path, manifest_overrides: dict | None = None) -> None:
     )
     (path / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
     (path / "metrics.json").write_text(json.dumps({"ok": True}), encoding="utf-8")
+    figure_rows = []
+    for figure_name in {Path(name).stem for name in REQUIRED_ARXIV_FIGURE_FILES}:
+        png_path = path / "figures" / f"{figure_name}.png"
+        svg_path = path / "figures" / f"{figure_name}.svg"
+        pdf_path = path / "figures" / f"{figure_name}.pdf"
+        csv_path = path / "figures" / f"{figure_name}.csv"
+        png_path.write_bytes(b"\x89PNG\r\n\x1a\n")
+        svg_path.write_text(
+            '<svg xmlns="http://www.w3.org/2000/svg"></svg>\n',
+            encoding="utf-8",
+        )
+        pdf_path.write_bytes(b"%PDF-1.7\n")
+        csv_path.write_text("x,y\n1,1\n", encoding="utf-8")
+        figure_rows.append(
+            {
+                "name": figure_name,
+                "png": str(png_path),
+                "png_sha256": _sha256(png_path),
+                "svg": str(svg_path),
+                "svg_sha256": _sha256(svg_path),
+                "pdf": str(pdf_path),
+                "pdf_sha256": _sha256(pdf_path),
+                "data_csv": str(csv_path),
+                "data_csv_sha256": _sha256(csv_path),
+            }
+        )
     figure_manifest = {
+        "figures": sorted(figure_rows, key=lambda row: row["name"]),
         "source_artifacts": {
             name: {"sha256": _sha256(path / name)}
             for name in ["manifest.json", "generations.jsonl", "metrics.json", "cache_stats.parquet"]
@@ -1241,13 +1360,61 @@ def _passing_claim_assessment(
     causal_audit: Path,
 ) -> dict:
     return {
-        "publication_gate": {"passed": True},
+        "schema_version": 1,
+        "thresholds": {
+            "min_safety_effect_ci_low": 0.02,
+            "min_ssei_effect_ci_low": 0.02,
+            "min_restoration_fraction": 0.2,
+            "min_restoration_margin_over_user_control": 0.1,
+            "min_human_audit_delta": 0.0,
+        },
+        "claims": {
+            "H1_behavioral_cache_sensitivity": {
+                "passed": True,
+                "eligible_evidence_count": 1,
+                "best_evidence": {"key": "public_refusal_safety::kv_int4_sim"},
+                "summary": "Safety degradation clears the registered interval gate.",
+            },
+            "H2_selective_safety_degradation": {
+                "passed": True,
+                "eligible_evidence_count": 1,
+                "best_evidence": {"key": "kv_int4_sim"},
+                "summary": "SSEI clears the registered interval gate.",
+            },
+            "H3_causal_safety_state_erasure": {
+                "passed": True,
+                "eligible_comparison_count": 1,
+                "best_comparison": {
+                    "system_patch": {"key": "public_refusal_safety::rolesystem"},
+                    "matched_user_control": {
+                        "key": "public_refusal_safety::roleuser__matchsystem"
+                    },
+                    "margin": 0.3,
+                    "margin_ci_low": 0.1,
+                    "passed": True,
+                },
+                "summary": "System-role patching beats matched user-token controls.",
+            },
+        },
+        "publication_gate": {
+            "passed": True,
+            "required_claims": [
+                "H1_behavioral_cache_sensitivity",
+                "H2_selective_safety_degradation",
+                "H3_causal_safety_state_erasure",
+                "human_audit_support",
+            ],
+        },
         "passed_claim_count": 3,
         "source_artifacts": _claim_source_artifacts(primary, causal, primary_audit, causal_audit),
         "human_audit_support": {
             "required": True,
             "passed": True,
+            "best_primary_delta": {"support": 0.1},
+            "best_causal_delta": {"support": 0.1},
+            "best_causal_restoration_delta": {"support": 0.1},
         },
+        "recommended_framing": "The completed gates support the registered claim.",
     }
 
 

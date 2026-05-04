@@ -39,13 +39,14 @@ def test_claim_assessment_passes_with_aligned_human_audit_support() -> None:
         _primary_positive_metrics(),
         _causal_positive_metrics(),
         primary_audit_metrics=_audit_positive_metrics(),
-        causal_audit_metrics=_audit_positive_metrics(),
+        causal_audit_metrics=_causal_audit_positive_metrics(),
         require_human_audit_support=True,
     )
 
     assert assessment["publication_gate"]["passed"] is True
     assert assessment["human_audit_support"]["passed"] is True
     assert assessment["human_audit_support"]["best_primary_delta"]["support"] > 0
+    assert assessment["human_audit_support"]["best_causal_restoration_delta"]["support"] > 0
 
 
 def test_claim_assessment_rejects_human_audit_that_contradicts_direction() -> None:
@@ -60,12 +61,34 @@ def test_claim_assessment_rejects_human_audit_that_contradicts_direction() -> No
         _primary_positive_metrics(),
         _causal_positive_metrics(),
         primary_audit_metrics=audit,
-        causal_audit_metrics=_audit_positive_metrics(),
+        causal_audit_metrics=_causal_audit_positive_metrics(),
         require_human_audit_support=True,
     )
 
     assert assessment["publication_gate"]["passed"] is False
     assert assessment["human_audit_support"]["passed"] is False
+
+
+def test_claim_assessment_rejects_human_audit_without_causal_control_gap() -> None:
+    causal_audit = _causal_audit_positive_metrics()
+    causal_audit["baseline_policy_deltas"][
+        "public_refusal_safety::kv_int4_sim__patchkey-value__roleuser__matchsystem::human_unsafe_compliance"
+    ]["treatment_minus_baseline"] = 0.05
+    causal_audit["baseline_policy_deltas"][
+        "public_refusal_safety::kv_int4_sim__patchkey-value__roleuser__matchsystem::human_refusal_correct"
+    ]["treatment_minus_baseline"] = -0.05
+
+    assessment = assess_claims(
+        _primary_positive_metrics(),
+        _causal_positive_metrics(),
+        primary_audit_metrics=_audit_positive_metrics(),
+        causal_audit_metrics=causal_audit,
+        require_human_audit_support=True,
+    )
+
+    assert assessment["publication_gate"]["passed"] is False
+    assert assessment["human_audit_support"]["passed"] is False
+    assert any("causal audit best system-vs-control" in failure for failure in assessment["human_audit_support"]["failures"])
 
 
 def test_claim_assessment_rejects_selective_effect_without_causal_control_gap() -> None:
@@ -132,7 +155,7 @@ def test_claim_assessment_writes_publication_abstract_status_only_after_gate() -
         _primary_positive_metrics(),
         _causal_positive_metrics(),
         primary_audit_metrics=_audit_positive_metrics(),
-        causal_audit_metrics=_audit_positive_metrics(),
+        causal_audit_metrics=_causal_audit_positive_metrics(),
         require_human_audit_support=True,
     )
     failed = assess_claims(
@@ -292,3 +315,26 @@ def _audit_positive_metrics() -> dict:
             },
         },
     }
+
+
+def _causal_audit_positive_metrics() -> dict:
+    metrics = _audit_positive_metrics()
+    metrics["baseline_policy_deltas"] = {
+        "public_refusal_safety::kv_int4_sim__patchkey-value__rolesystem::human_unsafe_compliance": {
+            "treatment_minus_baseline": 0.05,
+            "n": 4,
+        },
+        "public_refusal_safety::kv_int4_sim__patchkey-value__roleuser__matchsystem::human_unsafe_compliance": {
+            "treatment_minus_baseline": 0.25,
+            "n": 4,
+        },
+        "public_refusal_safety::kv_int4_sim__patchkey-value__rolesystem::human_refusal_correct": {
+            "treatment_minus_baseline": -0.05,
+            "n": 4,
+        },
+        "public_refusal_safety::kv_int4_sim__patchkey-value__roleuser__matchsystem::human_refusal_correct": {
+            "treatment_minus_baseline": -0.25,
+            "n": 4,
+        },
+    }
+    return metrics
