@@ -87,21 +87,35 @@ def main() -> None:
 
 def post_h200_next_steps(status: dict[str, Any]) -> dict[str, Any]:
     gates = status.get("gates") or {}
+    primary_raw_complete = bool(gates.get("primary_results_complete")) or _raw_result_available(
+        status.get("primary_results")
+    )
+    causal_raw_complete = bool(gates.get("causal_results_complete")) or _raw_result_available(
+        status.get("causal_results")
+    )
+    fetched_evidence_prepared = bool(gates.get("primary_results_complete")) and bool(
+        gates.get("causal_results_complete")
+    )
     steps = [
         _step(
             "complete_h200_results",
-            complete=bool(gates.get("primary_results_complete"))
-            and bool(gates.get("causal_results_complete")),
+            complete=primary_raw_complete and causal_raw_complete,
             ready=True,
             command="bash scripts/wait_and_run_h200_sweep.sh",
-            detail="Run or wait for the registered H200 launcher until primary and causal result directories pass artifact gates.",
+            detail="Run or wait for the registered H200 launcher until primary and causal raw result directories are ready to fetch.",
+        ),
+        _step(
+            "prepare_after_h200_fetch",
+            complete=fetched_evidence_prepared,
+            ready=primary_raw_complete and causal_raw_complete,
+            command="bash scripts/fetch_h200_results.sh && bash scripts/prepare_after_h200_fetch.sh",
+            detail="Fetch raw H200 evidence, then reaggregate metrics, regenerate figures and paper tables, run readiness checks, and export audit templates from the current clean local checkout.",
         ),
         _step(
             "complete_human_audits",
             complete=bool(gates.get("primary_human_audit_complete"))
             and bool(gates.get("causal_human_audit_complete")),
-            ready=bool(gates.get("primary_results_complete"))
-            and bool(gates.get("causal_results_complete")),
+            ready=fetched_evidence_prepared,
             command="bash scripts/export_publication_audit_samples.sh && uv run python scripts/aggregate_human_audit.py --audit-csv paper/audit/<run_id>_audit_blinded_annotator_*.csv --key-jsonl paper/audit/<run_id>_audit_key.jsonl --results-dir results/<run_id> --export-manifest paper/audit/<run_id>_audit_export_manifest.json --output-dir paper/audit/<run_id>_summary",
             detail="Regenerate leakage-capable blinded templates, complete annotations, aggregate them, and require result-source and export-protocol hashes to match the exact run artifacts.",
         ),
@@ -136,6 +150,20 @@ def post_h200_next_steps(status: dict[str, Any]) -> dict[str, Any]:
         "next_step": next_step["name"] if next_step else "done",
         "steps": steps,
     }
+
+
+def _raw_result_available(artifact: object) -> bool:
+    if not isinstance(artifact, dict):
+        return False
+    missing = set(str(item) for item in artifact.get("missing", []))
+    tolerated_missing = {"metrics.json", "figures/manifest.json"}
+    if missing - tolerated_missing:
+        return False
+    disqualifiers = artifact.get("disqualifiers", [])
+    if disqualifiers:
+        return False
+    readiness_failures = [str(item) for item in artifact.get("readiness_failures", [])]
+    return not any(failure.startswith("generation_row_count=") for failure in readiness_failures)
 
 
 def _blocker_details(status: dict[str, Any]) -> dict[str, list[str]]:
