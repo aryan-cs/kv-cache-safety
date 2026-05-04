@@ -31,6 +31,61 @@ def test_cache_stats_sink_preserves_existing_rows_on_resume(tmp_path: Path) -> N
     assert list(df["prompt_id"]) == ["p1", "p2"]
 
 
+def test_resume_reconciliation_quarantines_generations_without_cache_stats(
+    tmp_path: Path,
+) -> None:
+    import sys
+
+    sys.path.insert(0, str(Path("scripts").resolve()))
+    from run_experiment import _reconcile_resume_generations
+
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    rows = [
+        {"prompt_id": "p1", "suite": "suite", "policy": "none", "seed": 0},
+        {"prompt_id": "p2", "suite": "suite", "policy": "kv_int4_sim", "seed": 0},
+    ]
+    append_jsonl(run_dir / "generations.jsonl", rows)
+
+    kept = _reconcile_resume_generations(run_dir, rows)
+
+    assert kept == []
+    assert read_jsonl(run_dir / "generations.jsonl") == []
+    orphaned = list(run_dir.glob("generations.orphaned_without_cache_stats.*.jsonl"))
+    assert len(orphaned) == 1
+    assert read_jsonl(orphaned[0]) == rows
+
+
+def test_resume_reconciliation_keeps_only_generations_with_cache_stats(
+    tmp_path: Path,
+) -> None:
+    import sys
+
+    import pandas as pd
+
+    sys.path.insert(0, str(Path("scripts").resolve()))
+    from run_experiment import _reconcile_resume_generations
+
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    rows = [
+        {"prompt_id": "p1", "suite": "suite", "policy": "none", "seed": 0},
+        {"prompt_id": "p2", "suite": "suite", "policy": "kv_int4_sim", "seed": 0},
+    ]
+    append_jsonl(run_dir / "generations.jsonl", rows)
+    pd.DataFrame(
+        [{"prompt_id": "p1", "policy": "none", "seed": 0, "decode_step": 0}]
+    ).to_parquet(run_dir / "cache_stats.parquet", index=False)
+
+    kept = _reconcile_resume_generations(run_dir, rows)
+
+    assert kept == [rows[0]]
+    assert read_jsonl(run_dir / "generations.jsonl") == [rows[0]]
+    orphaned = list(run_dir.glob("generations.orphaned_without_cache_stats.*.jsonl"))
+    assert len(orphaned) == 1
+    assert read_jsonl(orphaned[0]) == rows
+
+
 def test_cache_stats_sink_uses_stable_schema_for_sparse_batches(tmp_path: Path) -> None:
     import sys
 

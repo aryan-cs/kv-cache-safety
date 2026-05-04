@@ -24,6 +24,7 @@ from cache_safety_erasure.utils.io import (
     environment_snapshot,
     make_run_dir,
     read_jsonl,
+    utc_timestamp,
     write_json,
     write_jsonl,
 )
@@ -59,6 +60,8 @@ def main() -> None:
     write_json(run_dir / "environment.json", env)
     generations_path = run_dir / "generations.jsonl"
     existing = read_jsonl(generations_path) if config.run.resume else []
+    if config.run.resume:
+        existing = _reconcile_resume_generations(run_dir, existing)
     done_keys = {
         (row["prompt_id"], row["suite"], row["policy"], int(row["seed"])) for row in existing
     }
@@ -197,6 +200,54 @@ def _raw_config_with_run_overrides(
 
 def _policy_manifest(policy: Any) -> dict[str, Any]:
     return asdict(policy)
+
+
+def _reconcile_resume_generations(run_dir: Path, rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    if not rows:
+        return rows
+    cache_keys = _cache_stats_generation_keys(run_dir / "cache_stats.parquet")
+    kept = [
+        row
+        for row in rows
+        if (
+            str(row.get("prompt_id")),
+            str(row.get("policy")),
+            int(row.get("seed", 0)),
+        )
+        in cache_keys
+    ]
+    if len(kept) == len(rows):
+        return rows
+    orphan_path = run_dir / f"generations.orphaned_without_cache_stats.{utc_timestamp()}.jsonl"
+    write_jsonl(orphan_path, rows)
+    write_jsonl(run_dir / "generations.jsonl", kept)
+    print(
+        "Resume reconciliation removed "
+        f"{len(rows) - len(kept)} generation row(s) without cache-stat evidence; "
+        f"archived original rows at {orphan_path}."
+    )
+    return kept
+
+
+def _cache_stats_generation_keys(cache_stats_path: Path) -> set[tuple[str, str, int]]:
+    if not cache_stats_path.exists():
+        return set()
+    try:
+        import pyarrow.parquet as pq
+    except ModuleNotFoundError as exc:
+        raise RuntimeError("pyarrow is required for cache stats resume reconciliation.") from exc
+    try:
+        table = pq.read_table(cache_stats_path, columns=["prompt_id", "policy", "seed"])
+    except Exception:
+        return set()
+    prompt_ids = table.column("prompt_id").to_pylist()
+    policies = table.column("policy").to_pylist()
+    seeds = table.column("seed").to_pylist()
+    return {
+        (str(prompt_id), str(policy), int(seed or 0))
+        for prompt_id, policy, seed in zip(prompt_ids, policies, seeds, strict=False)
+        if prompt_id is not None and policy is not None
+    }
 
 
 CACHE_STATS_COLUMNS = [
