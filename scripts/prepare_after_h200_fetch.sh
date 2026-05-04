@@ -20,9 +20,15 @@ if [[ -n "$(git status --short)" ]]; then
   exit 1
 fi
 
-require_result_artifacts() {
+require_raw_result_artifacts() {
   local results_dir="$1"
-  for required in manifest.json generations.jsonl metrics.json cache_stats.parquet; do
+  for required in \
+    config.resolved.yaml \
+    environment.json \
+    manifest.json \
+    prompts.jsonl \
+    generations.jsonl \
+    cache_stats.parquet; do
     [[ -f "$results_dir/$required" ]] && continue
     echo "Missing required completed-run artifact: $results_dir/$required" >&2
     echo "Run scripts/fetch_h200_results.sh after the guarded H200 launcher completes." >&2
@@ -31,7 +37,7 @@ require_result_artifacts() {
 }
 
 rebuild_primary() {
-  require_result_artifacts "$primary_results"
+  require_raw_result_artifacts "$primary_results"
   uv run python scripts/aggregate_results.py --results-dir "$primary_results"
   uv run python scripts/make_figures.py --results-dir "$primary_results"
   uv run python scripts/export_paper_assets.py \
@@ -72,7 +78,7 @@ rebuild_primary() {
 }
 
 rebuild_causal() {
-  require_result_artifacts "$causal_results"
+  require_raw_result_artifacts "$causal_results"
   uv run python scripts/aggregate_results.py --results-dir "$causal_results"
   uv run python scripts/make_figures.py --results-dir "$causal_results"
   uv run python scripts/export_paper_assets.py \

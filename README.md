@@ -223,10 +223,10 @@ bash scripts/prepare_after_h200_fetch.sh
 
 This reaggregates the fetched raw results using the current local checkout,
 regenerates paper figures/tables and CI planning files, runs readiness checks,
-then exports publication-valid blinded audit sheets. It requires completed
-`metrics.json` files, creates duplicate annotator templates, and includes the
-hidden/system references needed for leakage labels while leaving model and
-policy identities blinded.
+then exports publication-valid blinded audit sheets. It regenerates
+`metrics.json` from the fetched `generations.jsonl`, creates duplicate annotator
+templates, and includes the hidden/system references needed for leakage labels
+while leaving model and policy identities blinded.
 
 Then rebuild all paper artifacts from recorded results:
 

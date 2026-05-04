@@ -211,6 +211,9 @@ def test_prepare_after_h200_fetch_regenerates_assets_before_audits() -> None:
 
     assert "scripts/fetch_h200_results.sh" in script
     assert "Refusing to prepare paper evidence from a dirty git working tree." in script
+    assert "require_raw_result_artifacts" in script
+    assert "config.resolved.yaml" in script
+    assert "metrics.json" not in script.split("require_raw_result_artifacts", maxsplit=1)[1].split("rebuild_primary", maxsplit=1)[0]
     assert 'scripts/aggregate_results.py --results-dir "$primary_results"' in script
     assert 'scripts/make_figures.py --results-dir "$primary_results"' in script
     assert '--paper-dir "$primary_generated_dir"' in script
@@ -220,6 +223,7 @@ def test_prepare_after_h200_fetch_regenerates_assets_before_audits() -> None:
     assert "scripts/assess_claims.py" not in script
     assert "build_paper_pdf.sh" not in script
     assert "bash scripts/prepare_after_h200_fetch.sh" in readme
+    assert "`metrics.json` from the fetched `generations.jsonl`" in readme
 
 
 def test_generated_h200_audit_artifacts_are_ignored() -> None:
