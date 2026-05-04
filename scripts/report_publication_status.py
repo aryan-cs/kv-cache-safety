@@ -586,24 +586,53 @@ def _ci_width_failures(metrics: dict[str, Any], *, profile: str) -> list[str]:
         return []
     max_width = PRIMARY_MAX_CI_WIDTH if profile == "primary" else CAUSAL_MAX_CI_WIDTH
     failures = []
+    for policy, contrast in (metrics.get("policy_level_contrasts") or {}).items():
+        if str(policy) == "none" or not isinstance(contrast, dict):
+            continue
+        ci = contrast.get("selective_safety_erasure_index_ci") or {}
+        failures.extend(
+            _ci_interval_failures(
+                f"{policy}:policy_level_ssei_ci",
+                ci,
+                max_width=max_width,
+            )
+        )
     for key, value in metrics.get("selective_safety_erasure", {}).items():
         if not isinstance(value, dict):
             failures.append(f"{key}:malformed_selective_safety_erasure_entry")
             continue
         ci = value.get("paired_safety_degradation_ci") or {}
-        ci_low = ci.get("ci_low")
-        ci_high = ci.get("ci_high")
-        if ci_low is None or ci_high is None:
-            failures.append(f"{key}:missing_paired_safety_ci")
-            continue
-        try:
-            width = float(ci_high) - float(ci_low)
-        except (TypeError, ValueError):
-            failures.append(f"{key}:invalid_paired_safety_ci")
-            continue
-        if width > max_width:
-            failures.append(f"{key}:paired_safety_ci_width={width:.3f}; target<={max_width:.3f}")
+        failures.extend(_ci_interval_failures(f"{key}:paired_safety_ci", ci, max_width=max_width))
+    if profile == "causal":
+        for key, value in (metrics.get("causal_restoration") or {}).items():
+            if not isinstance(value, dict):
+                failures.append(f"{key}:malformed_causal_restoration_entry")
+                continue
+            for metric in [
+                "safety_restoration_fraction_ci",
+                "refusal_restoration_fraction_ci",
+                "leakage_avoidance_restoration_fraction_ci",
+            ]:
+                ci = value.get(metric)
+                if ci:
+                    failures.extend(
+                        _ci_interval_failures(f"{key}:{metric}", ci, max_width=max_width)
+                    )
     return failures
+
+
+def _ci_interval_failures(label: str, ci: dict[str, Any], *, max_width: float) -> list[str]:
+    ci_low = ci.get("ci_low")
+    ci_high = ci.get("ci_high")
+    if ci_low is None or ci_high is None:
+        return [f"{label}:missing_ci"]
+    try:
+        width = float(ci_high) - float(ci_low)
+    except (TypeError, ValueError):
+        return [f"{label}:invalid_ci"]
+    if width > max_width:
+        return [f"{label}_width={width:.3f}; target<={max_width:.3f}"]
+    return []
 
 
 def _coerce_nonnegative_int(value: object, *, default: int) -> int:

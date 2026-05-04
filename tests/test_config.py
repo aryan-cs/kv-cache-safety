@@ -368,6 +368,10 @@ def test_evidence_gated_paper_builder_allows_nonpassing_claim_pdf() -> None:
     assert "--require-arxiv-bundle" in script
     assert "build_evidence_gated_paper_artifacts.sh" in finalizer
     assert "AUDIT_SOURCE=open_judge bash scripts/aggregate_publication_human_audits.sh" in finalizer
+    assert "FINALIZER_ALLOW_WIDE_CI:-0" in finalizer
+    assert "ALLOW_EVIDENCE_GATED_FALLBACK:-0" in finalizer
+    assert "Evidence-gated fallback was built, but strict publication readiness did not pass." in finalizer
+    assert "STAGING_ALLOW_WIDE_CI" not in finalizer
 
 
 def test_h200_scripts_use_composite_public_refusal_suite() -> None:

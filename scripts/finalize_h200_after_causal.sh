@@ -21,7 +21,8 @@ audit_per_suite_policy="${AUDIT_PER_SUITE_POLICY:-10}"
 audit_annotator_template_count="${AUDIT_ANNOTATOR_TEMPLATE_COUNT:-2}"
 run_open_judge_audit="${RUN_OPEN_JUDGE_AUDIT:-0}"
 attempt_publication_build="${ATTEMPT_PUBLICATION_BUILD:-1}"
-staging_allow_wide_ci="${STAGING_ALLOW_WIDE_CI:-1}"
+staging_allow_wide_ci="${FINALIZER_ALLOW_WIDE_CI:-0}"
+allow_evidence_gated_fallback="${ALLOW_EVIDENCE_GATED_FALLBACK:-0}"
 
 wide_ci_args=()
 if [[ "$staging_allow_wide_ci" == "1" ]]; then
@@ -207,6 +208,11 @@ if [[ "$attempt_publication_build" == "1" ]]; then
     echo "Publication build did not pass. See paper/build/publication_status.md and claim assessment artifacts."
     echo "Building an honest evidence-gated PDF/arXiv bundle from the completed artifacts."
     bash scripts/build_evidence_gated_paper_artifacts.sh
+    if [[ "$allow_evidence_gated_fallback" != "1" ]]; then
+      echo "Evidence-gated fallback was built, but strict publication readiness did not pass." >&2
+      echo "Set ALLOW_EVIDENCE_GATED_FALLBACK=1 only when intentionally producing a non-publication fallback bundle." >&2
+      exit 1
+    fi
   fi
 fi
 

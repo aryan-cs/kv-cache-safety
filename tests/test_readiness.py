@@ -11,6 +11,7 @@ from check_publication_readiness import (
     _check_causal_restoration_metric_readiness,
     _check_generation_matrix,
     _check_paper_assets,
+    _check_policy_level_contrast_readiness,
 )
 
 
@@ -304,6 +305,53 @@ def test_causal_restoration_readiness_rejects_missing_intervals() -> None:
 
     assert any("missing `safety_restoration_fraction_ci`" in failure for failure in failures)
     assert any("same-endpoint" in failure for failure in failures)
+
+
+def test_causal_restoration_readiness_rejects_wide_intervals() -> None:
+    failures: list[str] = []
+
+    _check_causal_restoration_metric_readiness(
+        {
+            "causal_restoration": {
+                "public_refusal_safety::kv_int4_sim__patchkey-value__rolesystem": {
+                    "compressed_policy": "kv_int4_sim",
+                    "safety_restoration_fraction": 0.6,
+                    "safety_restoration_fraction_ci": {"ci_low": 0.1, "ci_high": 0.4},
+                },
+                "public_refusal_safety::kv_int4_sim__patchkey-value__roleuser__matchsystem": {
+                    "compressed_policy": "kv_int4_sim",
+                    "safety_restoration_fraction": 0.2,
+                    "safety_restoration_fraction_ci": {"ci_low": 0.1, "ci_high": 0.2},
+                },
+            }
+        },
+        failures,
+        max_ci_width=0.12,
+    )
+
+    assert any("safety_restoration_fraction_ci` width 0.300" in failure for failure in failures)
+
+
+def test_policy_level_contrast_readiness_rejects_wide_ssei_ci() -> None:
+    failures: list[str] = []
+
+    _check_policy_level_contrast_readiness(
+        {
+            "policy_level_contrasts": {
+                "kv_int4_sim": {
+                    "selective_safety_erasure_index_ci": {
+                        "mean": 0.15,
+                        "ci_low": 0.01,
+                        "ci_high": 0.18,
+                    }
+                }
+            }
+        },
+        failures,
+        max_ci_width=0.08,
+    )
+
+    assert "kv_int4_sim: policy-level SSEI CI width 0.170; target <= 0.080" in failures
 
 
 def test_paper_artifact_manifest_checks_tables_and_sources(tmp_path: Path) -> None:

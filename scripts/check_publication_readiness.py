@@ -249,17 +249,21 @@ def main() -> None:
             value.get("mean_capability_score") is not None for value in policy_summary.values()
         )
         if has_global_safety and has_global_capability:
-            contrasts = metrics.get("policy_level_contrasts", {})
-            if not contrasts:
-                failures.append("missing policy-level safety-vs-capability contrasts")
-            for policy, contrast in contrasts.items():
-                ssei_ci = contrast.get("selective_safety_erasure_index_ci", {})
-                if policy != "none" and ssei_ci.get("mean") is None:
-                    failures.append(f"{policy}: missing policy-level SSEI CI")
+            _check_policy_level_contrast_readiness(
+                metrics,
+                failures,
+                max_ci_width=args.max_ci_width,
+                allow_wide_ci=args.allow_wide_ci,
+            )
         if args.require_causal_patch and not metrics.get("causal_restoration"):
             failures.append("missing causal restoration metrics")
         if args.require_causal_patch and metrics.get("causal_restoration"):
-            _check_causal_restoration_metric_readiness(metrics, failures)
+            _check_causal_restoration_metric_readiness(
+                metrics,
+                failures,
+                max_ci_width=args.max_ci_width,
+                allow_wide_ci=args.allow_wide_ci,
+            )
         for key, value in metrics.get("selective_safety_erasure", {}).items():
             ci = value.get("paired_safety_degradation_ci", {})
             if ci.get("ci_low") is None or ci.get("ci_high") is None:
@@ -606,7 +610,11 @@ def _check_causal_patch_config(policy_configs: list[dict], failures: list[str]) 
 
 
 def _check_causal_restoration_metric_readiness(
-    metrics: dict, failures: list[str]
+    metrics: dict,
+    failures: list[str],
+    *,
+    max_ci_width: float | None = None,
+    allow_wide_ci: bool = False,
 ) -> None:
     grouped: dict[tuple[str, str, str, str], set[str]] = {}
     for key, values in metrics.get("causal_restoration", {}).items():
@@ -630,11 +638,67 @@ def _check_causal_restoration_metric_readiness(
             if ci.get("ci_low") is None or ci.get("ci_high") is None:
                 failures.append(f"{key}: missing `{metric}_ci` interval")
                 continue
+            if max_ci_width is not None:
+                _check_ci_width(
+                    failures,
+                    f"{key}: `{metric}_ci`",
+                    ci,
+                    max_ci_width=max_ci_width,
+                    allow_wide_ci=allow_wide_ci,
+                )
             grouped.setdefault((suite, compressed_policy, metric, signature), set()).add(role)
     if not any({"system", "user_control"}.issubset(roles) for roles in grouped.values()):
         failures.append(
             "causal restoration metrics lack same-endpoint system patch and matched user control intervals"
         )
+
+
+def _check_policy_level_contrast_readiness(
+    metrics: dict,
+    failures: list[str],
+    *,
+    max_ci_width: float,
+    allow_wide_ci: bool = False,
+) -> None:
+    contrasts = metrics.get("policy_level_contrasts", {})
+    if not contrasts:
+        failures.append("missing policy-level safety-vs-capability contrasts")
+        return
+    for policy, contrast in contrasts.items():
+        if policy == "none":
+            continue
+        ssei_ci = contrast.get("selective_safety_erasure_index_ci", {})
+        if ssei_ci.get("mean") is None:
+            failures.append(f"{policy}: missing policy-level SSEI CI")
+        _check_ci_width(
+            failures,
+            f"{policy}: policy-level SSEI CI",
+            ssei_ci,
+            max_ci_width=max_ci_width,
+            allow_wide_ci=allow_wide_ci,
+        )
+
+
+def _check_ci_width(
+    failures: list[str],
+    label: str,
+    ci: dict,
+    *,
+    max_ci_width: float,
+    allow_wide_ci: bool,
+) -> None:
+    ci_low = ci.get("ci_low")
+    ci_high = ci.get("ci_high")
+    if ci_low is None or ci_high is None:
+        failures.append(f"{label}: missing CI endpoints")
+        return
+    try:
+        width = float(ci_high) - float(ci_low)
+    except (TypeError, ValueError):
+        failures.append(f"{label}: invalid CI endpoints")
+        return
+    if width > max_ci_width and not allow_wide_ci:
+        failures.append(f"{label} width {width:.3f}; target <= {max_ci_width:.3f}")
 
 
 def _patch_role_class_from_label(policy: str) -> str | None:

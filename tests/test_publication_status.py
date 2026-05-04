@@ -1802,6 +1802,100 @@ def test_publication_status_rejects_wide_primary_safety_intervals(tmp_path: Path
     )
 
 
+def test_publication_status_rejects_wide_policy_level_ssei_ci(tmp_path: Path) -> None:
+    primary = tmp_path / "primary"
+    causal = tmp_path / "causal"
+    primary_audit = tmp_path / "primary_audit"
+    causal_audit = tmp_path / "causal_audit"
+    _write_run(primary)
+    _write_run(causal)
+    metrics_path = primary / "metrics.json"
+    metrics = json.loads(metrics_path.read_text(encoding="utf-8"))
+    metrics["policy_level_contrasts"]["kv_int4_sim"]["selective_safety_erasure_index_ci"] = {
+        "mean": 0.12,
+        "ci_low": 0.01,
+        "ci_high": 0.18,
+        "n_safety": 100,
+        "n_capability": 100,
+    }
+    metrics_path.write_text(json.dumps(metrics), encoding="utf-8")
+    _refresh_figure_manifest_source_hashes(primary)
+    _write_audit(primary_audit, primary)
+    _write_audit(causal_audit, causal)
+    claim_path = tmp_path / "claim_assessment.json"
+    claim_path.write_text(
+        json.dumps(_passing_claim_assessment(primary, causal, primary_audit, causal_audit)),
+        encoding="utf-8",
+    )
+    pdf_path = tmp_path / "paper.pdf"
+    pdf_path.write_bytes(PDF_BYTES)
+
+    status = publication_status(
+        primary_results_dir=primary,
+        causal_results_dir=causal,
+        primary_audit_dir=primary_audit,
+        causal_audit_dir=causal_audit,
+        claim_assessment_path=claim_path,
+        paper_pdf=pdf_path,
+    )
+
+    assert status["publication_ready"] is False
+    assert "primary_results_complete" in status["blockers"]
+    assert any(
+        failure.startswith("kv_int4_sim:policy_level_ssei_ci_width=")
+        for failure in status["primary_results"]["readiness_failures"]
+    )
+
+
+def test_publication_status_rejects_wide_causal_restoration_ci(tmp_path: Path) -> None:
+    primary = tmp_path / "primary"
+    causal = tmp_path / "causal"
+    primary_audit = tmp_path / "primary_audit"
+    causal_audit = tmp_path / "causal_audit"
+    _write_run(primary)
+    _write_run(causal)
+    metrics_path = causal / "metrics.json"
+    metrics = json.loads(metrics_path.read_text(encoding="utf-8"))
+    metrics["causal_restoration"][
+        "public_refusal_safety::kv_int4_sim__patchkey-value__rolesystem"
+    ]["safety_restoration_fraction_ci"] = {
+        "mean": 0.62,
+        "ci_low": 0.30,
+        "ci_high": 0.60,
+        "cluster_n": 100,
+    }
+    metrics_path.write_text(json.dumps(metrics), encoding="utf-8")
+    _refresh_figure_manifest_source_hashes(causal)
+    _write_audit(primary_audit, primary)
+    _write_audit(causal_audit, causal)
+    claim_path = tmp_path / "claim_assessment.json"
+    claim_path.write_text(
+        json.dumps(_passing_claim_assessment(primary, causal, primary_audit, causal_audit)),
+        encoding="utf-8",
+    )
+    pdf_path = tmp_path / "paper.pdf"
+    pdf_path.write_bytes(PDF_BYTES)
+
+    status = publication_status(
+        primary_results_dir=primary,
+        causal_results_dir=causal,
+        primary_audit_dir=primary_audit,
+        causal_audit_dir=causal_audit,
+        claim_assessment_path=claim_path,
+        paper_pdf=pdf_path,
+    )
+
+    assert status["publication_ready"] is False
+    assert "causal_results_complete" in status["blockers"]
+    assert any(
+        failure.startswith(
+            "public_refusal_safety::kv_int4_sim__patchkey-value__rolesystem:"
+            "safety_restoration_fraction_ci_width="
+        )
+        for failure in status["causal_results"]["readiness_failures"]
+    )
+
+
 def _write_run(path: Path, manifest_overrides: dict | None = None) -> None:
     (path / "figures").mkdir(parents=True)
     profile = "causal" if "causal" in path.name else "primary"
@@ -2369,8 +2463,8 @@ def _passing_metrics() -> dict:
                 "selective_safety_erasure_index": 0.10,
                 "selective_safety_erasure_index_ci": {
                     "mean": 0.10,
-                    "ci_low": 0.04,
-                    "ci_high": 0.16,
+                    "ci_low": 0.06,
+                    "ci_high": 0.13,
                     "n_safety": 100,
                     "n_capability": 100,
                 },
@@ -2382,15 +2476,15 @@ def _passing_metrics() -> dict:
                 "safety_restoration_fraction": 0.62,
                 "safety_restoration_fraction_ci": {
                     "mean": 0.62,
-                    "ci_low": 0.50,
-                    "ci_high": 0.72,
+                    "ci_low": 0.56,
+                    "ci_high": 0.67,
                     "cluster_n": 100,
                 },
                 "refusal_restoration_fraction": 0.55,
                 "refusal_restoration_fraction_ci": {
                     "mean": 0.55,
-                    "ci_low": 0.44,
-                    "ci_high": 0.66,
+                    "ci_low": 0.50,
+                    "ci_high": 0.60,
                     "cluster_n": 100,
                 },
             },
@@ -2399,15 +2493,15 @@ def _passing_metrics() -> dict:
                 "safety_restoration_fraction": 0.20,
                 "safety_restoration_fraction_ci": {
                     "mean": 0.20,
-                    "ci_low": 0.12,
-                    "ci_high": 0.30,
+                    "ci_low": 0.16,
+                    "ci_high": 0.25,
                     "cluster_n": 100,
                 },
                 "refusal_restoration_fraction": 0.18,
                 "refusal_restoration_fraction_ci": {
                     "mean": 0.18,
-                    "ci_low": 0.10,
-                    "ci_high": 0.25,
+                    "ci_low": 0.13,
+                    "ci_high": 0.22,
                     "cluster_n": 100,
                 },
             },
