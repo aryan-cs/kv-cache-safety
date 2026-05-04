@@ -54,6 +54,7 @@ uv run python scripts/preflight_h200.py \
   --config configs/experiments/h200_qwen14b_ci_extension.yaml
 
 run_id="${CI_EXTENSION_RUN_ID:-h200_qwen14b_ci_extension_primary}"
+merged_run_id="${MERGED_PRIMARY_RUN_ID:-h200_qwen_full_sweep_plus_ci_extension}"
 uv run python scripts/run_experiment.py \
   --config configs/experiments/h200_qwen14b_ci_extension.yaml \
   --run-id "$run_id" \
@@ -85,6 +86,9 @@ uv run python scripts/check_publication_readiness.py \
   --required-suite public_capability_arc \
   --required-policy none \
   --required-policy sliding_window \
+  --required-policy sink_recent \
+  --required-policy random_matched \
+  --required-policy kv_int8_sim \
   --required-policy kv_int4_sim \
   --require-policy-pinned \
   --require-public-provenance
@@ -94,4 +98,54 @@ uv run python scripts/export_human_audit_sample.py \
   --annotator-template-count "$audit_annotator_template_count" \
   "${audit_hidden_reference_args[@]}"
 
+merged="results/$merged_run_id"
+merged_paper_dir="paper/generated/$merged_run_id"
+uv run python scripts/merge_ci_extension_results.py \
+  --primary-results-dir "$primary_results_dir" \
+  --extension-results-dir "$latest" \
+  --output-results-dir "$merged" \
+  --overwrite
+uv run python scripts/make_figures.py --results-dir "$merged"
+uv run python scripts/export_paper_assets.py \
+  --results-dir "$merged" \
+  --paper-dir "$merged_paper_dir" \
+  --macro-prefix PrimaryMerged
+uv run python scripts/plan_ci_power.py \
+  --results-dir "$merged" \
+  --target-ci-width "$target_ci_width" \
+  --output-json "$merged/ci_power.json" \
+  --output-md "$merged_paper_dir/ci_power.md"
+uv run python scripts/check_publication_readiness.py \
+  --results-dir "$merged" \
+  --paper-dir "$merged_paper_dir" \
+  --min-prompts-per-suite 600 \
+  --suite-min-prompts system_leakage=2 \
+  --suite-min-prompts public_xstest_safe=200 \
+  --max-ci-width "$target_ci_width" \
+  --required-suite system_leakage \
+  --required-suite public_system_leakage \
+  --required-suite public_refusal_safety \
+  --required-suite public_benign_overrefusal \
+  --required-suite public_xstest_safe \
+  --required-suite public_capability_arc \
+  --required-policy none \
+  --required-policy sliding_window \
+  --required-policy sink_recent \
+  --required-policy random_matched \
+  --required-policy kv_int8_sim \
+  --required-policy kv_int4_sim \
+  --require-policy-pinned \
+  --required-figure safety_capability_phase_portrait \
+  --required-figure selective_safety_erasure_heatmap \
+  --required-figure prompt_effect_constellation \
+  --required-figure cache_state_fingerprint \
+  --required-figure safety_state_atlas \
+  --require-public-provenance
+uv run python scripts/export_human_audit_sample.py \
+  --results-dir "$merged" \
+  --per-suite-policy 10 \
+  --annotator-template-count "$audit_annotator_template_count" \
+  "${audit_hidden_reference_args[@]}"
+
 echo "CI-extension sweep complete: $latest"
+echo "Merged primary evidence complete: $merged"

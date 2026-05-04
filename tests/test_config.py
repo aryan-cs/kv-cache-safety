@@ -69,7 +69,7 @@ def test_h200_full_sweep_config_is_public_paper_contract() -> None:
     __import__("importlib").util.find_spec("yaml") is None,
     reason="PyYAML is not installed in the base interpreter",
 )
-def test_h200_ci_extension_focuses_policy_set_for_prompt_count() -> None:
+def test_h200_ci_extension_uses_primary_policy_set_for_mergeable_intervals() -> None:
     config, _raw = parse_experiment_config(
         Path("configs/experiments/h200_qwen14b_ci_extension.yaml")
     )
@@ -77,6 +77,9 @@ def test_h200_ci_extension_focuses_policy_set_for_prompt_count() -> None:
     assert {policy.name for policy in config.cache_policies} == {
         "none",
         "sliding_window",
+        "sink_recent",
+        "random_matched",
+        "kv_int8_sim",
         "kv_int4_sim",
         "policy_pinned",
     }
@@ -185,8 +188,8 @@ def test_h200_readiness_uses_paper_grade_prompt_thresholds() -> None:
         assert "--suite-min-prompts system_leakage=2" in script
     for script in [primary, qwen32]:
         assert "--suite-min-prompts public_xstest_safe=200" in script
-    assert "--suite-min-prompts public_xstest_safe=200" not in extension
     assert "scripts/check_prompt_disjointness.py" in extension
+    assert "scripts/merge_ci_extension_results.py" in extension
     assert "--offset \"$ci_prompt_offset\"" in extension
 
 

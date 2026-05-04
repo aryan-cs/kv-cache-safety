@@ -26,6 +26,17 @@ cache_policies:
   - name: none
   - name: sliding_window
     budget: 64
+  - name: sliding_window
+    budget: 128
+  - name: sliding_window
+    budget: 256
+  - name: sink_recent
+    budget: 128
+    sink_tokens: 8
+  - name: random_matched
+    budget: 128
+    seed: 991
+  - name: kv_int8_sim
   - name: kv_int4_sim
   - name: policy_pinned
     budget: 128
