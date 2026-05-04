@@ -3,7 +3,12 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path("scripts").resolve()))
 
-from assess_claims import assess_claims, render_latex_table
+from assess_claims import (
+    assess_claims,
+    render_interpretation_latex,
+    render_interpretation_markdown,
+    render_latex_table,
+)
 
 
 def test_claim_assessment_passes_only_with_causal_system_control_gap() -> None:
@@ -47,6 +52,29 @@ def test_claim_assessment_latex_table_is_formal_and_escaped() -> None:
     assert r"\label{tab:claim-assessment}" in table
     assert r"95\% CI" in table
     assert "kv\\_int4\\_sim" in table
+
+
+def test_claim_interpretation_allows_full_claim_only_when_all_gates_pass() -> None:
+    assessment = assess_claims(_primary_positive_metrics(), _causal_positive_metrics())
+
+    latex = render_interpretation_latex(assessment)
+    markdown = render_interpretation_markdown(assessment)
+
+    assert "The manuscript may describe the observed effect as cache-mediated safety erasure" in latex
+    assert "All registered claim gates passed" in markdown
+
+
+def test_claim_interpretation_blocks_causal_claim_for_selective_only_result() -> None:
+    causal = _causal_positive_metrics()
+    causal["causal_restoration"][
+        "public_refusal_safety::kv_int4_sim__patchkey-value__roleuser__matchsystem"
+    ]["safety_restoration_fraction"] = 0.60
+    assessment = assess_claims(_primary_positive_metrics(), causal)
+
+    latex = render_interpretation_latex(assessment)
+
+    assert "must not claim cache-mediated safety erasure" in latex
+    assert "selective cache-induced safety degradation" in latex
 
 
 def test_claim_assessment_require_flag_failure(tmp_path: Path) -> None:

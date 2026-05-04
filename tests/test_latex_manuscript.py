@@ -17,6 +17,7 @@ def test_latex_manuscript_is_formal_registered_protocol() -> None:
     assert "Empirical result not yet reported" in tex
     assert r"\maybeinputtable{../generated/h200_qwen_full_sweep/main_results_table.tex}" in tex
     assert r"\maybeinputtable{../generated/claim_assessment/claim_assessment_table.tex}" in tex
+    assert r"\maybeinputtable{../generated/claim_assessment/claim_interpretation.tex}" in tex
     assert r"\maybeinputtable{../audit/h200_qwen_full_sweep_summary/human_audit_summary_table.tex}" in tex
     assert r"\PrimaryTopSSEIPolicy" in tex
     assert r"\bibliography{../references}" in tex
