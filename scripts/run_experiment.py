@@ -26,7 +26,6 @@ from cache_safety_erasure.utils.io import (
     read_jsonl,
     write_json,
     write_jsonl,
-    write_parquet,
 )
 
 
@@ -251,6 +250,52 @@ def _normalize_cache_stat_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any
     return [{column: row.get(column) for column in CACHE_STATS_COLUMNS} for row in rows]
 
 
+def _cache_stats_schema() -> Any:
+    import pyarrow as pa
+
+    int_columns = {
+        "seed",
+        "decode_step",
+        "original_seq_len",
+        "retained_count",
+        "evicted_count",
+        "layer_count",
+        "retained_special_tokens",
+        "retained_template_tokens",
+        "retained_system_tokens",
+        "retained_user_tokens",
+        "retained_generated_tokens",
+        "retained_unknown_tokens",
+        "evicted_special_tokens",
+        "evicted_template_tokens",
+        "evicted_system_tokens",
+        "evicted_user_tokens",
+        "evicted_generated_tokens",
+        "evicted_unknown_tokens",
+        "sink_tokens",
+        "recent_tokens",
+        "policy_seed",
+        "quantization_bits",
+        "protected_candidate_count",
+        "protected_retained_count",
+        "protected_dropped_count",
+        "patched_token_count",
+    }
+    float_columns = {"cache_l2_before", "cache_l2_after", "cache_l2_after_patch"}
+    bool_columns = {"attention_scores_used", "patched_from_baseline"}
+    fields = []
+    for column in CACHE_STATS_COLUMNS:
+        if column in int_columns:
+            fields.append(pa.field(column, pa.int64()))
+        elif column in float_columns:
+            fields.append(pa.field(column, pa.float64()))
+        elif column in bool_columns:
+            fields.append(pa.field(column, pa.bool_()))
+        else:
+            fields.append(pa.field(column, pa.large_string()))
+    return pa.schema(fields)
+
+
 class _CacheStatsSink:
     def __init__(self, path: Path, *, resume: bool) -> None:
         self.path = path
@@ -283,17 +328,24 @@ class _CacheStatsSink:
                 self.temp_path.replace(self.path)
             return
         if not self.path.exists():
-            write_parquet(self.path, [])
+            try:
+                import pyarrow.parquet as pq
+            except ModuleNotFoundError as exc:
+                raise RuntimeError("pyarrow is required for cache_stats.parquet.") from exc
+            pq.write_table(_cache_stats_table([]), self.path)
 
 
 def _cache_stats_table(rows: list[dict[str, Any]]) -> Any:
     try:
-        import pandas as pd
         import pyarrow as pa
     except ModuleNotFoundError as exc:
-        raise RuntimeError("pandas and pyarrow are required for cache_stats.parquet.") from exc
-    df = pd.DataFrame(_normalize_cache_stat_rows(rows), columns=CACHE_STATS_COLUMNS)
-    return pa.Table.from_pandas(df, preserve_index=False)
+        raise RuntimeError("pyarrow is required for cache_stats.parquet.") from exc
+    normalized = _normalize_cache_stat_rows(rows)
+    schema = _cache_stats_schema()
+    arrays = [
+        pa.array([row[field.name] for row in normalized], type=field.type) for field in schema
+    ]
+    return pa.Table.from_arrays(arrays, schema=schema)
 
 
 def _copy_existing_cache_stats(path: Path, writer: Any, schema: Any) -> None:

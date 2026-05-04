@@ -30,6 +30,90 @@ def test_cache_stats_sink_preserves_existing_rows_on_resume(tmp_path: Path) -> N
     assert list(df["prompt_id"]) == ["p1", "p2"]
 
 
+def test_cache_stats_sink_uses_stable_schema_for_sparse_batches(tmp_path: Path) -> None:
+    import sys
+
+    import pyarrow.parquet as pq
+
+    sys.path.insert(0, str(Path("scripts").resolve()))
+    from run_experiment import _CacheStatsSink
+
+    path = tmp_path / "cache_stats.parquet"
+    sink = _CacheStatsSink(path, resume=False)
+    sink.write(
+        [
+            {
+                "prompt_id": "p1",
+                "seed": 0,
+                "policy": "policy_pinned__budget128__sink8",
+                "decode_step": 0,
+                "original_seq_len": 32,
+                "retained_count": 32,
+                "evicted_count": 0,
+                "retained_indices": "0,1",
+                "evicted_indices": "",
+                "cache_l2_before": 1.25,
+                "cache_l2_after": 1.25,
+                "retained_generated_tokens": 0,
+                "evicted_generated_tokens": 0,
+                "sink_tokens": 8,
+                "protected_spans": "system,policy",
+                "protected_candidate_count": 4,
+                "protected_retained_count": 4,
+                "protected_dropped_count": 0,
+            }
+        ]
+    )
+    sink.write(
+        [
+            {
+                "prompt_id": "p2",
+                "seed": 0,
+                "policy": "sliding_window__budget64",
+                "decode_step": 1,
+                "original_seq_len": 96,
+                "retained_count": 64,
+                "evicted_count": 32,
+                "retained_indices": "32,33",
+                "evicted_indices": "0,1",
+                "cache_l2_before": 2.5,
+                "cache_l2_after": 2.0,
+                "retained_template_tokens": 5,
+                "retained_system_tokens": 3,
+                "retained_user_tokens": 56,
+                "evicted_template_tokens": 1,
+                "evicted_system_tokens": 2,
+                "evicted_user_tokens": 29,
+            }
+        ]
+    )
+    sink.close()
+
+    parquet_file = pq.ParquetFile(path)
+    assert parquet_file.metadata.num_rows == 2
+    schema = parquet_file.schema_arrow
+    assert str(schema.field("protected_spans").type) == "large_string"
+    assert str(schema.field("sink_tokens").type) == "int64"
+    assert str(schema.field("retained_generated_tokens").type) == "int64"
+
+
+def test_empty_cache_stats_sink_writes_readable_schema(tmp_path: Path) -> None:
+    import sys
+
+    import pyarrow.parquet as pq
+
+    sys.path.insert(0, str(Path("scripts").resolve()))
+    from run_experiment import CACHE_STATS_COLUMNS, _CacheStatsSink
+
+    path = tmp_path / "cache_stats.parquet"
+    sink = _CacheStatsSink(path, resume=False)
+    sink.close()
+
+    parquet_file = pq.ParquetFile(path)
+    assert parquet_file.metadata.num_rows == 0
+    assert parquet_file.schema_arrow.names == CACHE_STATS_COLUMNS
+
+
 def test_latex_table_export_escapes_policy_names(tmp_path: Path) -> None:
     import sys
 
