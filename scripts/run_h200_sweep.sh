@@ -22,6 +22,11 @@ public_prompt_limit="${PUBLIC_PROMPT_LIMIT:-650}"
 target_ci_width="${TARGET_CI_WIDTH:-0.08}"
 audit_per_suite_policy="${AUDIT_PER_SUITE_POLICY:-10}"
 audit_annotator_template_count="${AUDIT_ANNOTATOR_TEMPLATE_COUNT:-2}"
+audit_include_hidden_reference="${AUDIT_INCLUDE_HIDDEN_REFERENCE:-1}"
+audit_hidden_reference_args=()
+if [[ "$audit_include_hidden_reference" == "1" ]]; then
+  audit_hidden_reference_args+=(--include-hidden-reference)
+fi
 
 uv run python scripts/prepare_data.py --suite all
 uv run python scripts/prepare_data.py --source hf --suite cyberec_prompt_injection_leakage --limit "$public_prompt_limit" --output-suite public_system_leakage
@@ -113,7 +118,8 @@ uv run python scripts/check_publication_readiness.py \
 uv run python scripts/export_human_audit_sample.py \
   --results-dir "$latest_full" \
   --per-suite-policy "$audit_per_suite_policy" \
-  --annotator-template-count "$audit_annotator_template_count"
+  --annotator-template-count "$audit_annotator_template_count" \
+  "${audit_hidden_reference_args[@]}"
 
 echo "Waiting for GPU to clear after primary H200 Qwen 14B sweep..."
 bash scripts/wait_for_h200_gpu.sh
@@ -164,7 +170,8 @@ uv run python scripts/plan_registered_followups.py \
 uv run python scripts/export_human_audit_sample.py \
   --results-dir "$latest_causal" \
   --per-suite-policy "$audit_per_suite_policy" \
-  --annotator-template-count "$audit_annotator_template_count"
+  --annotator-template-count "$audit_annotator_template_count" \
+  "${audit_hidden_reference_args[@]}"
 
 echo "Waiting for GPU to clear after causal patch diagnostic..."
 bash scripts/wait_for_h200_gpu.sh

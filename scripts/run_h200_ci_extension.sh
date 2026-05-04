@@ -21,6 +21,11 @@ uv sync --frozen --extra dev
 ci_prompt_limit="${CI_PROMPT_LIMIT:-650}"
 target_ci_width="${TARGET_CI_WIDTH:-0.08}"
 audit_annotator_template_count="${AUDIT_ANNOTATOR_TEMPLATE_COUNT:-2}"
+audit_include_hidden_reference="${AUDIT_INCLUDE_HIDDEN_REFERENCE:-1}"
+audit_hidden_reference_args=()
+if [[ "$audit_include_hidden_reference" == "1" ]]; then
+  audit_hidden_reference_args+=(--include-hidden-reference)
+fi
 
 uv run python scripts/prepare_data.py --suite all
 uv run python scripts/prepare_data.py --source hf --suite cyberec_prompt_injection_leakage --limit "$ci_prompt_limit" --output-suite public_system_leakage
@@ -83,6 +88,7 @@ uv run python scripts/check_publication_readiness.py \
 uv run python scripts/export_human_audit_sample.py \
   --results-dir "$latest" \
   --per-suite-policy 10 \
-  --annotator-template-count "$audit_annotator_template_count"
+  --annotator-template-count "$audit_annotator_template_count" \
+  "${audit_hidden_reference_args[@]}"
 
 echo "CI-extension sweep complete: $latest"

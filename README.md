@@ -103,7 +103,7 @@ Run the primary H200 workflow:
 bash scripts/run_h200_sweep.sh
 ```
 
-The primary workflow defaults to `PUBLIC_PROMPT_LIMIT=650`, one deterministic seed, `AUDIT_PER_SUITE_POLICY=10`, and `AUDIT_ANNOTATOR_TEMPLATE_COUNT=2`. The public refusal suite combines AdvBench with JailbreakBench harmful behaviors, and the public system-leakage suite uses a prompt-injection benchmark, so both safety and leakage prompt counts clear the 600-cluster paper-readiness threshold. This keeps runtime lower than repeated deterministic seeds while targeting prompt-cluster counts needed for narrow confidence intervals and producing duplicate blinded audit templates for inter-annotator agreement. For a cheaper pilot, run `PUBLIC_PROMPT_LIMIT=200 AUDIT_PER_SUITE_POLICY=3 AUDIT_ANNOTATOR_TEMPLATE_COUNT=0 bash scripts/run_h200_sweep.sh`.
+The primary workflow defaults to `PUBLIC_PROMPT_LIMIT=650`, one deterministic seed, `AUDIT_PER_SUITE_POLICY=10`, `AUDIT_ANNOTATOR_TEMPLATE_COUNT=2`, and `AUDIT_INCLUDE_HIDDEN_REFERENCE=1`. The public refusal suite combines AdvBench with JailbreakBench harmful behaviors, and the public system-leakage suite uses a prompt-injection benchmark, so both safety and leakage prompt counts clear the 600-cluster paper-readiness threshold. This keeps runtime lower than repeated deterministic seeds while targeting prompt-cluster counts needed for narrow confidence intervals and producing duplicate leakage-capable blinded audit templates for inter-annotator agreement. For a cheaper pilot, run `PUBLIC_PROMPT_LIMIT=200 AUDIT_PER_SUITE_POLICY=3 AUDIT_ANNOTATOR_TEMPLATE_COUNT=0 bash scripts/run_h200_sweep.sh`.
 
 If the H200 GPU is busy, queue the sweep behind an availability gate from the H200 checkout:
 

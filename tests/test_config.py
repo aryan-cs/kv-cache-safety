@@ -174,7 +174,9 @@ def test_h200_scripts_export_multi_annotator_audit_templates() -> None:
     ]:
         script = script_path.read_text(encoding="utf-8")
         assert 'audit_annotator_template_count="${AUDIT_ANNOTATOR_TEMPLATE_COUNT:-2}"' in script
+        assert 'audit_include_hidden_reference="${AUDIT_INCLUDE_HIDDEN_REFERENCE:-1}"' in script
         assert '--annotator-template-count "$audit_annotator_template_count"' in script
+        assert "--include-hidden-reference" in script
 
 
 def test_publication_artifact_builder_fails_without_real_results() -> None:
