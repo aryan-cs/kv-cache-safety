@@ -90,6 +90,17 @@ def test_h200_readiness_uses_paper_grade_prompt_thresholds() -> None:
         assert "--suite-min-prompts public_xstest_safe=200" in script
 
 
+def test_h200_scripts_export_multi_annotator_audit_templates() -> None:
+    for script_path in [
+        Path("scripts/run_h200_sweep.sh"),
+        Path("scripts/run_h200_ci_extension.sh"),
+        Path("scripts/run_qwen32b_followup.sh"),
+    ]:
+        script = script_path.read_text(encoding="utf-8")
+        assert 'audit_annotator_template_count="${AUDIT_ANNOTATOR_TEMPLATE_COUNT:-2}"' in script
+        assert '--annotator-template-count "$audit_annotator_template_count"' in script
+
+
 def test_publication_artifact_builder_fails_without_real_results() -> None:
     script = Path("scripts/build_publication_artifacts.sh").read_text(encoding="utf-8")
 

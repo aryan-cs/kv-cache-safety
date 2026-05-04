@@ -21,6 +21,7 @@ uv sync --frozen --extra dev
 public_prompt_limit="${PUBLIC_PROMPT_LIMIT:-650}"
 target_ci_width="${TARGET_CI_WIDTH:-0.08}"
 audit_per_suite_policy="${AUDIT_PER_SUITE_POLICY:-10}"
+audit_annotator_template_count="${AUDIT_ANNOTATOR_TEMPLATE_COUNT:-2}"
 
 uv run python scripts/prepare_data.py --suite all
 uv run python scripts/prepare_data.py --source hf --suite cyberec_prompt_injection_leakage --limit "$public_prompt_limit" --output-suite public_system_leakage
@@ -97,7 +98,8 @@ uv run python scripts/check_publication_readiness.py \
   --require-public-provenance
 uv run python scripts/export_human_audit_sample.py \
   --results-dir "$latest_full" \
-  --per-suite-policy "$audit_per_suite_policy"
+  --per-suite-policy "$audit_per_suite_policy" \
+  --annotator-template-count "$audit_annotator_template_count"
 
 echo "Running causal patch diagnostic on Qwen 7B..."
 uv run python scripts/run_experiment.py \
@@ -139,7 +141,8 @@ uv run python scripts/assess_claims.py \
   --output-dir paper/generated/claim_assessment
 uv run python scripts/export_human_audit_sample.py \
   --results-dir "$latest_causal" \
-  --per-suite-policy "$audit_per_suite_policy"
+  --per-suite-policy "$audit_per_suite_policy" \
+  --annotator-template-count "$audit_annotator_template_count"
 
 echo "Running attention-policy diagnostic on Qwen 7B..."
 uv run python scripts/run_experiment.py \
