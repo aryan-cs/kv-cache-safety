@@ -6,7 +6,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path("scripts").resolve()))
 
-from check_final_pdf_text import placeholder_text_failures
+from check_final_pdf_text import forbidden_final_prose_failures, placeholder_text_failures
 from check_latex_placeholders import missing_placeholder_artifacts, placeholder_artifact_failures
 from package_arxiv_submission import (
     GENERATED_DIRS,
@@ -95,12 +95,70 @@ def test_paper_notes_avoid_internal_planning_language() -> None:
 def test_final_pdf_text_checker_rejects_draft_protocol_markers() -> None:
     failures = placeholder_text_failures(
         "This registered analysis protocol reports no empirical claims. "
-        "Figure unavailable."
+        "Figure unavailable. The H200 launcher produced a smoke run on a MacBook GPU."
     )
 
     assert "placeholder_text:registered analysis protocol" in failures
     assert "placeholder_text:reports no empirical claims" in failures
     assert "placeholder_text:Figure unavailable" in failures
+    assert "forbidden_final_prose:H200" in failures
+    assert "forbidden_final_prose:launcher" in failures
+    assert "forbidden_final_prose:smoke run" in failures
+    assert "forbidden_final_prose:MacBook" in failures
+
+
+def test_final_pdf_text_checker_rejects_internal_operational_language() -> None:
+    failures = forbidden_final_prose_failures(
+        "The evidence-gated fallback is draft-only because of a cgroup hardware constraint. "
+        "The notebook allocation report included nvidia-smi, CUDA status, VRAM status, "
+        "visible compute apps, infrastructure diagnostics, and a support bundle."
+    )
+
+    assert "forbidden_final_prose:evidence-gated fallback" in failures
+    assert "forbidden_final_prose:draft-only" in failures
+    assert "forbidden_final_prose:cgroup" in failures
+    assert "forbidden_final_prose:hardware constraint" in failures
+    assert "forbidden_final_prose:notebook allocation" in failures
+    assert "forbidden_final_prose:nvidia-smi" in failures
+    assert "forbidden_final_prose:CUDA operational status" in failures
+    assert "forbidden_final_prose:VRAM operational status" in failures
+    assert "forbidden_final_prose:visible compute apps" in failures
+    assert "forbidden_final_prose:infrastructure diagnostics" in failures
+    assert "forbidden_final_prose:support bundle" in failures
+
+
+def test_final_pdf_text_checker_normalizes_escaped_operational_terms() -> None:
+    failures = forbidden_final_prose_failures(
+        r"The H\,200 launcher ran on a Mac\-Book. The G P U was busy."
+    )
+
+    assert "forbidden_final_prose:H200" in failures
+    assert "forbidden_final_prose:launcher" in failures
+    assert "forbidden_final_prose:MacBook" in failures
+    assert "forbidden_final_prose:GPU operational status" in failures
+
+
+def test_final_pdf_text_checker_allows_relevant_cache_memory_prose() -> None:
+    assert (
+        forbidden_final_prose_failures(
+            "Cache compression methods reduce key-value memory use during long-context decoding."
+        )
+        == []
+    )
+    assert (
+        forbidden_final_prose_failures(
+            "KV-cache compression can reduce GPU memory utilization in long-context decoding."
+        )
+        == []
+    )
+
+
+def test_final_pdf_text_checker_rejects_dirty_working_tree_language() -> None:
+    failures = forbidden_final_prose_failures(
+        "The artifact was generated from a dirty working tree and dirty git working tree."
+    )
+
+    assert failures.count("forbidden_final_prose:dirty tree") == 1
 
 
 def test_latex_references_cover_primary_model_and_cache_work() -> None:
@@ -508,6 +566,53 @@ def test_latex_placeholder_checker_rejects_placeholder_artifacts(tmp_path: Path)
         "empty artifact: generated/claim_interpretation.tex",
         "placeholder text in artifact: generated/result_macros.tex",
     ]
+
+
+def test_latex_placeholder_checker_rejects_internal_generated_prose(tmp_path: Path) -> None:
+    generated = tmp_path / "generated"
+    generated.mkdir()
+    artifact = generated / "claim_interpretation.tex"
+    artifact.write_text("The H200 finalizer produced a draft-only fallback.", encoding="utf-8")
+    tex = tmp_path / "main.tex"
+    tex.write_text(
+        r"\maybeinputtable{generated/claim_interpretation.tex}",
+        encoding="utf-8",
+    )
+
+    assert placeholder_artifact_failures(tex) == [
+        (
+            "forbidden final prose in artifact: generated/claim_interpretation.tex::"
+            "forbidden_final_prose:H200"
+        ),
+        (
+            "forbidden final prose in artifact: generated/claim_interpretation.tex::"
+            "forbidden_final_prose:draft-only"
+        ),
+        (
+            "forbidden final prose in artifact: generated/claim_interpretation.tex::"
+            "forbidden_final_prose:finalizer"
+        ),
+    ]
+
+
+def test_latex_placeholder_checker_ignores_nonrendered_internal_comments(
+    tmp_path: Path,
+) -> None:
+    generated = tmp_path / "generated"
+    generated.mkdir()
+    artifact = generated / "claim_interpretation.tex"
+    artifact.write_text(
+        "% H200 finalizer draft-only\n"
+        "The causal results show restored refusal behavior after targeted cache repair.",
+        encoding="utf-8",
+    )
+    tex = tmp_path / "main.tex"
+    tex.write_text(
+        r"\maybeinputtable{generated/claim_interpretation.tex}",
+        encoding="utf-8",
+    )
+
+    assert placeholder_artifact_failures(tex) == []
 
 
 def test_latex_placeholder_checker_requires_result_macro_values(tmp_path: Path) -> None:

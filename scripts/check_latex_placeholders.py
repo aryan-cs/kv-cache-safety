@@ -4,6 +4,8 @@ import argparse
 import re
 from pathlib import Path
 
+from check_final_pdf_text import forbidden_final_prose_failures
+
 PLACEHOLDER_PATTERNS = [
     re.compile(r"\\maybeincludegraphic\{([^{}]+)\}"),
     re.compile(r"\\maybeinputtable\{([^{}]+)\}"),
@@ -105,11 +107,16 @@ def placeholder_artifact_failures(tex_path: Path) -> list[str]:
                 continue
             if path.suffix.lower() == ".tex":
                 text = path.read_text(encoding="utf-8", errors="replace")
+                rendered_text = _strip_tex_comments(text)
                 text_lower = text.lower()
                 for marker in PLACEHOLDER_TEXT_MARKERS:
                     if marker.lower() in text_lower:
                         failures.append(f"placeholder text in artifact: {raw_path}")
                         break
+                failures.extend(
+                    f"forbidden final prose in artifact: {raw_path}::{failure}"
+                    for failure in forbidden_final_prose_failures(rendered_text)
+                )
                 failures.extend(_semantic_tex_failures(raw_path, path.name, text))
     return sorted(set(failures))
 
@@ -136,6 +143,24 @@ def _is_pdf(path: Path) -> bool:
         and len(content) >= 32
         and b"%%EOF" in content[-2048:]
     )
+
+
+def _strip_tex_comments(text: str) -> str:
+    rendered_lines = []
+    for line in text.splitlines():
+        rendered_lines.append(_strip_tex_comment_line(line))
+    return "\n".join(rendered_lines)
+
+
+def _strip_tex_comment_line(line: str) -> str:
+    escaped = False
+    for index, char in enumerate(line):
+        if char == "%" and not escaped:
+            return line[:index]
+        escaped = char == "\\" and not escaped
+        if char != "\\":
+            escaped = False
+    return line
 
 
 def _semantic_tex_failures(raw_path: str, name: str, text: str) -> list[str]:
