@@ -255,6 +255,7 @@ def test_figure_manifest_rejects_stale_hash(tmp_path: Path) -> None:
                     "pdf_sha256": file_sha256(figures_dir / "figure.pdf"),
                     "data_csv": str(figures_dir / "figure.csv"),
                     "data_csv_sha256": file_sha256(figures_dir / "figure.csv"),
+                    "data_row_count": 0,
                 }
             ],
         },
@@ -294,6 +295,7 @@ def test_figure_manifest_rejects_malformed_visual_artifacts(tmp_path: Path) -> N
                     "pdf_sha256": file_sha256(figures_dir / "figure.pdf"),
                     "data_csv": str(figures_dir / "figure.csv"),
                     "data_csv_sha256": file_sha256(figures_dir / "figure.csv"),
+                    "data_row_count": 0,
                 }
             ],
         },
@@ -313,7 +315,7 @@ def test_figure_artifact_signature_validator_accepts_real_headers(tmp_path: Path
     svg = tmp_path / "figure.svg"
     csv = tmp_path / "figure.csv"
     png.write_bytes(b"\x89PNG\r\n\x1a\npayload")
-    pdf.write_bytes(b"%PDF-1.7\npayload")
+    pdf.write_bytes(b"%PDF-1.7\n1 0 obj\n<<>>\nendobj\ntrailer\n<<>>\n%%EOF\n")
     svg.write_text('<?xml version="1.0"?><svg xmlns="http://www.w3.org/2000/svg"/>', encoding="utf-8")
     csv.write_text("column\nvalue\n", encoding="utf-8")
 
@@ -351,6 +353,7 @@ def test_figure_manifest_requires_named_figures(tmp_path: Path) -> None:
                     "pdf_sha256": file_sha256(figures_dir / "present.pdf"),
                     "data_csv": str(figures_dir / "present.csv"),
                     "data_csv_sha256": file_sha256(figures_dir / "present.csv"),
+                    "data_row_count": 0,
                 }
             ],
         },

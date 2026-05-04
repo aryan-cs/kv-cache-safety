@@ -122,9 +122,14 @@ def _placeholder_artifacts(tex_path: Path) -> list[tuple[str, Path]]:
 
 def _is_pdf(path: Path) -> bool:
     try:
-        return path.read_bytes()[:5] == b"%PDF-"
+        content = path.read_bytes()
     except OSError:
         return False
+    return (
+        content.startswith(b"%PDF-")
+        and len(content) >= 32
+        and b"%%EOF" in content[-2048:]
+    )
 
 
 def _semantic_tex_failures(raw_path: str, name: str, text: str) -> list[str]:

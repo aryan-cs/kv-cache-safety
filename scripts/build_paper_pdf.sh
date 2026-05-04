@@ -38,6 +38,13 @@ require_valid_pdf() {
   fi
 }
 
+check_final_pdf_text() {
+  local pdf="$1"
+  if [[ "${REQUIRE_COMPLETE_PAPER:-0}" == "1" ]]; then
+    uv run python scripts/check_final_pdf_text.py --pdf "$pdf"
+  fi
+}
+
 if [[ "${REQUIRE_COMPLETE_PAPER:-0}" == "1" ]]; then
   uv run python scripts/check_latex_placeholders.py --tex "$src_dir/main.tex"
   uv run python scripts/check_paper_asset_freshness.py \
@@ -78,6 +85,7 @@ fi
 require_valid_pdf "$build_dir/main.pdf"
 mv "$build_dir/main.pdf" "$build_dir/cache_mediated_safety_erasure.pdf"
 require_valid_pdf "$build_dir/cache_mediated_safety_erasure.pdf"
+check_final_pdf_text "$build_dir/cache_mediated_safety_erasure.pdf"
 
 if [[ "${REQUIRE_COMPLETE_PAPER:-0}" == "1" ]]; then
   uv run python scripts/report_publication_status.py \
@@ -88,6 +96,7 @@ fi
 
 cp "$build_dir/cache_mediated_safety_erasure.pdf" paper/cache_mediated_safety_erasure.pdf
 require_valid_pdf paper/cache_mediated_safety_erasure.pdf
+check_final_pdf_text paper/cache_mediated_safety_erasure.pdf
 
 echo "Wrote $build_dir/cache_mediated_safety_erasure.pdf"
 echo "Wrote paper/cache_mediated_safety_erasure.pdf"

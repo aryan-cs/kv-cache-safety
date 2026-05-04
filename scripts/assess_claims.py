@@ -75,6 +75,7 @@ def main() -> None:
     (args.output_dir / "abstract_status_sentence.tex").write_text(
         render_abstract_status_latex(assessment), encoding="utf-8"
     )
+    write_json(args.output_dir / "artifact_manifest.json", _output_artifact_manifest(args.output_dir))
 
     print(f"Wrote claim assessment to {args.output_dir}")
     print(assessment["recommended_framing"])
@@ -410,6 +411,23 @@ def _source_artifact(path: Path) -> dict[str, Any]:
         "path": str(path),
         "sha256": file_sha256(path),
         "bytes": path.stat().st_size if path.exists() else None,
+    }
+
+
+def _output_artifact_manifest(output_dir: Path) -> dict[str, Any]:
+    return {
+        "schema_version": 1,
+        "generated_artifacts": {
+            name: _source_artifact(output_dir / name)
+            for name in [
+                "claim_assessment.json",
+                "claim_assessment.md",
+                "claim_assessment_table.tex",
+                "claim_interpretation.md",
+                "claim_interpretation.tex",
+                "abstract_status_sentence.tex",
+            ]
+        },
     }
 
 

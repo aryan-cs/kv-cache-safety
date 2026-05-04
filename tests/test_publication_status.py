@@ -8,7 +8,12 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path("scripts").resolve()))
 
-from aggregate_human_audit import aggregate_human_audit
+from aggregate_human_audit import (
+    aggregate_human_audit,
+    render_deltas_latex,
+    render_summary_latex,
+    render_summary_markdown,
+)
 from report_publication_status import (
     REQUIRED_ARXIV_FIGURE_FILES,
     publication_status,
@@ -1738,6 +1743,7 @@ def _write_run(path: Path, manifest_overrides: dict | None = None) -> None:
                 "pdf_sha256": _sha256(pdf_path),
                 "data_csv": str(csv_path),
                 "data_csv_sha256": _sha256(csv_path),
+                "data_row_count": 1,
             }
         )
     figure_manifest = {
@@ -1779,8 +1785,6 @@ def _write_audit(
     include_inter_annotator: bool = True,
 ) -> None:
     path.mkdir(parents=True)
-    for name in ["human_audit_summary.md", "human_audit_summary_table.tex", "human_audit_deltas_table.tex"]:
-        (path / name).write_text("artifact\n", encoding="utf-8")
     audit_csv = path / "audit_labels.csv"
     key_jsonl = path / "audit_key.jsonl"
     export_manifest = path / "audit_export_manifest.json"
@@ -1840,6 +1844,18 @@ def _write_audit(
     }
     (path / "audit_manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
     (path / "human_audit_summary.json").write_text(json.dumps(summary), encoding="utf-8")
+    (path / "human_audit_summary.md").write_text(
+        render_summary_markdown(summary),
+        encoding="utf-8",
+    )
+    (path / "human_audit_summary_table.tex").write_text(
+        render_summary_latex(summary),
+        encoding="utf-8",
+    )
+    (path / "human_audit_deltas_table.tex").write_text(
+        render_deltas_latex(summary),
+        encoding="utf-8",
+    )
 
 
 def _audit_fixture_rows(*, include_inter_annotator: bool) -> tuple[list[dict], list[dict]]:

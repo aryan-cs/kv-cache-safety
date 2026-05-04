@@ -62,6 +62,52 @@ OPTIONAL_GENERATED_DIRS = [DEFAULT_QWEN32_GENERATED_DIR]
 GENERATED_DIRS = REQUIRED_GENERATED_DIRS + OPTIONAL_GENERATED_DIRS
 AUDIT_DIRS = [DEFAULT_PRIMARY_AUDIT_DIR, DEFAULT_CAUSAL_AUDIT_DIR]
 ARXIV_SAFE_SUPPORT_SUFFIXES = {".tex"}
+FINAL_SOURCE_TEXT_MARKERS = [
+    *PLACEHOLDER_TEXT_MARKERS,
+    "Figure unavailable",
+    "registered analysis protocol",
+    "reports no empirical claims",
+]
+STRICT_PUBLICATION_COMMAND_BLOCK = r"""\newcommand{\todoresult}[1]{%
+  \PackageError{cache-paper}{Missing required publication artifact}{#1}%
+}
+\newcommand{\maybeincludegraphic}[3]{%
+  \IfFileExists{#1}{%
+    \includegraphics[width=#2]{#1}%
+  }{%
+    \PackageError{cache-paper}{Missing required publication figure}{#1}%
+  }%
+}
+\newcommand{\maybeinputtable}[2]{%
+  \IfFileExists{#1}{%
+    \input{#1}%
+  }{%
+    \PackageError{cache-paper}{Missing required publication table}{#1}%
+  }%
+}
+\newcommand{\requiredartifact}[1]{%
+  \IfFileExists{#1}{}{%
+    \PackageError{cache-paper}{Missing required generated artifact}{#1}%
+  }%
+}
+\newcommand{\EmpiricalStatusSentence}{}
+\newcommand{\PrimaryRunId}{}
+\newcommand{\PrimaryPolicyCount}{}
+\newcommand{\PrimaryTopSSEIPolicy}{}
+\newcommand{\PrimaryTopSSEI}{}
+\newcommand{\PrimaryTopSSEICILow}{}
+\newcommand{\PrimaryTopSSEICIHigh}{}
+\newcommand{\PrimarySafetyClusterCount}{}
+\newcommand{\PrimaryCapabilityClusterCount}{}
+\newcommand{\CausalRunId}{}
+\newcommand{\CausalPolicyCount}{}
+\newcommand{\CausalTopSSEIPolicy}{}
+\newcommand{\CausalTopSSEI}{}
+\newcommand{\CausalTopSSEICILow}{}
+\newcommand{\CausalTopSSEICIHigh}{}
+\newcommand{\CausalSafetyClusterCount}{}
+\newcommand{\CausalCapabilityClusterCount}{}
+"""
 
 
 def main() -> None:
@@ -97,12 +143,21 @@ def main() -> None:
     (source_dir / "figures").mkdir(parents=True)
 
     main_tex = Path("paper/latex/main.tex").read_text(encoding="utf-8")
-    rewritten_main_tex = _rewrite_main_tex_for_arxiv(main_tex, figure_sources=figure_sources)
+    rewritten_main_tex = _rewrite_main_tex_for_arxiv(
+        main_tex,
+        figure_sources=figure_sources,
+        strict_final=not args.allow_missing,
+    )
     rewrite_failures = _rewrite_failures(rewritten_main_tex)
     if rewrite_failures:
         for failure in rewrite_failures:
             print(f"Unrewritten LaTeX source path: {failure}")
         raise SystemExit("Refusing to package arXiv source with repo-local paths in main.tex.")
+    final_source_failures = [] if args.allow_missing else _final_source_failures(rewritten_main_tex)
+    if final_source_failures:
+        for failure in final_source_failures:
+            print(f"Final LaTeX source failure: {failure}")
+        raise SystemExit("Refusing to package arXiv source with draft fallback text in main.tex.")
     (source_dir / "main.tex").write_text(rewritten_main_tex, encoding="utf-8")
     shutil.copyfile("paper/references.bib", source_dir / "references.bib")
     copied_file_provenance = [
@@ -230,7 +285,10 @@ def main() -> None:
 
 
 def _rewrite_main_tex_for_arxiv(
-    text: str, *, figure_sources: dict[str, Path] | None = None
+    text: str,
+    *,
+    figure_sources: dict[str, Path] | None = None,
+    strict_final: bool = False,
 ) -> str:
     text = text.replace(r"\bibliography{../references}", r"\bibliography{references}")
     text = text.replace("../generated/", "generated/")
@@ -240,7 +298,28 @@ def _rewrite_main_tex_for_arxiv(
         source_items.extend(figure_sources.items())
     for output_name, source_path in source_items:
         text = text.replace(str(Path("../..") / source_path), f"figures/{output_name}")
+    if strict_final:
+        text = _rewrite_final_publication_fallbacks(text)
     return text
+
+
+def _rewrite_final_publication_fallbacks(text: str) -> str:
+    start_marker = r"\newcommand{\todoresult}"
+    end_marker = r"\IfFileExists{generated/h200_qwen_full_sweep/result_macros.tex}"
+    start = text.find(start_marker)
+    end = text.find(end_marker)
+    if start == -1 or end == -1 or end <= start:
+        return text
+    return text[:start] + STRICT_PUBLICATION_COMMAND_BLOCK + text[end:]
+
+
+def _final_source_failures(text: str) -> list[str]:
+    text_lower = text.lower()
+    return [
+        f"placeholder_text:{marker}"
+        for marker in FINAL_SOURCE_TEXT_MARKERS
+        if marker.lower() in text_lower
+    ]
 
 
 def _rewrite_failures(text: str) -> list[str]:
@@ -265,9 +344,14 @@ def _missing_inputs(manifest: dict) -> list[str]:
 
 def _is_pdf(path: Path) -> bool:
     try:
-        return path.read_bytes()[:5] == b"%PDF-"
+        content = path.read_bytes()
     except OSError:
         return False
+    return (
+        content.startswith(b"%PDF-")
+        and len(content) >= 32
+        and b"%%EOF" in content[-2048:]
+    )
 
 
 def _copy_arxiv_support_tree(source_dir: Path, bundle_dir: Path) -> list[Path]:

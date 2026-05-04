@@ -10,7 +10,17 @@ from _path import add_src_to_path
 
 add_src_to_path()
 
-from assess_claims import assess_claims
+from aggregate_human_audit import (
+    render_deltas_latex,
+    render_summary_latex,
+    render_summary_markdown,
+)
+from assess_claims import (
+    assess_claims,
+    render_abstract_status_latex,
+    render_interpretation_latex,
+    render_latex_table,
+)
 from check_human_audit_readiness import (
     DEFAULT_REQUIRED_LABELS,
     check_audit_input_source_match,
@@ -18,7 +28,7 @@ from check_human_audit_readiness import (
     check_human_audit_readiness,
 )
 from check_publication_readiness import _check_figure_manifest
-from package_arxiv_submission import FIGURE_SOURCES, _rewrite_failures
+from package_arxiv_submission import FIGURE_SOURCES, _final_source_failures, _rewrite_failures
 
 from cache_safety_erasure.utils.io import file_sha256, write_json
 
@@ -722,6 +732,7 @@ def _audit_status(audit_dir: Path, results_dir: Path) -> dict[str, Any]:
     failures.extend(check_audit_input_source_match(manifest))
     if summary and manifest:
         failures.extend(check_audit_summary_source_match(summary, manifest))
+    failures.extend(_audit_generated_output_failures(audit_dir, summary, manifest))
     failures.extend(_audit_result_source_failures(manifest, results_dir))
     return {
         "path": str(audit_dir),
@@ -757,6 +768,7 @@ def _claim_status(
             "causal_audit_manifest": causal_audit_dir / "audit_manifest.json",
         },
     )
+    failures.extend(_claim_generated_output_failures(path, assessment))
     return {
         "path": str(path),
         "exists": path.exists(),
@@ -837,8 +849,11 @@ def _arxiv_status(source_dir: Path, archive: Path) -> dict[str, Any]:
                 failures.append(f"stale_source_hash:{source_name}")
         main_tex_path = source_dir / "main.tex"
         if main_tex_path.exists():
-            for marker in _rewrite_failures(main_tex_path.read_text(encoding="utf-8")):
+            main_tex = main_tex_path.read_text(encoding="utf-8")
+            for marker in _rewrite_failures(main_tex):
                 failures.append(f"main_tex_repo_local_path:{marker}")
+            for failure in _final_source_failures(main_tex):
+                failures.append(f"main_tex_draft_placeholder:{failure}")
         copied_generated_names = {
             Path(str(path)).name for path in manifest.get("copied_generated", [])
         }
@@ -1255,6 +1270,73 @@ def _claim_recompute_failures(
         assessment.get("human_audit_support") or {}
     ).get("passed"):
         failures.append("claim_recompute_human_audit_mismatch")
+    return failures
+
+
+def _audit_generated_output_failures(
+    audit_dir: Path,
+    summary: dict[str, Any],
+    manifest: dict[str, Any],
+) -> list[str]:
+    if not summary or not audit_dir.name.endswith("_summary"):
+        return []
+    expected = {
+        "human_audit_summary.md": render_summary_markdown(summary),
+        "human_audit_summary_table.tex": render_summary_latex(summary),
+        "human_audit_deltas_table.tex": render_deltas_latex(summary),
+    }
+    failures = []
+    for name, expected_text in expected.items():
+        path = audit_dir / name
+        if not path.exists():
+            failures.append(f"missing_audit_generated_output:{name}")
+            continue
+        observed = path.read_text(encoding="utf-8", errors="replace")
+        if observed != expected_text:
+            failures.append(f"stale_audit_generated_output:{name}")
+    generated_manifest = manifest.get("generated_artifacts") if isinstance(manifest, dict) else None
+    if not isinstance(generated_manifest, dict):
+        failures.append("missing_audit_generated_artifact_manifest")
+    else:
+        for name in expected:
+            source = generated_manifest.get(name)
+            path = audit_dir / name
+            if not isinstance(source, dict):
+                failures.append(f"missing_audit_generated_artifact:{name}")
+            elif path.exists() and source.get("sha256") != file_sha256(path):
+                failures.append(f"stale_audit_generated_artifact:{name}")
+    return failures
+
+
+def _claim_generated_output_failures(path: Path, assessment: dict[str, Any]) -> list[str]:
+    if not assessment or path.parent.name != "claim_assessment":
+        return []
+    expected = {
+        "claim_assessment_table.tex": render_latex_table(assessment),
+        "claim_interpretation.tex": render_interpretation_latex(assessment),
+        "abstract_status_sentence.tex": render_abstract_status_latex(assessment),
+    }
+    failures = []
+    for name, expected_text in expected.items():
+        output_path = path.parent / name
+        if not output_path.exists():
+            failures.append(f"missing_claim_generated_output:{name}")
+            continue
+        observed = output_path.read_text(encoding="utf-8", errors="replace")
+        if observed != expected_text:
+            failures.append(f"stale_claim_generated_output:{name}")
+    artifact_manifest = _read_json(path.parent / "artifact_manifest.json")
+    generated_manifest = artifact_manifest.get("generated_artifacts")
+    if not isinstance(generated_manifest, dict):
+        failures.append("missing_claim_artifact_manifest")
+    else:
+        for name in ["claim_assessment.json", *expected]:
+            source = generated_manifest.get(name)
+            output_path = path.parent / name
+            if not isinstance(source, dict):
+                failures.append(f"missing_claim_generated_artifact:{name}")
+            elif output_path.exists() and source.get("sha256") != file_sha256(output_path):
+                failures.append(f"stale_claim_generated_artifact:{name}")
     return failures
 
 

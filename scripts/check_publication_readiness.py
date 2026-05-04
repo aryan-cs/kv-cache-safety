@@ -289,6 +289,10 @@ def _check_figure_manifest(
             artifact_failure = _figure_artifact_failure(path_key, path)
             if artifact_failure:
                 failures.append(f"figure `{name}` has invalid {path_key}: {artifact_failure}")
+        if figure.get("data_csv"):
+            row_count_failure = _figure_data_row_count_failure(figure)
+            if row_count_failure:
+                failures.append(f"figure `{name}` has invalid data_csv: {row_count_failure}")
     if require_causal_patch and "causal_restoration_fraction" not in figure_names:
         failures.append("causal patch runs require causal_restoration_fraction figure")
     for required_figure in required_figures or []:
@@ -298,15 +302,20 @@ def _check_figure_manifest(
 
 def _figure_artifact_failure(path_key: str, path: Path) -> str:
     try:
-        prefix = path.read_bytes()[:4096]
+        content = path.read_bytes()
     except OSError as exc:
         return str(exc)
+    prefix = content[:4096]
     if path_key == "png":
         if not prefix.startswith(b"\x89PNG\r\n\x1a\n"):
             return "missing PNG signature"
     elif path_key == "pdf":
         if not prefix.startswith(b"%PDF-"):
             return "missing PDF signature"
+        if len(content) < 32:
+            return "PDF too small"
+        if b"%%EOF" not in content[-2048:]:
+            return "missing PDF EOF marker"
     elif path_key == "svg":
         lowered = prefix.lstrip().lower()
         if b"<svg" not in lowered:
@@ -315,6 +324,34 @@ def _figure_artifact_failure(path_key: str, path: Path) -> str:
         first_line = prefix.splitlines()[0].strip() if prefix.splitlines() else b""
         if not first_line:
             return "missing CSV header"
+    return ""
+
+
+def _figure_data_row_count_failure(figure: dict) -> str:
+    raw_path = figure.get("data_csv")
+    if not raw_path:
+        return ""
+    path = Path(str(raw_path))
+    if not path.exists():
+        return ""
+    try:
+        nonempty_lines = [
+            line for line in path.read_text(encoding="utf-8", errors="replace").splitlines() if line
+        ]
+    except OSError as exc:
+        return str(exc)
+    observed_rows = max(0, len(nonempty_lines) - 1)
+    raw_declared = figure.get("data_row_count")
+    if raw_declared is None:
+        return "missing data_row_count"
+    try:
+        declared_rows = int(raw_declared)
+    except (TypeError, ValueError):
+        return f"invalid data_row_count={raw_declared!r}"
+    if declared_rows <= 0:
+        return "data_row_count must be positive"
+    if observed_rows != declared_rows:
+        return f"data_row_count={declared_rows}; observed_rows={observed_rows}"
     return ""
 
 

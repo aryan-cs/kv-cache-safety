@@ -11,6 +11,7 @@ from package_arxiv_submission import (
     OPTIONAL_GENERATED_DIRS,
     REQUIRED_GENERATED_DIRS,
     _copy_arxiv_support_tree,
+    _final_source_failures,
     _invalid_arxiv_support_files,
     _is_pdf,
     _missing_inputs,
@@ -83,6 +84,10 @@ def test_latex_references_cover_primary_model_and_cache_work() -> None:
         "wang2025cacheprune",
         "arditi2024refusal",
         "zhang2026anydepth",
+        "zou2023universal",
+        "databricks2023dolly",
+        "clark2018arc",
+        "cyberec2026promptinjection",
     ]:
         assert f"{{{key}," in bib
 
@@ -108,6 +113,12 @@ def test_arxiv_rewrite_uses_local_bibliography_and_figures() -> None:
     assert "figures/causal_restoration_fraction.pdf" in _rewrite_main_tex_for_arxiv(
         "../../results/h200_causal_patch_qwen7b/figures/causal_restoration_fraction.pdf"
     )
+    strict = _rewrite_main_tex_for_arxiv(
+        Path("paper/latex/main.tex").read_text(encoding="utf-8"),
+        strict_final=True,
+    )
+    assert _final_source_failures(strict) == []
+    assert r"\PackageError{cache-paper}{Missing required publication artifact}" in strict
     assert "generated/h200_qwen_full_sweep" in _rewrite_main_tex_for_arxiv(
         "../generated/h200_qwen_full_sweep/main_results_table.tex"
     )
@@ -188,7 +199,7 @@ def test_arxiv_packager_rejects_malformed_figure_pdfs(tmp_path: Path) -> None:
     fake_pdf = tmp_path / "figure.pdf"
     realish_pdf = tmp_path / "realish.pdf"
     fake_pdf.write_text("not a pdf", encoding="utf-8")
-    realish_pdf.write_bytes(b"%PDF-1.7\n")
+    realish_pdf.write_bytes(b"%PDF-1.7\n1 0 obj\n<<>>\nendobj\ntrailer\n<<>>\n%%EOF\n")
 
     assert _is_pdf(fake_pdf) is False
     assert _is_pdf(realish_pdf) is True

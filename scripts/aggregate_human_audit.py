@@ -46,16 +46,6 @@ def main() -> None:
     write_json(args.output_dir / "human_audit_summary.json", result["metrics"])
     write_jsonl(args.output_dir / "human_labels.jsonl", result["joined_rows"])
     _write_csv(args.output_dir / "human_audit_joined.csv", result["joined_rows"])
-    write_json(
-        args.output_dir / "audit_manifest.json",
-        _audit_manifest(
-            args.audit_csv,
-            args.key_jsonl,
-            args.results_dir,
-            args.export_manifest,
-            result,
-        ),
-    )
     (args.output_dir / "human_audit_summary.md").write_text(
         render_summary_markdown(result["metrics"]),
         encoding="utf-8",
@@ -67,6 +57,17 @@ def main() -> None:
     (args.output_dir / "human_audit_deltas_table.tex").write_text(
         render_deltas_latex(result["metrics"]),
         encoding="utf-8",
+    )
+    write_json(
+        args.output_dir / "audit_manifest.json",
+        _audit_manifest(
+            args.audit_csv,
+            args.key_jsonl,
+            args.results_dir,
+            args.export_manifest,
+            result,
+            args.output_dir,
+        ),
     )
     print(f"Wrote human-audit aggregation to {args.output_dir}")
 
@@ -509,6 +510,7 @@ def _audit_manifest(
     results_dir: Path | None,
     export_manifest_path: Path | None,
     result: dict[str, Any],
+    output_dir: Path | None = None,
 ) -> dict[str, Any]:
     source_artifacts = {
         "audit_csv": [
@@ -542,13 +544,35 @@ def _audit_manifest(
             if export_manifest_path.exists()
             else None,
         }
-    return {
+    manifest = {
         "schema_version": 1,
         "created_at_utc": utc_timestamp(),
         "source_artifacts": source_artifacts,
         "expected_audit_count": result["metrics"]["expected_audit_count"],
         "annotation_row_count": result["metrics"]["annotation_row_count"],
         "completed_audit_count": result["metrics"]["completed_audit_count"],
+    }
+    if output_dir is not None:
+        manifest["generated_artifacts"] = {
+            name: _source_artifact(output_dir / name)
+            for name in [
+                "human_audit_metrics.json",
+                "human_audit_summary.json",
+                "human_labels.jsonl",
+                "human_audit_joined.csv",
+                "human_audit_summary.md",
+                "human_audit_summary_table.tex",
+                "human_audit_deltas_table.tex",
+            ]
+        }
+    return manifest
+
+
+def _source_artifact(path: Path) -> dict[str, Any]:
+    return {
+        "path": str(path),
+        "sha256": file_sha256(path),
+        "bytes": path.stat().st_size if path.exists() else None,
     }
 
 
