@@ -224,6 +224,52 @@ def test_publication_status_rejects_malformed_arxiv_figure_pdf(tmp_path: Path) -
     )
 
 
+def test_publication_status_rejects_relative_malformed_arxiv_figure_pdf(
+    tmp_path: Path,
+) -> None:
+    primary = tmp_path / "primary"
+    causal = tmp_path / "causal"
+    primary_audit = tmp_path / "primary_audit"
+    causal_audit = tmp_path / "causal_audit"
+    arxiv_dir = tmp_path / "arxiv_source"
+    archive = tmp_path / "arxiv_source.tar.gz"
+    _write_run(primary)
+    _write_run(causal)
+    _write_audit(primary_audit, primary)
+    _write_audit(causal_audit, causal)
+    _write_arxiv_bundle(
+        arxiv_dir,
+        archive,
+        valid_figure_pdf=False,
+        manifest_overrides={"copied_figures": ["figures/figure.pdf"]},
+    )
+    claim_path = tmp_path / "claim_assessment.json"
+    claim_path.write_text(
+        json.dumps(_passing_claim_assessment(primary, causal, primary_audit, causal_audit)),
+        encoding="utf-8",
+    )
+    pdf_path = tmp_path / "paper.pdf"
+    pdf_path.write_bytes(b"%PDF-1.7\n")
+
+    status = publication_status(
+        primary_results_dir=primary,
+        causal_results_dir=causal,
+        primary_audit_dir=primary_audit,
+        causal_audit_dir=causal_audit,
+        claim_assessment_path=claim_path,
+        paper_pdf=pdf_path,
+        arxiv_source_dir=arxiv_dir,
+        arxiv_archive=archive,
+        require_arxiv_bundle=True,
+    )
+
+    assert status["publication_ready"] is False
+    assert (
+        "invalid_copied_figure_pdf:figures/figure.pdf:missing PDF signature"
+        in status["arxiv_bundle"]["failures"]
+    )
+
+
 def test_publication_status_rejects_stale_arxiv_provenance_source(
     tmp_path: Path,
 ) -> None:
@@ -399,6 +445,53 @@ def test_publication_status_rejects_unsafe_or_duplicate_archive_members(
     assert status["publication_ready"] is False
     assert "archive_duplicate:main.tex" in status["arxiv_bundle"]["failures"]
     assert "archive_unsafe_member:../escape.tex" in status["arxiv_bundle"]["failures"]
+
+
+def test_publication_status_rejects_unmanifested_empirical_archive_files(
+    tmp_path: Path,
+) -> None:
+    primary = tmp_path / "primary"
+    causal = tmp_path / "causal"
+    primary_audit = tmp_path / "primary_audit"
+    causal_audit = tmp_path / "causal_audit"
+    arxiv_dir = tmp_path / "arxiv_source"
+    archive = tmp_path / "arxiv_source.tar.gz"
+    _write_run(primary)
+    _write_run(causal)
+    _write_audit(primary_audit, primary)
+    _write_audit(causal_audit, causal)
+    _write_arxiv_bundle(arxiv_dir, archive)
+    extra = arxiv_dir / "generated" / "h200_qwen_full_sweep" / "unmanifested_extra.tex"
+    extra.write_text("extra\n", encoding="utf-8")
+    with tarfile.open(archive, "w:gz") as tar:
+        for path in sorted(arxiv_dir.rglob("*")):
+            tar.add(path, arcname=path.relative_to(arxiv_dir))
+    claim_path = tmp_path / "claim_assessment.json"
+    claim_path.write_text(
+        json.dumps(_passing_claim_assessment(primary, causal, primary_audit, causal_audit)),
+        encoding="utf-8",
+    )
+    pdf_path = tmp_path / "paper.pdf"
+    pdf_path.write_bytes(b"%PDF-1.7\n")
+
+    status = publication_status(
+        primary_results_dir=primary,
+        causal_results_dir=causal,
+        primary_audit_dir=primary_audit,
+        causal_audit_dir=causal_audit,
+        claim_assessment_path=claim_path,
+        paper_pdf=pdf_path,
+        arxiv_source_dir=arxiv_dir,
+        arxiv_archive=archive,
+        require_arxiv_bundle=True,
+    )
+
+    assert status["publication_ready"] is False
+    assert (
+        "archive_unmanifested_empirical_file:"
+        "generated/h200_qwen_full_sweep/unmanifested_extra.tex"
+        in status["arxiv_bundle"]["failures"]
+    )
 
 
 def test_publication_status_rejects_draft_arxiv_bundle_when_required(tmp_path: Path) -> None:

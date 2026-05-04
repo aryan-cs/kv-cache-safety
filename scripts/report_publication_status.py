@@ -447,7 +447,7 @@ def _arxiv_status(source_dir: Path, archive: Path) -> dict[str, Any]:
             if required_name not in copied_generated_names:
                 failures.append(f"missing_required_generated:{required_name}")
         for copied_path in manifest.get("copied_figures", []):
-            figure_path = Path(str(copied_path))
+            figure_path = _resolve_bundle_path(source_dir, copied_path)
             if not figure_path.exists():
                 continue
             figure_failure = _pdf_failure(figure_path)
@@ -473,13 +473,28 @@ def _arxiv_status(source_dir: Path, archive: Path) -> dict[str, Any]:
                 if member not in archive_hashes:
                     failures.append(f"archive_missing:{member}")
             if manifest:
-                for source_path in _manifest_copied_files(source_dir, manifest, failures):
+                copied_files = _manifest_provenance_files(source_dir, manifest, failures)
+                if not copied_files:
+                    copied_files = _manifest_copied_files(source_dir, manifest, failures)
+                expected_archive_members = {
+                    "main.tex",
+                    "references.bib",
+                    "manifest.json",
+                    *[
+                        source_path.relative_to(source_dir).as_posix()
+                        for source_path in copied_files
+                    ],
+                }
+                for source_path in copied_files:
                     member = source_path.relative_to(source_dir).as_posix()
                     archive_sha = archive_hashes.get(member)
                     if archive_sha is None:
                         failures.append(f"archive_missing:{member}")
                     elif archive_sha != file_sha256(source_path):
                         failures.append(f"archive_stale:{member}")
+                for member in archive_hashes:
+                    if _is_empirical_archive_member(member) and member not in expected_archive_members:
+                        failures.append(f"archive_unmanifested_empirical_file:{member}")
     return {
         "source_dir": str(source_dir),
         "archive": str(archive),
@@ -541,6 +556,34 @@ def _manifest_copied_files(
             else:
                 failures.append(f"missing_copied_path:{raw_path}")
     return files
+
+
+def _manifest_provenance_files(
+    source_dir: Path, manifest: dict[str, Any], failures: list[str]
+) -> list[Path]:
+    provenance = manifest.get("copied_file_provenance")
+    if not isinstance(provenance, list):
+        return []
+    files = []
+    for idx, row in enumerate(provenance):
+        if not isinstance(row, dict):
+            failures.append(f"malformed_copied_file_provenance:{idx}")
+            continue
+        bundle_path = _resolve_bundle_path(source_dir, row.get("bundle_path", ""))
+        try:
+            bundle_path.resolve().relative_to(source_dir.resolve())
+        except ValueError:
+            failures.append(f"provenance_bundle_outside_source:{row.get('bundle_path') or idx}")
+            continue
+        if bundle_path.is_file():
+            files.append(bundle_path)
+        else:
+            failures.append(f"provenance_bundle_missing:{row.get('bundle_path') or idx}")
+    return files
+
+
+def _is_empirical_archive_member(member: str) -> bool:
+    return member.startswith(("figures/", "generated/", "audit/"))
 
 
 def _copied_file_provenance_failures(source_dir: Path, manifest: dict[str, Any]) -> list[str]:

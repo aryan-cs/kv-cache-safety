@@ -12,6 +12,7 @@ from package_arxiv_submission import (
     REQUIRED_GENERATED_DIRS,
     _is_pdf,
     _missing_inputs,
+    _rewrite_failures,
     _rewrite_main_tex_for_arxiv,
 )
 
@@ -117,6 +118,18 @@ def test_arxiv_rewrite_uses_local_bibliography_and_figures() -> None:
         "../audit/h200_causal_patch_qwen7b_summary/human_audit_summary_table.tex"
     )
     assert "../../results" not in rewritten
+
+
+def test_arxiv_rewrite_current_manuscript_has_no_repo_local_paths() -> None:
+    tex = Path("paper/latex/main.tex").read_text(encoding="utf-8")
+
+    rewritten = _rewrite_main_tex_for_arxiv(tex)
+
+    assert _rewrite_failures(rewritten) == []
+    assert "../../results" not in rewritten
+    assert "../generated" not in rewritten
+    assert "../audit" not in rewritten
+    assert "../references" not in rewritten
 
 
 def test_arxiv_packager_treats_missing_inputs_as_publication_blockers() -> None:
