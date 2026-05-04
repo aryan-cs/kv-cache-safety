@@ -182,6 +182,7 @@ def render_markdown(status: dict[str, Any]) -> str:
                 "## Wait History",
                 "",
                 f"- samples: `{wait_history['sample_count']}`",
+                f"- observed wait duration: `{float(wait_history.get('observed_wait_minutes') or 0.0):.1f} minutes`",
                 (
                     f"- gate threshold: memory `<= {threshold.get('memory_used_mib', 'unknown')} MiB`, "
                     f"utilization `<= {threshold.get('utilization_pct', 'unknown')}%`"
@@ -206,6 +207,7 @@ def render_markdown(status: dict[str, Any]) -> str:
                 ),
                 f"- memory drop from first to latest: `{wait_history['memory_drop_mib']} MiB`",
                 f"- latest sample passes gate: `{str(wait_history['latest_gate_passed']).lower()}`",
+                f"- prolonged gate block: `{str(wait_history.get('prolonged_gate_block', False)).lower()}`",
             ]
         )
     lines.extend(["", "## Latest Launcher Log", ""])
@@ -472,6 +474,10 @@ def _wait_history(path: Path) -> dict[str, Any]:
     min_memory = min(samples, key=lambda item: item["memory_used_mib"])
     max_memory = max(samples, key=lambda item: item["memory_used_mib"])
     latest_plateau = _latest_memory_plateau(samples)
+    observed_wait_minutes = _minutes_between(first["timestamp_utc"], latest["timestamp_utc"])
+    latest_gate_passed = latest["memory_used_mib"] <= threshold["memory_used_mib"] and (
+        latest["utilization_pct"] <= threshold["utilization_pct"]
+    )
     return {
         "sample_count": len(samples),
         "first": first,
@@ -479,12 +485,13 @@ def _wait_history(path: Path) -> dict[str, Any]:
         "min_memory": min_memory,
         "max_memory": max_memory,
         "latest_memory_plateau": latest_plateau,
+        "observed_wait_minutes": observed_wait_minutes,
         "min_utilization_pct": min(item["utilization_pct"] for item in samples),
         "max_utilization_pct": max(item["utilization_pct"] for item in samples),
         "memory_drop_mib": first["memory_used_mib"] - latest["memory_used_mib"],
         "gate_threshold": threshold,
-        "latest_gate_passed": latest["memory_used_mib"] <= threshold["memory_used_mib"]
-        and latest["utilization_pct"] <= threshold["utilization_pct"],
+        "latest_gate_passed": latest_gate_passed,
+        "prolonged_gate_block": not latest_gate_passed and observed_wait_minutes >= 60.0,
     }
 
 

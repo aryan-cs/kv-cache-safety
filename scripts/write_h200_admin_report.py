@@ -100,6 +100,7 @@ def admin_report(status: dict[str, Any]) -> str:
                 "## Wait History",
                 "",
                 f"- Samples: `{wait_history['sample_count']}`",
+                f"- Observed wait duration: `{float(wait_history.get('observed_wait_minutes') or 0.0):.1f} minutes`",
                 (
                     f"- Gate threshold: memory `<= {threshold.get('memory_used_mib', 'unknown')} MiB`, "
                     f"utilization `<= {threshold.get('utilization_pct', 'unknown')}%`"
@@ -124,6 +125,7 @@ def admin_report(status: dict[str, Any]) -> str:
                 ),
                 f"- Memory drop from first to latest: `{wait_history['memory_drop_mib']} MiB`",
                 f"- Latest sample passes gate: `{_bool(wait_history['latest_gate_passed'])}`",
+                f"- Prolonged gate block: `{_bool(wait_history.get('prolonged_gate_block'))}`",
                 "",
             ]
         )

@@ -1,6 +1,8 @@
 import sys
 from pathlib import Path
 
+import pytest
+
 sys.path.insert(0, str(Path("scripts").resolve()))
 
 from report_h200_status import (
@@ -89,6 +91,7 @@ def test_wait_history_summarizes_launcher_memory_trend(tmp_path: Path) -> None:
     assert history["min_memory"]["memory_used_mib"] == 19000
     assert history["memory_drop_mib"] == 123461
     assert history["gate_threshold"] == {"memory_used_mib": 20000, "utilization_pct": 20}
+    assert history["observed_wait_minutes"] == pytest.approx(120.05)
     assert history["latest_memory_plateau"] == {
         "memory_used_mib": 19000,
         "sample_count": 1,
@@ -97,6 +100,27 @@ def test_wait_history_summarizes_launcher_memory_trend(tmp_path: Path) -> None:
         "duration_minutes": 0.0,
     }
     assert history["latest_gate_passed"] is True
+    assert history["prolonged_gate_block"] is False
+
+
+def test_wait_history_marks_prolonged_gate_block_only_while_blocked(tmp_path: Path) -> None:
+    log = tmp_path / "wait.log"
+    log.write_text(
+        "\n".join(
+            [
+                "Waiting for H200 GPU: memory.used <= 20000 MiB and utilization <= 20%",
+                "2026-05-04T02:04:08Z memory.used=142461MiB utilization=100%",
+                "2026-05-04T03:59:11Z memory.used=82139MiB utilization=95%",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    history = _wait_history(log)
+
+    assert history["latest_gate_passed"] is False
+    assert history["observed_wait_minutes"] == pytest.approx(115.05)
+    assert history["prolonged_gate_block"] is True
 
 
 def test_latest_memory_plateau_tracks_repeated_latest_memory() -> None:
@@ -245,6 +269,7 @@ def test_render_markdown_summarizes_blocked_launcher() -> None:
                         "memory_used_mib": 82139,
                         "utilization_pct": 95,
                     },
+                    "observed_wait_minutes": 115.0,
                     "memory_drop_mib": 60322,
                     "gate_threshold": {"memory_used_mib": 20000, "utilization_pct": 20},
                     "latest_memory_plateau": {
@@ -255,6 +280,7 @@ def test_render_markdown_summarizes_blocked_launcher() -> None:
                         "duration_minutes": 5.0,
                     },
                     "latest_gate_passed": False,
+                    "prolonged_gate_block": True,
                 },
             },
         }
@@ -267,8 +293,10 @@ def test_render_markdown_summarizes_blocked_launcher() -> None:
     assert "none reported by `nvidia-smi --query-accounted-apps`" in text
     assert "NVIDIA PIDS Query" in text
     assert "Wait History" in text
+    assert "observed wait duration: `115.0 minutes`" in text
     assert "gate threshold: memory `<= 20000 MiB`, utilization `<= 20%`" in text
     assert "latest memory plateau: `82139 MiB` for `2` samples" in text
     assert "memory drop from first to latest: `60322 MiB`" in text
+    assert "prolonged gate block: `true`" in text
     assert "release or restart the notebook allocation" in text
     assert "`results/h200_qwen_full_sweep`: missing" in text
