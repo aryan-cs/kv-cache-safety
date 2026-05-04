@@ -381,8 +381,14 @@ def test_evidence_gated_paper_builder_allows_nonpassing_claim_pdf() -> None:
     assert "scripts/package_arxiv_submission.py" in script
     assert "--require-arxiv-bundle" in script
     assert "build_evidence_gated_paper_artifacts.sh" in finalizer
-    assert "AUDIT_SOURCE=open_judge bash scripts/aggregate_publication_human_audits.sh" in finalizer
+    assert "AUDIT_SOURCE=open_judge \\" in finalizer
+    assert "PRIMARY_RUN_ID=\"$primary_run_id\"" in finalizer
+    assert "PRIMARY_AUDIT_SUMMARY_DIR=\"$primary_audit_summary\"" in finalizer
     assert "FINALIZER_ALLOW_WIDE_CI:-0" in finalizer
+    assert "RUN_CI_EXTENSION_IF_NEEDED:-1" in finalizer
+    assert "scripts/run_h200_ci_extension.sh" in finalizer
+    assert "use_merged_primary_evidence" in finalizer
+    assert "MERGED_PRIMARY_RUN_ID=\"$merged_primary_run_id\"" in finalizer
     assert "ALLOW_EVIDENCE_GATED_FALLBACK:-0" in finalizer
     assert "Evidence-gated fallback was built, but strict publication readiness did not pass." in finalizer
     assert "STAGING_ALLOW_WIDE_CI" not in finalizer
