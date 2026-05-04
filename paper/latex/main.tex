@@ -27,7 +27,7 @@ Testing Whether KV-Cache Optimizations Selectively Weaken Refusal Behavior}
   \texttt{aryan.cs.app@gmail.com}
 }
 
-\date{May 3, 2026}
+\date{}
 
 \newcommand{\ssei}{\mathrm{SSEI}}
 \newcommand{\todoresult}[1]{%
@@ -59,6 +59,10 @@ Testing Whether KV-Cache Optimizations Selectively Weaken Refusal Behavior}
     \todoresult{#2}%
   }%
 }
+\newcommand{\requiredartifact}[1]{}
+\newcommand{\EmpiricalStatusSentence}{%
+The present manuscript is a registered analysis protocol and reports no empirical claims; empirical sections are populated only after the complete evaluation and audit procedures described here have been executed.%
+}
 \newcommand{\PrimaryRunId}{results pending}
 \newcommand{\PrimaryPolicyCount}{}
 \newcommand{\PrimaryTopSSEIPolicy}{}
@@ -81,13 +85,17 @@ Testing Whether KV-Cache Optimizations Selectively Weaken Refusal Behavior}
 \IfFileExists{../generated/h200_causal_patch_qwen7b/result_macros.tex}{%
   \input{../generated/h200_causal_patch_qwen7b/result_macros.tex}%
 }{}
+\IfFileExists{../generated/claim_assessment/abstract_status_sentence.tex}{%
+  \input{../generated/claim_assessment/abstract_status_sentence.tex}%
+}{}
+\requiredartifact{../generated/claim_assessment/abstract_status_sentence.tex}
 
 \begin{document}
 
 \maketitle
 
 \begin{abstract}
-Inference systems increasingly compress, evict, or quantize key-value (KV) caches to reduce serving cost and extend usable context. This paper tests a safety-specific hypothesis: cache optimizations can selectively weaken refusal and policy-following behavior while preserving ordinary task capability, because some safety behavior depends on fragile cache-resident routing state. We call the target phenomenon \emph{cache-mediated safety erasure} only if three claims are supported: cache interventions degrade safety behavior, the degradation is larger than matched capability degradation, and targeted restoration or protection of policy-relevant cache slices recovers refusal more than matched non-policy controls. The present manuscript is a registered analysis protocol and reports no empirical claims; empirical sections are populated only after the complete evaluation and audit procedures described here have been executed.
+Inference systems increasingly compress, evict, or quantize key-value (KV) caches to reduce serving cost and extend usable context. This paper tests a safety-specific hypothesis: cache optimizations can selectively weaken refusal and policy-following behavior while preserving ordinary task capability, because some safety behavior depends on fragile cache-resident routing state. We call the target phenomenon \emph{cache-mediated safety erasure} only if three claims are supported: cache interventions degrade safety behavior, the degradation is larger than matched capability degradation, and targeted restoration or protection of policy-relevant cache slices recovers refusal more than matched non-policy controls. \EmpiricalStatusSentence
 \end{abstract}
 
 \section{Introduction}

@@ -21,6 +21,9 @@ def test_latex_manuscript_is_formal_registered_protocol() -> None:
     assert "aryan.cs.app@gmail.com" in tex
     assert "registered analysis protocol" in tex
     assert "reports no empirical claims" in tex
+    assert r"\EmpiricalStatusSentence" in tex
+    assert r"\requiredartifact{../generated/claim_assessment/abstract_status_sentence.tex}" in tex
+    assert "../generated/claim_assessment/abstract_status_sentence.tex" in tex
     assert "Empirical result not yet reported" in tex
     assert r"\maybeinputtable{../generated/h200_qwen_full_sweep/main_results_table.tex}" in tex
     assert r"\maybeinputtable{../generated/claim_assessment/claim_assessment_table.tex}" in tex
@@ -84,6 +87,9 @@ def test_arxiv_rewrite_uses_local_bibliography_and_figures() -> None:
     assert "generated/claim_assessment" in _rewrite_main_tex_for_arxiv(
         "../generated/claim_assessment/claim_assessment_table.tex"
     )
+    assert "generated/claim_assessment" in _rewrite_main_tex_for_arxiv(
+        "../generated/claim_assessment/abstract_status_sentence.tex"
+    )
     assert Path("paper/generated/claim_assessment") in GENERATED_DIRS
     assert Path("paper/generated/claim_assessment") in REQUIRED_GENERATED_DIRS
     assert Path("paper/generated/h200_qwen32b_public_followup") in OPTIONAL_GENERATED_DIRS
@@ -119,3 +125,18 @@ def test_latex_placeholder_checker_reports_missing_artifacts(tmp_path: Path) -> 
     )
 
     assert missing_placeholder_artifacts(tex) == ["missing/table.tex"]
+
+
+def test_latex_placeholder_checker_requires_generated_text_artifacts(tmp_path: Path) -> None:
+    tex = tmp_path / "main.tex"
+    existing = tmp_path / "generated" / "ok.tex"
+    existing.parent.mkdir()
+    existing.write_text(r"\renewcommand{\EmpiricalStatusSentence}{ok}", encoding="utf-8")
+    tex.write_text(
+        r"\requiredartifact{generated/ok.tex}"
+        "\n"
+        r"\requiredartifact{generated/missing_status.tex}",
+        encoding="utf-8",
+    )
+
+    assert missing_placeholder_artifacts(tex) == ["generated/missing_status.tex"]

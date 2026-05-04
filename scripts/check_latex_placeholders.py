@@ -7,12 +7,16 @@ from pathlib import Path
 PLACEHOLDER_PATTERNS = [
     re.compile(r"\\maybeincludegraphic\{([^{}]+)\}"),
     re.compile(r"\\maybeinputtable\{([^{}]+)\}"),
+    re.compile(r"\\requiredartifact\{([^{}]+)\}"),
 ]
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Fail if the LaTeX manuscript would render placeholder figures or tables."
+        description=(
+            "Fail if the LaTeX manuscript would render placeholder figures, tables, "
+            "or required generated text."
+        )
     )
     parser.add_argument("--tex", type=Path, default=Path("paper/latex/main.tex"))
     args = parser.parse_args()

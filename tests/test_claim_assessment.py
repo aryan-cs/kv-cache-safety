@@ -5,6 +5,7 @@ sys.path.insert(0, str(Path("scripts").resolve()))
 
 from assess_claims import (
     assess_claims,
+    render_abstract_status_latex,
     render_interpretation_latex,
     render_interpretation_markdown,
     render_latex_table,
@@ -124,6 +125,29 @@ def test_claim_interpretation_allows_full_claim_only_when_all_gates_pass() -> No
 
     assert "The manuscript may describe the observed effect as cache-mediated safety erasure" in latex
     assert "All registered claim gates passed" in markdown
+
+
+def test_claim_assessment_writes_publication_abstract_status_only_after_gate() -> None:
+    passed = assess_claims(
+        _primary_positive_metrics(),
+        _causal_positive_metrics(),
+        primary_audit_metrics=_audit_positive_metrics(),
+        causal_audit_metrics=_audit_positive_metrics(),
+        require_human_audit_support=True,
+    )
+    failed = assess_claims(
+        _primary_positive_metrics(),
+        _causal_positive_metrics(),
+        require_human_audit_support=True,
+    )
+
+    passed_latex = render_abstract_status_latex(passed)
+    failed_latex = render_abstract_status_latex(failed)
+
+    assert r"\renewcommand{\EmpiricalStatusSentence}" in passed_latex
+    assert "support the cache-mediated safety erasure claim" in passed_latex
+    assert "human-audit gate has not cleared" in failed_latex
+    assert "publication-ready positive safety claims" in failed_latex
 
 
 def test_claim_interpretation_blocks_causal_claim_for_selective_only_result() -> None:
