@@ -109,9 +109,14 @@ def post_h200_next_steps(status: dict[str, Any]) -> dict[str, Any]:
     causal_raw_complete = bool(gates.get("causal_results_complete")) or _raw_result_available(
         status.get("causal_results")
     )
-    fetched_evidence_prepared = bool(gates.get("primary_results_complete")) and bool(
-        gates.get("causal_results_complete")
+    primary_evidence_prepared = bool(gates.get("primary_results_complete")) or _prepared_result_available(
+        status.get("primary_results")
     )
+    causal_evidence_prepared = bool(gates.get("causal_results_complete")) or _prepared_result_available(
+        status.get("causal_results")
+    )
+    fetched_evidence_prepared = primary_evidence_prepared and causal_evidence_prepared
+    ci_width_blocked = fetched_evidence_prepared and _has_ci_width_blockers(status)
     steps = [
         _step(
             "complete_h200_results",
@@ -133,10 +138,21 @@ def post_h200_next_steps(status: dict[str, Any]) -> dict[str, Any]:
             detail="Fetch raw H200 evidence, then reaggregate metrics, regenerate figures and paper tables, run readiness checks, and export audit templates from the current clean local checkout.",
         ),
         _step(
+            "resolve_ci_width",
+            complete=not ci_width_blocked,
+            ready=fetched_evidence_prepared and ci_width_blocked,
+            command="bash scripts/run_h200_ci_extension.sh",
+            detail=(
+                "Run the registered CI extension before publication if completed result artifacts "
+                "are otherwise valid but confidence intervals exceed the configured width gate. "
+                "Do not change thresholds or claim wording to bypass this gate."
+            ),
+        ),
+        _step(
             "complete_human_audits",
             complete=bool(gates.get("primary_human_audit_complete"))
             and bool(gates.get("causal_human_audit_complete")),
-            ready=fetched_evidence_prepared,
+            ready=fetched_evidence_prepared and not ci_width_blocked,
             command="bash scripts/aggregate_publication_human_audits.sh",
             detail=(
                 "Complete the leakage-capable blinded annotator CSVs, or run the documented "
@@ -188,13 +204,48 @@ def _raw_result_available(artifact: object) -> bool:
     if disqualifiers:
         return False
     readiness_failures = [str(item) for item in artifact.get("readiness_failures", [])]
-    return all(_raw_readiness_failure_is_derived(failure) for failure in readiness_failures)
+    return all(
+        _raw_readiness_failure_is_derived(failure) or _readiness_failure_is_ci_width(failure)
+        for failure in readiness_failures
+    )
+
+
+def _prepared_result_available(artifact: object) -> bool:
+    if not isinstance(artifact, dict):
+        return False
+    if artifact.get("missing") or artifact.get("disqualifiers"):
+        return False
+    readiness_failures = [str(item) for item in artifact.get("readiness_failures", [])]
+    return all(_readiness_failure_is_ci_width(failure) for failure in readiness_failures)
 
 
 def _raw_readiness_failure_is_derived(failure: str) -> bool:
     if failure in _DERIVED_READINESS_EXACT_FAILURES:
         return True
     return failure.startswith(_DERIVED_READINESS_PREFIXES)
+
+
+def _has_ci_width_blockers(status: dict[str, Any]) -> bool:
+    for artifact_name in ["primary_results", "causal_results"]:
+        artifact = status.get(artifact_name)
+        if not isinstance(artifact, dict):
+            continue
+        if any(
+            _readiness_failure_is_ci_width(str(failure))
+            for failure in artifact.get("readiness_failures", [])
+        ):
+            return True
+    return False
+
+
+def _readiness_failure_is_ci_width(failure: str) -> bool:
+    normalized = failure.lower()
+    return (
+        "ci_width" in normalized
+        or ("ci width" in normalized and "target" in normalized)
+        or (" ci` width " in normalized and "target" in normalized)
+        or ("_ci` width " in normalized and "target" in normalized)
+    )
 
 
 def _blocker_details(status: dict[str, Any]) -> dict[str, list[str]]:
