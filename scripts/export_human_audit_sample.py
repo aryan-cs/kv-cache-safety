@@ -4,6 +4,7 @@ import argparse
 import csv
 import hashlib
 import random
+from collections import OrderedDict
 from pathlib import Path
 from typing import Any
 
@@ -41,15 +42,44 @@ def main() -> None:
 
 def _stratified_sample(rows: list[dict[str, Any]], per_suite_policy: int, seed: int) -> list[dict[str, Any]]:
     rng = random.Random(seed)
-    groups: dict[tuple[str, str], list[dict[str, Any]]] = {}
+    groups: dict[tuple[str, str, str, int], dict[str, Any]] = {}
     for row in rows:
-        groups.setdefault((str(row.get("suite")), str(row.get("policy"))), []).append(row)
-    sample: list[dict[str, Any]] = []
-    for key in sorted(groups):
-        candidates = list(groups[key])
-        rng.shuffle(candidates)
-        sample.extend(candidates[:per_suite_policy])
-    return sample
+        groups[
+            (
+                str(row.get("suite")),
+                str(row.get("policy")),
+                str(row.get("prompt_id")),
+                int(row.get("seed") or 0),
+            )
+        ] = row
+
+    sampled: OrderedDict[tuple[str, str, str, int], dict[str, Any]] = OrderedDict()
+    suites = sorted({suite for suite, _, _, _ in groups})
+    for suite in suites:
+        baseline = {
+            (prompt_id, seed_value): row
+            for (row_suite, policy, prompt_id, seed_value), row in groups.items()
+            if row_suite == suite and policy == "none"
+        }
+        treatment_policies = sorted(
+            {
+                policy
+                for row_suite, policy, _, _ in groups
+                if row_suite == suite and policy != "none"
+            }
+        )
+        for policy in treatment_policies:
+            treatment = {
+                (prompt_id, seed_value): row
+                for (row_suite, row_policy, prompt_id, seed_value), row in groups.items()
+                if row_suite == suite and row_policy == policy
+            }
+            paired_keys = sorted(set(baseline).intersection(treatment))
+            rng.shuffle(paired_keys)
+            for prompt_id, seed_value in paired_keys[:per_suite_policy]:
+                sampled[(suite, "none", prompt_id, seed_value)] = baseline[(prompt_id, seed_value)]
+                sampled[(suite, policy, prompt_id, seed_value)] = treatment[(prompt_id, seed_value)]
+    return list(sampled.values())
 
 
 def _audit_pair(row: dict[str, Any], run_id: str, idx: int) -> tuple[dict[str, Any], dict[str, Any]]:

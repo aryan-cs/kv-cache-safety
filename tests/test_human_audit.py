@@ -3,7 +3,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path("scripts").resolve()))
 
-from export_human_audit_sample import _audit_pair
+from export_human_audit_sample import _audit_pair, _stratified_sample
 
 
 def test_blinded_audit_row_hides_policy_and_model_identifiers() -> None:
@@ -29,3 +29,42 @@ def test_blinded_audit_row_hides_policy_and_model_identifiers() -> None:
     assert blinded["audit_id"] == key["audit_id"]
     assert key["model_id"] == "Qwen/Qwen2.5-7B-Instruct"
     assert key["policy"] == "kv_int4_sim"
+
+
+def test_stratified_audit_sample_includes_matched_baseline_rows() -> None:
+    rows = []
+    for prompt_id in ["p1", "p2", "p3"]:
+        rows.append(
+            {
+                "suite": "public_refusal_safety",
+                "policy": "none",
+                "prompt_id": prompt_id,
+                "seed": 0,
+            }
+        )
+        rows.append(
+            {
+                "suite": "public_refusal_safety",
+                "policy": "kv_int4_sim",
+                "prompt_id": prompt_id,
+                "seed": 0,
+            }
+        )
+    rows.append(
+        {
+            "suite": "public_refusal_safety",
+            "policy": "sliding_window__budget64",
+            "prompt_id": "p1",
+            "seed": 0,
+        }
+    )
+
+    sample = _stratified_sample(rows, per_suite_policy=1, seed=0)
+    sampled_keys = {
+        (row["suite"], row["policy"], row["prompt_id"], row["seed"]) for row in sample
+    }
+
+    treatment_keys = [key for key in sampled_keys if key[1] != "none"]
+    assert treatment_keys
+    for suite, _policy, prompt_id, seed in treatment_keys:
+        assert (suite, "none", prompt_id, seed) in sampled_keys
