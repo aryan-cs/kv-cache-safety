@@ -169,7 +169,7 @@ After the primary and causal H200 runs complete, rebuild all paper artifacts fro
 bash scripts/build_publication_artifacts.sh
 ```
 
-This command regenerates aggregate metrics, figures, paper tables, CI planning files, readiness checks, the readable PDF, and the arXiv source bundle. It fails if the required real result artifacts are missing.
+This command regenerates aggregate metrics, figures, paper tables, CI planning files, readiness checks, the readable PDF, and the arXiv source bundle. It fails if the required real result artifacts or completed human-audit summaries are missing. For a non-publication draft rebuild before audit labels are complete, set `REQUIRE_HUMAN_AUDIT=0`.
 
 Export paper tables:
 

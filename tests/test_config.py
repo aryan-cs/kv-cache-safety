@@ -83,6 +83,8 @@ def test_publication_artifact_builder_fails_without_real_results() -> None:
 
     assert "require_result_artifacts" in script
     assert "Missing required result artifact" in script
+    assert "require_human_audit_artifacts" in script
+    assert "Missing required human-audit artifact" in script
     assert "paper/cache_mediated_safety_erasure.pdf" in script
     assert "scripts/package_arxiv_submission.py" in script
 

@@ -4,7 +4,13 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path("scripts").resolve()))
 
-from aggregate_human_audit import aggregate_human_audit, parse_bool, render_summary_markdown
+from aggregate_human_audit import (
+    aggregate_human_audit,
+    parse_bool,
+    render_deltas_latex,
+    render_summary_latex,
+    render_summary_markdown,
+)
 
 from cache_safety_erasure.utils.io import write_jsonl
 
@@ -129,3 +135,5 @@ def test_aggregate_human_audit_joins_key_and_computes_agreement(tmp_path: Path) 
         "n": 3,
     }
     assert "human_refusal_correct" in render_summary_markdown(metrics)
+    assert r"\label{tab:human-audit-summary}" in render_summary_latex(metrics)
+    assert r"\label{tab:human-audit-deltas}" in render_deltas_latex(metrics)

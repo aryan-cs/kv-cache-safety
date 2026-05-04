@@ -53,6 +53,14 @@ def main() -> None:
         render_summary_markdown(result["metrics"]),
         encoding="utf-8",
     )
+    (args.output_dir / "human_audit_summary_table.tex").write_text(
+        render_summary_latex(result["metrics"]),
+        encoding="utf-8",
+    )
+    (args.output_dir / "human_audit_deltas_table.tex").write_text(
+        render_deltas_latex(result["metrics"]),
+        encoding="utf-8",
+    )
     print(f"Wrote human-audit aggregation to {args.output_dir}")
 
 
@@ -420,6 +428,76 @@ def render_summary_markdown(metrics: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def render_summary_latex(metrics: dict[str, Any]) -> str:
+    lines = [
+        r"\begin{table}[t]",
+        r"\centering",
+        r"\begin{tabular}{lccc}",
+        r"\toprule",
+        r"Label & Mean & 95\% CI & $n$ \\",
+        r"\midrule",
+    ]
+    for field, values in metrics["label_rates"].items():
+        lines.append(
+            " & ".join(
+                [
+                    _latex_escape(field),
+                    _format_float(values["mean"]),
+                    _latex_escape(_format_ci(values["ci_low"], values["ci_high"])),
+                    str(values["n"]),
+                ]
+            )
+            + r" \\"
+        )
+    lines.extend(
+        [
+            r"\bottomrule",
+            r"\end{tabular}",
+            r"\caption{Human-audit label rates with Wilson confidence intervals.}",
+            r"\label{tab:human-audit-summary}",
+            r"\end{table}",
+            "",
+        ]
+    )
+    return "\n".join(lines)
+
+
+def render_deltas_latex(metrics: dict[str, Any]) -> str:
+    deltas = metrics.get("baseline_policy_deltas", {})
+    lines = [
+        r"\begin{table}[t]",
+        r"\centering",
+        r"\begin{tabular}{lcc}",
+        r"\toprule",
+        r"Comparison & Treatment $-$ baseline & $n$ \\",
+        r"\midrule",
+    ]
+    if not deltas:
+        lines.append(r"No paired human-audit deltas available &  & 0 \\")
+    for key, values in sorted(deltas.items()):
+        lines.append(
+            " & ".join(
+                [
+                    _latex_escape(key),
+                    _format_float(values.get("treatment_minus_baseline")),
+                    str(values.get("n", 0)),
+                ]
+            )
+            + r" \\"
+        )
+    lines.extend(
+        [
+            r"\bottomrule",
+            r"\end{tabular}",
+            r"\caption{Paired human-audit treatment-minus-baseline deltas by suite, policy, and label.}",
+            r"\label{tab:human-audit-deltas}",
+            r"\end{table}",
+            "",
+        ]
+    )
+    return "\n".join(lines)
+
+
 def _format_float(value: float | int | None) -> str:
     if value is None:
         return ""
@@ -430,6 +508,21 @@ def _format_ci(low: float | int | None, high: float | int | None) -> str:
     if low is None or high is None:
         return ""
     return f"[{_format_float(low)}, {_format_float(high)}]"
+
+
+def _latex_escape(value: str) -> str:
+    return (
+        value.replace("\\", r"\textbackslash{}")
+        .replace("&", r"\&")
+        .replace("%", r"\%")
+        .replace("$", r"\$")
+        .replace("#", r"\#")
+        .replace("_", r"\_")
+        .replace("{", r"\{")
+        .replace("}", r"\}")
+        .replace("~", r"\textasciitilde{}")
+        .replace("^", r"\textasciicircum{}")
+    )
 
 
 def _write_csv(path: Path, rows: list[dict[str, Any]]) -> None:

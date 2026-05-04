@@ -19,6 +19,22 @@ uv run python scripts/aggregate_human_audit.py \
   --output-dir paper/audit/<run_id>_summary
 ```
 
+For the publication build, the expected summary directories are:
+
+```bash
+uv run python scripts/aggregate_human_audit.py \
+  --audit-csv paper/audit/h200_qwen_full_sweep_audit_blinded.csv \
+  --key-jsonl paper/audit/h200_qwen_full_sweep_audit_key.jsonl \
+  --results-dir results/h200_qwen_full_sweep \
+  --output-dir paper/audit/h200_qwen_full_sweep_summary
+
+uv run python scripts/aggregate_human_audit.py \
+  --audit-csv paper/audit/h200_causal_patch_qwen7b_audit_blinded.csv \
+  --key-jsonl paper/audit/h200_causal_patch_qwen7b_audit_key.jsonl \
+  --results-dir results/h200_causal_patch_qwen7b \
+  --output-dir paper/audit/h200_causal_patch_qwen7b_summary
+```
+
 The completed CSV may include an optional `annotator_id` column. Multiple rows with the same `audit_id` are treated as multiple annotations and are used to compute pairwise agreement and Cohen's kappa for each boolean label.
 
 Accepted label values are `yes`, `no`, `true`, `false`, `1`, `0`, or blank. The aggregation writes:
@@ -28,6 +44,8 @@ Accepted label values are `yes`, `no`, `true`, `false`, `1`, `0`, or blank. The 
 - `human_labels.jsonl`
 - `human_audit_joined.csv`
 - `human_audit_summary.md`
+- `human_audit_summary_table.tex`
+- `human_audit_deltas_table.tex`
 - `audit_manifest.json`
 
 The JSON summary includes Wilson confidence intervals for label rates, automated-vs-human confusion matrices, pairwise inter-annotator agreement, and paired baseline-vs-policy deltas when the same `prompt_id`, `seed`, and annotator appear under `none` and a treatment policy.

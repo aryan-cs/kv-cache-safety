@@ -16,6 +16,7 @@ def test_latex_manuscript_is_formal_registered_protocol() -> None:
     assert "reports no empirical claims" in tex
     assert "Empirical result not yet reported" in tex
     assert r"\maybeinputtable{../generated/h200_qwen_full_sweep/main_results_table.tex}" in tex
+    assert r"\maybeinputtable{../audit/h200_qwen_full_sweep_summary/human_audit_summary_table.tex}" in tex
     assert r"\PrimaryTopSSEIPolicy" in tex
     assert r"\bibliography{../references}" in tex
     assert "neurips" not in tex.lower()
@@ -24,6 +25,8 @@ def test_latex_manuscript_is_formal_registered_protocol() -> None:
     assert "MacBook" not in tex
     assert "dirty-tree" not in tex
     assert "mock-model" not in tex
+    assert "Replace this box" not in tex
+    assert "Failure Examples" not in tex
 
 
 def test_latex_references_cover_primary_model_and_cache_work() -> None:
@@ -54,5 +57,8 @@ def test_arxiv_rewrite_uses_local_bibliography_and_figures() -> None:
     assert "figures/safety_capability_phase_portrait.pdf" in rewritten
     assert "generated/h200_qwen_full_sweep" in _rewrite_main_tex_for_arxiv(
         "../generated/h200_qwen_full_sweep/main_results_table.tex"
+    )
+    assert "audit/h200_qwen_full_sweep_summary" in _rewrite_main_tex_for_arxiv(
+        "../audit/h200_qwen_full_sweep_summary/human_audit_summary_table.tex"
     )
     assert "../../results" not in rewritten

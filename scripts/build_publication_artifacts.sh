@@ -6,15 +6,34 @@ cd "$(dirname "$0")/.."
 primary_results="${PRIMARY_RESULTS_DIR:-results/h200_qwen_full_sweep}"
 causal_results="${CAUSAL_RESULTS_DIR:-results/h200_causal_patch_qwen7b}"
 qwen32_results="${QWEN32_RESULTS_DIR:-results/h200_qwen32b_public_followup_primary}"
+primary_audit_summary="${PRIMARY_AUDIT_SUMMARY_DIR:-paper/audit/h200_qwen_full_sweep_summary}"
+causal_audit_summary="${CAUSAL_AUDIT_SUMMARY_DIR:-paper/audit/h200_causal_patch_qwen7b_summary}"
 target_ci_width="${TARGET_CI_WIDTH:-0.08}"
 causal_ci_width="${CAUSAL_CI_WIDTH:-0.12}"
 qwen32_ci_width="${QWEN32_CI_WIDTH:-0.10}"
+require_human_audit="${REQUIRE_HUMAN_AUDIT:-1}"
 
 require_result_artifacts() {
   local results_dir="$1"
   for required in manifest.json generations.jsonl metrics.json cache_stats.parquet; do
     if [[ ! -f "$results_dir/$required" ]]; then
       echo "Missing required result artifact: $results_dir/$required" >&2
+      exit 1
+    fi
+  done
+}
+
+require_human_audit_artifacts() {
+  local audit_dir="$1"
+  for required in \
+    audit_manifest.json \
+    human_audit_summary.json \
+    human_audit_summary.md \
+    human_audit_summary_table.tex \
+    human_audit_deltas_table.tex; do
+    if [[ ! -f "$audit_dir/$required" ]]; then
+      echo "Missing required human-audit artifact: $audit_dir/$required" >&2
+      echo "Aggregate completed annotations with scripts/aggregate_human_audit.py before publication." >&2
       exit 1
     fi
   done
@@ -114,6 +133,11 @@ rebuild_qwen32_if_present() {
     --require-policy-pinned \
     --require-public-provenance
 }
+
+if [[ "$require_human_audit" == "1" ]]; then
+  require_human_audit_artifacts "$primary_audit_summary"
+  require_human_audit_artifacts "$causal_audit_summary"
+fi
 
 uv sync --frozen --extra dev
 uv run ruff check .

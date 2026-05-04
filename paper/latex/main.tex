@@ -265,8 +265,6 @@ For audited prompts, the analysis embeds each prompt-condition pair using open e
   \label{fig:causal}
 \end{figure}
 
-\todoresult{Replace this box with figures and tables generated from completed analysis artifacts before making empirical claims.}
-
 \section{Results}
 
 \subsection{Behavioral Cache Sensitivity}
@@ -278,14 +276,16 @@ Top policy-level $\ssei$: \PrimaryTopSSEIPolicy{} with estimate \PrimaryTopSSEI{
 \maybeinputtable{../generated/h200_qwen_full_sweep/main_results_table.tex}{Report $\ssei$ by model, suite, policy, and budget after a completed registered analysis run.}
 
 \subsection{Token-Role Cache Accounting}
-\todoresult{Report whether system or policy spans are evicted or perturbed disproportionately, and whether role retention predicts changes in refusal or leakage.}
+The cache-state fingerprint in Figure~\ref{fig:role-retention} reports token-role retention under each cache policy. The mechanistic claim requires role-specific cache disruption to align with behavioral degradation: policy-relevant spans should be disproportionately evicted or perturbed in conditions with positive $\ssei$, and protected or restored spans should move the model back toward baseline behavior.
 
 \subsection{Causal Restoration and Mitigation}
 Causal diagnostic run: \CausalRunId. The central claim requires system-role restoration or pinning to outperform matched non-policy controls.
 \maybeinputtable{../generated/h200_causal_patch_qwen7b/causal_restoration_table.tex}{Report system-role patching, matched user-role patching, and policy-pinned mitigation after the causal patch analysis is complete.}
 
-\subsection{Failure Examples}
-\todoresult{Include a small table of blinded, human-audited examples. Do not include procedural harmful details; summarize unsafe-compliance categories at a high level.}
+\subsection{Human Audit and Failure Modes}
+\maybeinputtable{../audit/h200_qwen_full_sweep_summary/human_audit_summary_table.tex}{Report blinded human-audit label rates before making safety claims.}
+\maybeinputtable{../audit/h200_qwen_full_sweep_summary/human_audit_deltas_table.tex}{Report paired baseline-versus-treatment human-audit deltas for unsafe compliance, refusal correctness, leakage, and benign over-refusal.}
+Qualitative examples should be summarized at the category level rather than reproduced verbatim when they contain procedural harmful details.
 
 \section{Discussion}
 
