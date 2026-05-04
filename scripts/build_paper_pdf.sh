@@ -11,6 +11,18 @@ primary_paper_dir="${PRIMARY_PAPER_DIR:-paper/generated/h200_qwen_full_sweep}"
 causal_paper_dir="${CAUSAL_PAPER_DIR:-paper/generated/h200_causal_patch_qwen7b}"
 mkdir -p "$build_dir"
 
+require_valid_pdf() {
+  local pdf="$1"
+  if [[ ! -s "$pdf" ]]; then
+    echo "LaTeX build did not produce a nonempty PDF: $pdf" >&2
+    exit 1
+  fi
+  if [[ "$(head -c 5 "$pdf")" != "%PDF-" ]]; then
+    echo "LaTeX build produced an invalid PDF: $pdf" >&2
+    exit 1
+  fi
+}
+
 if [[ "${REQUIRE_COMPLETE_PAPER:-0}" == "1" ]]; then
   uv run python scripts/check_latex_placeholders.py --tex "$src_dir/main.tex"
   uv run python scripts/check_paper_asset_freshness.py \
@@ -22,13 +34,18 @@ if [[ "${REQUIRE_COMPLETE_PAPER:-0}" == "1" ]]; then
     --fail-if-not-ready
 fi
 
+rm -f "$build_dir/main.pdf" "$build_dir/cache_mediated_safety_erasure.pdf"
+
 if command -v tectonic >/dev/null 2>&1; then
   (
     cd "$src_dir"
     tectonic --outdir ../build main.tex
   )
 elif command -v latexmk >/dev/null 2>&1; then
-  latexmk -pdf -interaction=nonstopmode -halt-on-error -output-directory="$build_dir" "$src_dir/main.tex"
+  (
+    cd "$src_dir"
+    latexmk -pdf -interaction=nonstopmode -halt-on-error -output-directory=../build main.tex
+  )
 elif command -v pdflatex >/dev/null 2>&1 && command -v bibtex >/dev/null 2>&1; then
   (
     cd "$src_dir"
@@ -42,18 +59,18 @@ else
   exit 1
 fi
 
-if [[ -f "$build_dir/main.pdf" ]]; then
-  mv "$build_dir/main.pdf" "$build_dir/cache_mediated_safety_erasure.pdf"
-fi
-
-cp "$build_dir/cache_mediated_safety_erasure.pdf" paper/cache_mediated_safety_erasure.pdf
+require_valid_pdf "$build_dir/main.pdf"
+mv "$build_dir/main.pdf" "$build_dir/cache_mediated_safety_erasure.pdf"
+require_valid_pdf "$build_dir/cache_mediated_safety_erasure.pdf"
 
 if [[ "${REQUIRE_COMPLETE_PAPER:-0}" == "1" ]]; then
-  test -s "$build_dir/cache_mediated_safety_erasure.pdf"
   uv run python scripts/report_publication_status.py \
     --paper-pdf "$build_dir/cache_mediated_safety_erasure.pdf" \
     --fail-if-not-ready
 fi
+
+cp "$build_dir/cache_mediated_safety_erasure.pdf" paper/cache_mediated_safety_erasure.pdf
+require_valid_pdf paper/cache_mediated_safety_erasure.pdf
 
 echo "Wrote $build_dir/cache_mediated_safety_erasure.pdf"
 echo "Wrote paper/cache_mediated_safety_erasure.pdf"

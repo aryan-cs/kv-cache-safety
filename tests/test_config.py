@@ -219,8 +219,18 @@ def test_complete_paper_build_checks_publication_status_before_latex() -> None:
     assert "--fail-if-not-ready" in script
     copy_cmd = 'cp "$build_dir/cache_mediated_safety_erasure.pdf" paper/cache_mediated_safety_erasure.pdf'
     assert copy_cmd in script
-    assert script.index(copy_cmd) < script.rindex("scripts/report_publication_status.py")
-    assert 'test -s "$build_dir/cache_mediated_safety_erasure.pdf"' in script
+    assert 'rm -f "$build_dir/main.pdf" "$build_dir/cache_mediated_safety_erasure.pdf"' in script
+    assert script.index("scripts/check_latex_placeholders.py") < script.index(
+        'rm -f "$build_dir/main.pdf" "$build_dir/cache_mediated_safety_erasure.pdf"'
+    )
+    assert script.index(
+        'rm -f "$build_dir/main.pdf" "$build_dir/cache_mediated_safety_erasure.pdf"'
+    ) < script.index("command -v tectonic")
+    assert "require_valid_pdf \"$build_dir/main.pdf\"" in script
+    assert "require_valid_pdf \"$build_dir/cache_mediated_safety_erasure.pdf\"" in script
+    assert script.rindex("scripts/report_publication_status.py") < script.index(copy_cmd)
+    assert "require_valid_pdf paper/cache_mediated_safety_erasure.pdf" in script
+    assert "cd \"$src_dir\"\n    latexmk" in script
 
 
 def test_h200_scripts_use_composite_public_refusal_suite() -> None:
