@@ -55,22 +55,29 @@ echo "Branch: ${branch}"
 echo "Sweep script: ${sweep_script}"
 echo "Log: ${log_file}"
 
-git fetch origin "$branch"
-git checkout "$branch"
-git pull --ff-only origin "$branch"
+sync_and_validate() {
+  local phase="$1"
+  echo "${phase}: syncing ${branch} and running static validation..."
+  git fetch origin "$branch"
+  git checkout "$branch"
+  git pull --ff-only origin "$branch"
 
-if [[ -n "$(git status --short)" ]]; then
-  echo "Refusing to run from a dirty H200 worktree." >&2
-  git status --short >&2
-  exit 1
-fi
+  if [[ -n "$(git status --short)" ]]; then
+    echo "Refusing to run from a dirty H200 worktree." >&2
+    git status --short >&2
+    exit 1
+  fi
 
-echo "Running static validation before waiting for GPU availability..."
-uv run ruff check .
-uv run pytest -q
-bash -n scripts/run_h200_sweep.sh scripts/run_h200_ci_extension.sh scripts/run_qwen32b_followup.sh
+  uv run ruff check .
+  uv run pytest -q
+  bash -n scripts/run_h200_sweep.sh scripts/run_h200_ci_extension.sh scripts/run_qwen32b_followup.sh
+}
+
+sync_and_validate "Pre-gate"
 
 bash scripts/wait_for_h200_gpu.sh
+
+sync_and_validate "Post-gate"
 
 echo "GPU gate passed at $(date -u +%Y-%m-%dT%H:%M:%SZ); starting ${sweep_script}."
 bash "$sweep_script"

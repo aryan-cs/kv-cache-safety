@@ -67,6 +67,16 @@ def test_h200_sweep_run_ids_match_paper_figure_paths() -> None:
     assert "../../results/h200_causal_patch_qwen7b/figures/" in tex
 
 
+def test_h200_launcher_revalidates_after_gpu_gate() -> None:
+    script = Path("scripts/wait_and_run_h200_sweep.sh").read_text(encoding="utf-8")
+
+    assert 'sync_and_validate "Pre-gate"' in script
+    assert 'sync_and_validate "Post-gate"' in script
+    assert script.index('sync_and_validate "Post-gate"') > script.index(
+        "bash scripts/wait_for_h200_gpu.sh"
+    )
+
+
 def test_h200_readiness_uses_paper_grade_prompt_thresholds() -> None:
     primary = Path("scripts/run_h200_sweep.sh").read_text(encoding="utf-8")
     extension = Path("scripts/run_h200_ci_extension.sh").read_text(encoding="utf-8")
