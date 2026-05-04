@@ -51,6 +51,7 @@ def admin_report(status: dict[str, Any]) -> str:
         f"- Experiment running: `{_bool(status.get('experiment_running'))}`",
         f"- Launcher waiting: `{_bool(status.get('launcher_waiting'))}`",
         f"- GPU gate blocked: `{_bool(status.get('gpu_gate_likely_blocked'))}`",
+        f"- GPU gate block reasons: `{_reasons(status.get('gpu_gate_block_reasons'))}`",
         f"- Hidden GPU context likely: `{_bool(status.get('hidden_gpu_context_likely'))}`",
         "",
         "## GPU Snapshot",
@@ -176,6 +177,12 @@ def _count(value: Any) -> int:
     if isinstance(value, list):
         return len(value)
     return 0
+
+
+def _reasons(value: Any) -> str:
+    if isinstance(value, list) and value:
+        return ", ".join(str(item) for item in value)
+    return "none"
 
 
 if __name__ == "__main__":

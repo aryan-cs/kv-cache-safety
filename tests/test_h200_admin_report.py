@@ -17,6 +17,7 @@ def test_admin_report_summarizes_hidden_gpu_context_without_results() -> None:
             "experiment_running": False,
             "launcher_waiting": True,
             "gpu_gate_likely_blocked": True,
+            "gpu_gate_block_reasons": ["utilization"],
             "hidden_gpu_context_likely": True,
             "gpu": {
                 "available": True,
@@ -74,6 +75,7 @@ def test_admin_report_summarizes_hidden_gpu_context_without_results() -> None:
 
     assert "infrastructure diagnostics only" in report
     assert "Hidden GPU context likely: `true`" in report
+    assert "GPU gate block reasons: `utilization`" in report
     assert "Visible compute apps: `0`" in report
     assert "Processes                             : None" in report
     assert "Wait History" in report
