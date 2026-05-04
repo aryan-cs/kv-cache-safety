@@ -205,6 +205,23 @@ def test_publication_audit_export_regenerates_leakage_capable_templates() -> Non
     assert '--annotator-template-count "$audit_annotator_template_count"' in script
 
 
+def test_publication_human_audit_aggregation_has_fail_closed_wrapper() -> None:
+    script = Path("scripts/aggregate_publication_human_audits.sh").read_text(encoding="utf-8")
+    readme = Path("README.md").read_text(encoding="utf-8")
+    audit_readme = Path("paper/audit/README.md").read_text(encoding="utf-8")
+
+    assert "PRIMARY_RUN_ID:-h200_qwen_full_sweep" in script
+    assert "CAUSAL_RUN_ID:-h200_causal_patch_qwen7b" in script
+    assert "Missing completed annotator CSVs" in script
+    assert "scripts/aggregate_human_audit.py" in script
+    assert "--require-result-source-match" in script
+    assert "--require-baseline-deltas" in script
+    assert "scripts/check_human_audit_readiness.py" in script
+    assert "scripts/post_h200_next_steps.py" in script
+    assert "bash scripts/aggregate_publication_human_audits.sh" in readme
+    assert "bash scripts/aggregate_publication_human_audits.sh" in audit_readme
+
+
 def test_prepare_after_h200_fetch_regenerates_assets_before_audits() -> None:
     script = Path("scripts/prepare_after_h200_fetch.sh").read_text(encoding="utf-8")
     readme = Path("README.md").read_text(encoding="utf-8")

@@ -36,8 +36,14 @@ bash scripts/export_publication_audit_samples.sh
 ```
 
 This regenerates leakage-capable publication audit templates from the fetched
-primary and causal completed-run artifacts before annotation. Then aggregate the
-completed annotator files:
+primary and causal completed-run artifacts before annotation. Then aggregate and
+validate both completed annotator file sets:
+
+```bash
+bash scripts/aggregate_publication_human_audits.sh
+```
+
+For one-off debugging, the equivalent per-run commands are:
 
 ```bash
 uv run python scripts/aggregate_human_audit.py \
