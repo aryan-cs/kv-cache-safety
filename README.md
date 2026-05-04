@@ -92,7 +92,7 @@ Resume or pin a run id without editing YAML:
 
 ```bash
 uv run python scripts/run_experiment.py \
-  --config configs/experiments/h200_public_qwen14b.yaml \
+  --config configs/experiments/h200_qwen_full_sweep.yaml \
   --run-id h200_qwen_full_sweep \
   --resume
 ```
@@ -122,6 +122,7 @@ uv run python scripts/report_h200_status.py \
 uv run python scripts/write_h200_admin_report.py \
   --status-json logs/h200/h200_status_latest.json \
   --output-md logs/h200/h200_admin_report.md
+uv run python scripts/package_h200_support_bundle.py
 ```
 
 If the status report says `Hidden GPU context likely: true`, `nvidia-smi` is showing high memory or utilization without a visible compute process inside the notebook namespace. Treat that as an infrastructure/allocation blocker, not an experiment result. Do not kill the waiting launcher, and do not run `nvidia-smi --gpu-reset` on shared infrastructure unless an administrator explicitly authorizes it. First preserve the status report, then release or restart the H200 notebook allocation from the Illinois Computes/Jupyter UI if this is your session. After reconnecting, return to `/home/aryang9/sandbox/llm-safety` and rerun `uv run python scripts/report_h200_status.py`; the existing launcher should continue waiting or start automatically once the GPU gate clears. If the launcher process is gone, restart it with the `setsid -f bash scripts/wait_and_run_h200_sweep.sh ...` command above from a clean `master` checkout.
@@ -130,6 +131,7 @@ From the local checkout, copy the latest H200 status and admin-support report in
 
 ```bash
 bash scripts/fetch_h200_reports.sh
+uv run python scripts/package_h200_support_bundle.py
 ```
 
 Run the prompt-count extension for narrower confidence intervals after the primary pilot identifies viable effects:
@@ -152,7 +154,7 @@ Preflight the H200 configs without launching a sweep:
 
 ```bash
 uv run python scripts/preflight_h200.py \
-  --config configs/experiments/h200_public_qwen14b.yaml \
+  --config configs/experiments/h200_qwen_full_sweep.yaml \
   --config configs/experiments/h200_qwen14b_ci_extension.yaml \
   --config configs/experiments/h200_causal_patch_qwen7b.yaml \
   --config configs/experiments/h200_attention_diagnostic_qwen7b.yaml

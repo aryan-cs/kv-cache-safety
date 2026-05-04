@@ -128,6 +128,8 @@ def test_h200_report_fetcher_copies_expected_reports() -> None:
     assert "h200_status_latest.json" in script
     assert "scp -q" in script
     assert "bash scripts/fetch_h200_reports.sh" in readme
+    assert "scripts/package_h200_support_bundle.py" in readme
+    assert "configs/experiments/h200_qwen_full_sweep.yaml" in readme
 
 
 def test_h200_readiness_uses_paper_grade_prompt_thresholds() -> None:
