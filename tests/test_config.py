@@ -130,6 +130,10 @@ def test_publication_artifact_builder_fails_without_real_results() -> None:
     assert "--require-cache-mediated-claim" in script
     assert "--require-human-audit-support" in script
     assert "--fail-if-not-ready" in script
+    assert "rm -f paper/cache_mediated_safety_erasure.pdf" in script
+    assert script.index("write_publication_status --fail-if-not-ready") < script.index(
+        "uv run python scripts/package_arxiv_submission.py"
+    )
     assert "REQUIRE_HUMAN_AUDIT" not in script
     assert "REQUIRE_CACHE_MEDIATED_CLAIM" not in script
     assert "--required-figure prompt_effect_constellation" in script
