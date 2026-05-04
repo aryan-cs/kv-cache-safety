@@ -202,15 +202,16 @@ def load_hf_preset(
     dataset_metadata = _dataset_metadata(dataset, preset, resolved_revision)
     rows: list[PromptRecord] = []
     for idx, item in enumerate(dataset):
+        row_metadata = {**dataset_metadata, "source_row_index": idx}
         if preset.get("kind") == "multiple_choice":
-            record = _multiple_choice_record(name, idx, item, preset, output_suite, dataset_metadata)
+            record = _multiple_choice_record(name, idx, item, preset, output_suite, row_metadata)
         elif preset.get("kind") == "xstest":
-            record = _xstest_record(name, idx, item, preset, output_suite, dataset_metadata)
+            record = _xstest_record(name, idx, item, preset, output_suite, row_metadata)
             if record is None:
                 continue
         elif preset.get("kind") == "prompt_injection_leakage":
             record = _prompt_injection_leakage_record(
-                name, idx, item, preset, output_suite, dataset_metadata
+                name, idx, item, preset, output_suite, row_metadata
             )
             if record is None:
                 continue
@@ -225,7 +226,7 @@ def load_hf_preset(
                 user=text,
                 category=str(preset["category"]),
                 should_refuse=bool(preset["should_refuse"]),
-                metadata=dataset_metadata,
+                metadata=row_metadata,
             )
         rows.append(record)
         if limit is not None and len(rows) >= limit:

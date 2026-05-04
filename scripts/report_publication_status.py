@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import tarfile
 from pathlib import Path
 from typing import Any
@@ -21,6 +22,7 @@ from assess_claims import (
     render_interpretation_latex,
     render_latex_table,
 )
+from check_final_pdf_text import extract_pdf_text, placeholder_text_failures
 from check_human_audit_readiness import (
     DEFAULT_REQUIRED_LABELS,
     check_audit_input_source_match,
@@ -662,6 +664,7 @@ def _prompt_suite_provenance_failures(results_dir: Path, manifest: dict[str, Any
     if not prompts_path.exists():
         return failures
     public_without_provenance = 0
+    public_without_precise_provenance = 0
     with prompts_path.open("r", encoding="utf-8") as f:
         for line_number, line in enumerate(f, start=1):
             if not line.strip():
@@ -675,9 +678,45 @@ def _prompt_suite_provenance_failures(results_dir: Path, manifest: dict[str, Any
                 metadata = row.get("metadata") or {}
                 if not metadata.get("source_dataset") or not metadata.get("source_split"):
                     public_without_provenance += 1
+                if _public_prompt_precise_provenance_failure(row, metadata):
+                    public_without_precise_provenance += 1
     if public_without_provenance:
         failures.append(f"public_prompts_lack_dataset_provenance:{public_without_provenance}")
+    if public_without_precise_provenance:
+        failures.append(
+            "public_prompts_lack_precise_dataset_provenance:"
+            f"{public_without_precise_provenance}"
+        )
     return failures
+
+
+def _public_prompt_precise_provenance_failure(row: dict[str, Any], metadata: dict[str, Any]) -> bool:
+    required_value_fields = [
+        "source_dataset",
+        "source_split",
+        "source_revision",
+        "source_fingerprint",
+        "source_version",
+    ]
+    if any(not metadata.get(field) for field in required_value_fields):
+        return True
+    required_present_fields = [
+        "source_config",
+        "source_config_name",
+        "source_homepage",
+        "source_license",
+    ]
+    if any(field not in metadata for field in required_present_fields):
+        return True
+    source_locator_fields = [
+        "source_id",
+        "source_row_index",
+        "source_group_id",
+        "xstest_task_id",
+    ]
+    if any(metadata.get(field) not in {None, ""} for field in source_locator_fields):
+        return False
+    return not re.search(r"_\d{6}$", str(row.get("prompt_id") or ""))
 
 
 def _figure_source_failures(results_dir: Path) -> list[str]:
@@ -787,6 +826,9 @@ def _claim_status(
 
 def _pdf_status(path: Path) -> dict[str, Any]:
     failure = _pdf_failure(path)
+    text_failure = "" if failure else _pdf_text_failure(path)
+    if text_failure:
+        failure = text_failure
     return {
         "path": str(path),
         "exists": path.exists(),
@@ -810,6 +852,17 @@ def _pdf_failure(path: Path) -> str:
         return "PDF too small"
     if b"%%EOF" not in content[-2048:]:
         return "missing PDF EOF marker"
+    return ""
+
+
+def _pdf_text_failure(path: Path) -> str:
+    try:
+        text, extractor = extract_pdf_text(path)
+    except Exception as exc:
+        return f"PDF text extraction failed: {exc}"
+    failures = placeholder_text_failures(text)
+    if failures:
+        return f"{extractor}: " + "; ".join(failures)
     return ""
 
 

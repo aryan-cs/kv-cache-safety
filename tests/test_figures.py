@@ -310,12 +310,17 @@ def test_figure_manifest_rejects_malformed_visual_artifacts(tmp_path: Path) -> N
 
 
 def test_figure_artifact_signature_validator_accepts_real_headers(tmp_path: Path) -> None:
+    import matplotlib.pyplot as plt
+
     png = tmp_path / "figure.png"
     pdf = tmp_path / "figure.pdf"
     svg = tmp_path / "figure.svg"
     csv = tmp_path / "figure.csv"
-    png.write_bytes(b"\x89PNG\r\n\x1a\npayload")
-    pdf.write_bytes(b"%PDF-1.7\n1 0 obj\n<<>>\nendobj\ntrailer\n<<>>\n%%EOF\n")
+    fig, ax = plt.subplots(figsize=(2, 2))
+    ax.plot([0, 1], [0, 1])
+    fig.savefig(png)
+    plt.close(fig)
+    pdf.write_bytes(_test_pdf_bytes())
     svg.write_text('<?xml version="1.0"?><svg xmlns="http://www.w3.org/2000/svg"/>', encoding="utf-8")
     csv.write_text("column\nvalue\n", encoding="utf-8")
 
@@ -369,3 +374,88 @@ def test_figure_manifest_requires_named_figures(tmp_path: Path) -> None:
     )
 
     assert "missing required figure `missing_creative_figure`" in failures
+
+
+def test_figure_manifest_rejects_blank_png(tmp_path: Path) -> None:
+    from cache_safety_erasure.utils.io import file_sha256, write_json
+
+    results_dir = tmp_path / "results"
+    figures_dir = results_dir / "figures"
+    figures_dir.mkdir(parents=True)
+    for name in ["manifest.json", "generations.jsonl", "metrics.json", "cache_stats.parquet"]:
+        (results_dir / name).write_text(name, encoding="utf-8")
+    png = figures_dir / "figure.png"
+    pdf = figures_dir / "figure.pdf"
+    svg = figures_dir / "figure.svg"
+    csv_path = figures_dir / "figure.csv"
+    _write_blank_png(png)
+    pdf.write_bytes(_test_pdf_bytes())
+    svg.write_text('<svg xmlns="http://www.w3.org/2000/svg"></svg>\n', encoding="utf-8")
+    csv_path.write_text("x,y\n1,1\n", encoding="utf-8")
+    write_json(
+        figures_dir / "manifest.json",
+        {
+            "source_artifacts": {
+                name: {"sha256": file_sha256(results_dir / name)}
+                for name in ["manifest.json", "generations.jsonl", "metrics.json", "cache_stats.parquet"]
+            },
+            "figures": [
+                {
+                    "name": "figure",
+                    "png": str(png),
+                    "png_sha256": file_sha256(png),
+                    "svg": str(svg),
+                    "svg_sha256": file_sha256(svg),
+                    "pdf": str(pdf),
+                    "pdf_sha256": file_sha256(pdf),
+                    "data_csv": str(csv_path),
+                    "data_csv_sha256": file_sha256(csv_path),
+                    "data_row_count": 1,
+                }
+            ],
+        },
+    )
+    failures: list[str] = []
+
+    _check_figure_manifest(figures_dir, results_dir, failures, require_causal_patch=False)
+
+    assert "figure `figure` has invalid png: PNG appears visually blank" in failures
+
+
+def _test_pdf_bytes() -> bytes:
+    stream = b"BT /F1 12 Tf 72 72 Td (Figure evidence) Tj ET"
+    objects = [
+        b"<< /Type /Catalog /Pages 2 0 R >>",
+        b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+        (
+            b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 144] "
+            b"/Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>"
+        ),
+        b"<< /Length " + str(len(stream)).encode("ascii") + b" >>\nstream\n" + stream + b"\nendstream",
+        b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+    ]
+    content = b"%PDF-1.4\n"
+    offsets = []
+    for index, obj in enumerate(objects, start=1):
+        offsets.append(len(content))
+        content += f"{index} 0 obj\n".encode("ascii") + obj + b"\nendobj\n"
+    xref_offset = len(content)
+    content += f"xref\n0 {len(objects) + 1}\n0000000000 65535 f \n".encode("ascii")
+    for offset in offsets:
+        content += f"{offset:010d} 00000 n \n".encode("ascii")
+    content += (
+        f"trailer\n<< /Size {len(objects) + 1} /Root 1 0 R >>\n"
+        f"startxref\n{xref_offset}\n%%EOF\n"
+    ).encode("ascii")
+    return content
+
+
+def _write_blank_png(path: Path) -> None:
+    import matplotlib.pyplot as plt
+
+    fig, ax = plt.subplots(figsize=(1, 1))
+    ax.set_axis_off()
+    fig.patch.set_facecolor("white")
+    ax.set_facecolor("white")
+    fig.savefig(path, facecolor="white")
+    plt.close(fig)

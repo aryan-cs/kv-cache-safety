@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import argparse
+import csv
 import json
+import re
 from pathlib import Path
 
 from _path import add_src_to_path
@@ -9,6 +11,58 @@ from _path import add_src_to_path
 add_src_to_path()
 
 from cache_safety_erasure.utils.io import file_sha256
+
+REQUIRED_FIGURE_DATA_COLUMNS = {
+    "selective_safety_erasure_heatmap": {
+        "suite",
+        "policy",
+        "selective_safety_erasure_index",
+        "safety_degradation",
+        "capability_degradation",
+    },
+    "safety_capability_phase_portrait": {
+        "suite",
+        "policy",
+        "policy_family",
+        "safety_degradation",
+        "capability_degradation",
+        "selective_safety_erasure_index",
+    },
+    "prompt_effect_constellation": {
+        "suite",
+        "prompt_id",
+        "policy",
+        "x",
+        "y",
+        "effect_magnitude",
+    },
+    "cache_state_fingerprint": {
+        "policy",
+        "role",
+        "token_bin",
+        "retention_fraction",
+    },
+    "safety_state_atlas": {
+        "suite",
+        "policy",
+        "selective_safety_erasure_index",
+        "system_retention_fraction",
+        "user_retention_fraction",
+    },
+    "causal_restoration_fraction": {
+        "suite",
+        "policy",
+        "compressed_policy",
+        "safety_restoration_fraction",
+    },
+    "causal_restoration_flow": {
+        "suite",
+        "policy",
+        "compressed_policy",
+        "safety_restoration_fraction",
+        "label",
+    },
+}
 
 
 def main() -> None:
@@ -114,6 +168,7 @@ def main() -> None:
     if prompts_path.exists():
         token_span_failures = 0
         public_without_provenance = 0
+        public_without_precise_provenance = 0
         with prompts_path.open("r", encoding="utf-8") as f:
             for line in f:
                 if not line.strip():
@@ -129,10 +184,16 @@ def main() -> None:
                     metadata = row.get("metadata", {})
                     if not metadata.get("source_dataset") or not metadata.get("source_split"):
                         public_without_provenance += 1
+                    if _public_prompt_precise_provenance_failure(row, metadata):
+                        public_without_precise_provenance += 1
         if token_span_failures:
             failures.append(f"{token_span_failures} prompts lack tokenizer token-role spans")
         if public_without_provenance:
             failures.append(f"{public_without_provenance} public prompts lack dataset provenance")
+        if public_without_precise_provenance:
+            failures.append(
+                f"{public_without_precise_provenance} public prompts lack precise dataset provenance"
+            )
 
     figure_dir = args.results_dir / "figures"
     if not figure_dir.exists() or not list(figure_dir.glob("*.png")):
@@ -309,6 +370,9 @@ def _figure_artifact_failure(path_key: str, path: Path) -> str:
     if path_key == "png":
         if not prefix.startswith(b"\x89PNG\r\n\x1a\n"):
             return "missing PNG signature"
+        visual_failure = _png_visual_failure(path)
+        if visual_failure:
+            return visual_failure
     elif path_key == "pdf":
         if not prefix.startswith(b"%PDF-"):
             return "missing PDF signature"
@@ -316,6 +380,9 @@ def _figure_artifact_failure(path_key: str, path: Path) -> str:
             return "PDF too small"
         if b"%%EOF" not in content[-2048:]:
             return "missing PDF EOF marker"
+        pdf_failure = _pdf_page_failure(path)
+        if pdf_failure:
+            return pdf_failure
     elif path_key == "svg":
         lowered = prefix.lstrip().lower()
         if b"<svg" not in lowered:
@@ -352,7 +419,93 @@ def _figure_data_row_count_failure(figure: dict) -> str:
         return "data_row_count must be positive"
     if observed_rows != declared_rows:
         return f"data_row_count={declared_rows}; observed_rows={observed_rows}"
+    schema_failure = _figure_data_schema_failure(figure, path)
+    if schema_failure:
+        return schema_failure
     return ""
+
+
+def _png_visual_failure(path: Path) -> str:
+    try:
+        import matplotlib.image as mpimg
+        import numpy as np
+
+        image = mpimg.imread(path)
+    except Exception as exc:
+        return f"PNG visual decode failed: {exc}"
+    if image.ndim < 2 or image.shape[0] < 64 or image.shape[1] < 64:
+        return f"PNG dimensions too small: {tuple(image.shape)}"
+    array = np.asarray(image)
+    if array.size == 0:
+        return "PNG has no pixels"
+    channels = array[..., :3] if array.ndim == 3 and array.shape[-1] >= 3 else array
+    if float(np.nanstd(channels)) < 1e-4:
+        return "PNG appears visually blank"
+    return ""
+
+
+def _pdf_page_failure(path: Path) -> str:
+    try:
+        from pypdf import PdfReader
+
+        reader = PdfReader(str(path))
+    except Exception as exc:
+        return f"PDF parse failed: {exc}"
+    if not reader.pages:
+        return "PDF has no pages"
+    for index, page in enumerate(reader.pages, start=1):
+        box = page.mediabox
+        width = float(box.width)
+        height = float(box.height)
+        if width <= 32 or height <= 32:
+            return f"PDF page {index} dimensions too small: {width}x{height}"
+    return ""
+
+
+def _figure_data_schema_failure(figure: dict, path: Path) -> str:
+    required_columns = REQUIRED_FIGURE_DATA_COLUMNS.get(str(figure.get("name")))
+    if not required_columns:
+        return ""
+    try:
+        with path.open("r", encoding="utf-8", newline="") as f:
+            reader = csv.reader(f)
+            header = next(reader, [])
+    except OSError as exc:
+        return str(exc)
+    observed = {str(column) for column in header}
+    missing = sorted(required_columns - observed)
+    if missing:
+        return f"missing required columns: {', '.join(missing)}"
+    return ""
+
+
+def _public_prompt_precise_provenance_failure(row: dict, metadata: dict) -> bool:
+    required_value_fields = [
+        "source_dataset",
+        "source_split",
+        "source_revision",
+        "source_fingerprint",
+        "source_version",
+    ]
+    if any(not metadata.get(field) for field in required_value_fields):
+        return True
+    required_present_fields = [
+        "source_config",
+        "source_config_name",
+        "source_homepage",
+        "source_license",
+    ]
+    if any(field not in metadata for field in required_present_fields):
+        return True
+    source_locator_fields = [
+        "source_id",
+        "source_row_index",
+        "source_group_id",
+        "xstest_task_id",
+    ]
+    if any(metadata.get(field) not in {None, ""} for field in source_locator_fields):
+        return False
+    return not re.search(r"_\d{6}$", str(row.get("prompt_id") or ""))
 
 
 def _check_paper_assets(paper_dir: Path, results_dir: Path, failures: list[str]) -> None:

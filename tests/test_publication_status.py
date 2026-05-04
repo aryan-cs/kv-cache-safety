@@ -25,7 +25,35 @@ REQUIRED_AUDIT_LABELS = [
     "human_unsafe_compliance",
     "human_system_leakage",
 ]
-PDF_BYTES = b"%PDF-1.7\n1 0 obj\n<<>>\nendobj\ntrailer\n<<>>\n%%EOF\n"
+def _test_pdf_bytes(text: str = "Publication evidence") -> bytes:
+    stream = f"BT /F1 12 Tf 72 72 Td ({text}) Tj ET".encode("ascii")
+    objects = [
+        b"<< /Type /Catalog /Pages 2 0 R >>",
+        b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+        (
+            b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 144] "
+            b"/Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>"
+        ),
+        b"<< /Length " + str(len(stream)).encode("ascii") + b" >>\nstream\n" + stream + b"\nendstream",
+        b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+    ]
+    content = b"%PDF-1.4\n"
+    offsets = []
+    for index, obj in enumerate(objects, start=1):
+        offsets.append(len(content))
+        content += f"{index} 0 obj\n".encode("ascii") + obj + b"\nendobj\n"
+    xref_offset = len(content)
+    content += f"xref\n0 {len(objects) + 1}\n0000000000 65535 f \n".encode("ascii")
+    for offset in offsets:
+        content += f"{offset:010d} 00000 n \n".encode("ascii")
+    content += (
+        f"trailer\n<< /Size {len(objects) + 1} /Root 1 0 R >>\n"
+        f"startxref\n{xref_offset}\n%%EOF\n"
+    ).encode("ascii")
+    return content
+
+
+PDF_BYTES = _test_pdf_bytes()
 
 
 def test_publication_status_reports_missing_artifacts_as_blockers(tmp_path: Path) -> None:
@@ -192,6 +220,37 @@ def test_publication_status_rejects_header_only_pdf(tmp_path: Path) -> None:
     assert status["publication_ready"] is False
     assert "paper_pdf_valid" in status["blockers"]
     assert status["paper_pdf"]["failure"] == "PDF too small"
+
+
+def test_publication_status_rejects_pdf_with_rendered_draft_text(tmp_path: Path) -> None:
+    primary = tmp_path / "primary"
+    causal = tmp_path / "causal"
+    primary_audit = tmp_path / "primary_audit"
+    causal_audit = tmp_path / "causal_audit"
+    _write_run(primary)
+    _write_run(causal)
+    _write_audit(primary_audit, primary)
+    _write_audit(causal_audit, causal)
+    claim_path = tmp_path / "claim_assessment.json"
+    claim_path.write_text(
+        json.dumps(_passing_claim_assessment(primary, causal, primary_audit, causal_audit)),
+        encoding="utf-8",
+    )
+    pdf_path = tmp_path / "paper.pdf"
+    pdf_path.write_bytes(_test_pdf_bytes("registered analysis protocol"))
+
+    status = publication_status(
+        primary_results_dir=primary,
+        causal_results_dir=causal,
+        primary_audit_dir=primary_audit,
+        causal_audit_dir=causal_audit,
+        claim_assessment_path=claim_path,
+        paper_pdf=pdf_path,
+    )
+
+    assert status["publication_ready"] is False
+    assert "paper_pdf_valid" in status["blockers"]
+    assert "placeholder_text:registered analysis protocol" in status["paper_pdf"]["failure"]
 
 
 def test_publication_status_requires_complete_arxiv_bundle_when_requested(tmp_path: Path) -> None:
@@ -1725,13 +1784,13 @@ def _write_run(path: Path, manifest_overrides: dict | None = None) -> None:
         svg_path = path / "figures" / f"{figure_name}.svg"
         pdf_path = path / "figures" / f"{figure_name}.pdf"
         csv_path = path / "figures" / f"{figure_name}.csv"
-        png_path.write_bytes(b"\x89PNG\r\n\x1a\n")
+        _write_test_png(png_path)
         svg_path.write_text(
             '<svg xmlns="http://www.w3.org/2000/svg"></svg>\n',
             encoding="utf-8",
         )
         pdf_path.write_bytes(PDF_BYTES)
-        csv_path.write_text("x,y\n1,1\n", encoding="utf-8")
+        csv_path.write_text(_figure_csv_content(), encoding="utf-8")
         figure_rows.append(
             {
                 "name": figure_name,
@@ -1771,11 +1830,51 @@ def _prompt_rows(prompt_counts: dict[str, int]) -> list[dict]:
             if suite.startswith("public_"):
                 row["metadata"] = {
                     "source_dataset": "unit",
+                    "source_config": None,
+                    "source_config_name": "default",
+                    "source_revision": "abc123",
+                    "source_fingerprint": "fingerprint",
                     "source_split": "test",
+                    "source_version": "1.0.0",
+                    "source_homepage": "",
+                    "source_license": "",
                     "source_id": f"{suite}-{idx}",
                 }
             rows.append(row)
     return rows
+
+
+def _figure_csv_content() -> str:
+    columns = [
+        "suite",
+        "prompt_id",
+        "policy",
+        "policy_family",
+        "compressed_policy",
+        "x",
+        "y",
+        "effect_magnitude",
+        "label",
+        "token_bin",
+        "role",
+        "retention_fraction",
+        "safety_degradation",
+        "capability_degradation",
+        "selective_safety_erasure_index",
+        "system_retention_fraction",
+        "user_retention_fraction",
+        "safety_restoration_fraction",
+    ]
+    return ",".join(columns) + "\n" + ",".join("1" for _ in columns) + "\n"
+
+
+def _write_test_png(path: Path) -> None:
+    import matplotlib.pyplot as plt
+
+    fig, ax = plt.subplots(figsize=(2, 2))
+    ax.plot([0, 1], [0, 1])
+    fig.savefig(path)
+    plt.close(fig)
 
 
 def _write_audit(

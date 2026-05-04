@@ -266,7 +266,7 @@ def test_arxiv_packager_excludes_raw_evidence_from_support_trees(tmp_path: Path)
 
 def test_arxiv_packager_rejects_placeholder_generated_tex(tmp_path: Path) -> None:
     generated = tmp_path / "generated"
-    generated.mkdir()
+    generated.mkdir(parents=True)
     placeholder = generated / "main_results_table.tex"
     valid = generated / "result_macros.tex"
     placeholder.write_text(
@@ -277,9 +277,21 @@ def test_arxiv_packager_rejects_placeholder_generated_tex(tmp_path: Path) -> Non
 
     failures = _invalid_arxiv_support_files([placeholder, valid])
 
-    assert failures == [
-        f"{placeholder}:placeholder_text:Results pending; no readiness-passing rows exported."
-    ]
+    assert f"{placeholder}:placeholder_text:Results pending; no readiness-passing rows exported." in failures
+
+
+def test_arxiv_packager_rejects_semantically_incomplete_generated_tex(tmp_path: Path) -> None:
+    generated = tmp_path / "generated" / "h200_qwen_full_sweep"
+    generated.mkdir(parents=True)
+    macros = generated / "result_macros.tex"
+    table = generated / "main_results_table.tex"
+    macros.write_text(r"\renewcommand{\PrimaryRunId}{h200_qwen_full_sweep}", encoding="utf-8")
+    table.write_text("policy & estimate \\\\\n", encoding="utf-8")
+
+    failures = _invalid_arxiv_support_files([macros, table])
+
+    assert any("PrimaryTopSSEIPolicy" in failure for failure in failures)
+    assert any("policy level ssei" in failure for failure in failures)
 
 
 def test_latex_placeholder_checker_reports_missing_artifacts(tmp_path: Path) -> None:

@@ -20,7 +20,18 @@ def test_check_prepared_suites_validates_counts_hashes_and_public_provenance(
             {
                 "id": "p1",
                 "suite": "public_refusal_safety",
-                "metadata": {"source_dataset": "dataset", "source_split": "train"},
+                "metadata": {
+                    "source_dataset": "dataset",
+                    "source_config": None,
+                    "source_config_name": "default",
+                    "source_revision": "abc123",
+                    "source_fingerprint": "fingerprint",
+                    "source_split": "train",
+                    "source_version": "1.0.0",
+                    "source_homepage": "",
+                    "source_license": "",
+                    "source_row_index": 0,
+                },
             }
         )
         + "\n",

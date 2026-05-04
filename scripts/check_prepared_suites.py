@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -109,12 +110,46 @@ def _check_public_provenance(
     suite: str, records: list[dict[str, Any]], failures: list[str]
 ) -> None:
     missing = 0
+    imprecise = 0
     for record in records:
         metadata = record.get("metadata") or {}
         if not metadata.get("source_dataset") or not metadata.get("source_split"):
             missing += 1
+        if _public_record_precise_provenance_failure(record, metadata):
+            imprecise += 1
     if missing:
         failures.append(f"`{suite}` has {missing} public records without dataset provenance")
+    if imprecise:
+        failures.append(f"`{suite}` has {imprecise} public records without precise provenance")
+
+
+def _public_record_precise_provenance_failure(record: dict[str, Any], metadata: dict[str, Any]) -> bool:
+    required_value_fields = [
+        "source_dataset",
+        "source_split",
+        "source_revision",
+        "source_fingerprint",
+        "source_version",
+    ]
+    if any(not metadata.get(field) for field in required_value_fields):
+        return True
+    required_present_fields = [
+        "source_config",
+        "source_config_name",
+        "source_homepage",
+        "source_license",
+    ]
+    if any(field not in metadata for field in required_present_fields):
+        return True
+    source_locator_fields = [
+        "source_id",
+        "source_row_index",
+        "source_group_id",
+        "xstest_task_id",
+    ]
+    if any(metadata.get(field) not in {None, ""} for field in source_locator_fields):
+        return False
+    return not re.search(r"_\d{6}$", str(record.get("id") or ""))
 
 
 if __name__ == "__main__":

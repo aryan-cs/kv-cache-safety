@@ -9,7 +9,7 @@ from _path import add_src_to_path
 
 add_src_to_path()
 
-from check_latex_placeholders import PLACEHOLDER_TEXT_MARKERS
+from check_latex_placeholders import PLACEHOLDER_TEXT_MARKERS, _semantic_tex_failures
 
 from cache_safety_erasure.utils.io import file_sha256, write_json
 
@@ -378,6 +378,10 @@ def _invalid_arxiv_support_files(paths: list[Path]) -> list[str]:
             if marker.lower() in text_lower:
                 failures.append(f"{path}:placeholder_text:{marker}")
                 break
+        failures.extend(
+            f"{path}:{failure}"
+            for failure in _semantic_tex_failures(str(path), path.name, text)
+        )
     return failures
 
 
