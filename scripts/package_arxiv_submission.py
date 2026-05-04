@@ -23,6 +23,8 @@ DEFAULT_CLAIM_GENERATED_DIR = Path("paper/generated/claim_assessment")
 DEFAULT_QWEN32_GENERATED_DIR = Path("paper/generated/h200_qwen32b_public_followup")
 DEFAULT_PRIMARY_AUDIT_DIR = Path("paper/audit/h200_qwen_full_sweep_summary")
 DEFAULT_CAUSAL_AUDIT_DIR = Path("paper/audit/h200_causal_patch_qwen7b_summary")
+DEFAULT_ACTIVE_PRIMARY_AUDIT_DIR = Path("paper/audit/active_primary_summary")
+DEFAULT_ACTIVE_CAUSAL_AUDIT_DIR = Path("paper/audit/active_causal_summary")
 
 
 def build_figure_sources(
@@ -64,7 +66,12 @@ REQUIRED_GENERATED_DIRS = [
 ]
 OPTIONAL_GENERATED_DIRS = [DEFAULT_QWEN32_GENERATED_DIR]
 GENERATED_DIRS = REQUIRED_GENERATED_DIRS + OPTIONAL_GENERATED_DIRS
-AUDIT_DIRS = [DEFAULT_PRIMARY_AUDIT_DIR, DEFAULT_CAUSAL_AUDIT_DIR]
+AUDIT_DIRS = [
+    DEFAULT_PRIMARY_AUDIT_DIR,
+    DEFAULT_CAUSAL_AUDIT_DIR,
+    DEFAULT_ACTIVE_PRIMARY_AUDIT_DIR,
+    DEFAULT_ACTIVE_CAUSAL_AUDIT_DIR,
+]
 ARXIV_SAFE_SUPPORT_SUFFIXES = {".tex"}
 FINAL_SOURCE_TEXT_MARKERS = [
     *PLACEHOLDER_TEXT_MARKERS,
@@ -151,7 +158,12 @@ def main() -> None:
         args.claim_generated_dir,
     ]
     optional_generated_dirs = [args.qwen32_generated_dir] if args.qwen32_generated_dir else []
-    audit_dirs = [args.primary_audit_dir, args.causal_audit_dir]
+    audit_dirs = [
+        args.primary_audit_dir,
+        args.causal_audit_dir,
+        DEFAULT_ACTIVE_PRIMARY_AUDIT_DIR,
+        DEFAULT_ACTIVE_CAUSAL_AUDIT_DIR,
+    ]
     if source_dir.exists():
         shutil.rmtree(source_dir)
     (source_dir / "figures").mkdir(parents=True)

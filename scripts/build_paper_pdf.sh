@@ -13,6 +13,8 @@ active_primary_dir="paper/generated/active_primary"
 active_causal_dir="paper/generated/active_causal"
 primary_audit_dir="${PRIMARY_AUDIT_SUMMARY_DIR:-paper/audit/h200_qwen_full_sweep_summary}"
 causal_audit_dir="${CAUSAL_AUDIT_SUMMARY_DIR:-paper/audit/h200_causal_patch_qwen7b_summary}"
+active_primary_audit_dir="paper/audit/active_primary_summary"
+active_causal_audit_dir="paper/audit/active_causal_summary"
 claim_assessment="${CLAIM_ASSESSMENT_PATH:-paper/generated/claim_assessment/claim_assessment.json}"
 arxiv_source_dir="${ARXIV_SOURCE_DIR:-paper/build/arxiv_source}"
 arxiv_archive="${ARXIV_ARCHIVE:-paper/build/arxiv_source.tar.gz}"
@@ -48,9 +50,15 @@ final_pdf_sources=(
   "primary_audit_manifest=$primary_audit_dir/audit_manifest.json"
   "primary_audit_summary_table=$primary_audit_dir/human_audit_summary_table.tex"
   "primary_audit_deltas_table=$primary_audit_dir/human_audit_deltas_table.tex"
+  "active_primary_audit_manifest=$active_primary_audit_dir/active_audit_manifest.json"
+  "active_primary_audit_summary_table=$active_primary_audit_dir/human_audit_summary_table.tex"
+  "active_primary_audit_deltas_table=$active_primary_audit_dir/human_audit_deltas_table.tex"
   "causal_audit_manifest=$causal_audit_dir/audit_manifest.json"
   "causal_audit_summary_table=$causal_audit_dir/human_audit_summary_table.tex"
   "causal_audit_deltas_table=$causal_audit_dir/human_audit_deltas_table.tex"
+  "active_causal_audit_manifest=$active_causal_audit_dir/active_audit_manifest.json"
+  "active_causal_audit_summary_table=$active_causal_audit_dir/human_audit_summary_table.tex"
+  "active_causal_audit_deltas_table=$active_causal_audit_dir/human_audit_deltas_table.tex"
   "primary_figure=$primary_results/figures/safety_capability_phase_portrait.pdf"
   "primary_figure=$primary_results/figures/selective_safety_erasure_heatmap.pdf"
   "primary_figure=$primary_results/figures/prompt_effect_constellation.pdf"
@@ -118,8 +126,12 @@ uv run python scripts/sync_active_paper_assets.py \
   --causal-results-dir "$causal_results" \
   --primary-generated-dir "$primary_paper_dir" \
   --causal-generated-dir "$causal_paper_dir" \
+  --primary-audit-dir "$primary_audit_dir" \
+  --causal-audit-dir "$causal_audit_dir" \
   --active-primary-dir "$active_primary_dir" \
-  --active-causal-dir "$active_causal_dir"
+  --active-causal-dir "$active_causal_dir" \
+  --active-primary-audit-dir "$active_primary_audit_dir" \
+  --active-causal-audit-dir "$active_causal_audit_dir"
 
 if [[ "${REQUIRE_COMPLETE_PAPER:-0}" == "1" ]]; then
   uv run python scripts/check_latex_placeholders.py --tex "$src_dir/main.tex"

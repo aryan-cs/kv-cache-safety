@@ -32,14 +32,22 @@ def test_required_arxiv_bundle_files_follow_selected_generated_dirs() -> None:
     files = _required_arxiv_bundle_files(
         primary_generated_dir=Path("paper/generated/h200_qwen_full_sweep_plus_ci_extension"),
         causal_generated_dir=Path("paper/generated/h200_causal_patch_qwen7b"),
+        primary_audit_dir=Path("paper/audit/h200_qwen_full_sweep_plus_ci_extension_summary"),
+        causal_audit_dir=Path("paper/audit/h200_causal_patch_qwen7b_summary"),
     )
 
     assert (
         "generated/h200_qwen_full_sweep_plus_ci_extension/main_results_table.tex"
         in files
     )
+    assert (
+        "audit/h200_qwen_full_sweep_plus_ci_extension_summary/human_audit_summary_table.tex"
+        in files
+    )
+    assert "audit/active_primary_summary/human_audit_summary_table.tex" in files
     assert "generated/active_primary/main_results_table.tex" in files
     assert "generated/h200_qwen_full_sweep/main_results_table.tex" not in files
+    assert "audit/h200_qwen_full_sweep_summary/human_audit_summary_table.tex" not in files
 
 
 def _test_pdf_bytes(text: str = "Publication evidence") -> bytes:
@@ -2263,6 +2271,21 @@ def _write_audit(
         render_deltas_latex(summary),
         encoding="utf-8",
     )
+    active_name = "active_causal_summary" if "causal" in path.name else "active_primary_summary"
+    active_path = path.parent / active_name
+    active_path.mkdir(parents=True, exist_ok=True)
+    for source_name in [
+        "audit_manifest.json",
+        "human_audit_summary.json",
+        "human_audit_summary.md",
+        "human_audit_summary_table.tex",
+        "human_audit_deltas_table.tex",
+    ]:
+        (active_path / source_name).write_bytes((path / source_name).read_bytes())
+    (active_path / "active_audit_manifest.json").write_text(
+        json.dumps({"audit_dir": str(path), "active_dir": str(active_path)}),
+        encoding="utf-8",
+    )
 
 
 def _audit_fixture_rows(*, include_inter_annotator: bool) -> tuple[list[dict], list[dict]]:
@@ -2404,6 +2427,8 @@ def _final_pdf_sources(
 ) -> list[tuple[str, Path]]:
     active_primary = primary_generated.parent / "active_primary"
     active_causal = causal_generated.parent / "active_causal"
+    active_primary_audit = primary_audit.parent / "active_primary_summary"
+    active_causal_audit = causal_audit.parent / "active_causal_summary"
     return [
         ("latex_main", Path("paper/latex/main.tex")),
         ("bibliography", Path("paper/references.bib")),
@@ -2440,9 +2465,27 @@ def _final_pdf_sources(
         ("primary_audit_manifest", primary_audit / "audit_manifest.json"),
         ("primary_audit_summary_table", primary_audit / "human_audit_summary_table.tex"),
         ("primary_audit_deltas_table", primary_audit / "human_audit_deltas_table.tex"),
+        ("active_primary_audit_manifest", active_primary_audit / "active_audit_manifest.json"),
+        (
+            "active_primary_audit_summary_table",
+            active_primary_audit / "human_audit_summary_table.tex",
+        ),
+        (
+            "active_primary_audit_deltas_table",
+            active_primary_audit / "human_audit_deltas_table.tex",
+        ),
         ("causal_audit_manifest", causal_audit / "audit_manifest.json"),
         ("causal_audit_summary_table", causal_audit / "human_audit_summary_table.tex"),
         ("causal_audit_deltas_table", causal_audit / "human_audit_deltas_table.tex"),
+        ("active_causal_audit_manifest", active_causal_audit / "active_audit_manifest.json"),
+        (
+            "active_causal_audit_summary_table",
+            active_causal_audit / "human_audit_summary_table.tex",
+        ),
+        (
+            "active_causal_audit_deltas_table",
+            active_causal_audit / "human_audit_deltas_table.tex",
+        ),
         (
             "primary_figure",
             primary / "figures" / "safety_capability_phase_portrait.pdf",
@@ -2599,6 +2642,10 @@ def _write_arxiv_bundle(
     (source_dir / "generated" / "claim_assessment").mkdir(parents=True)
     (source_dir / "audit" / "h200_qwen_full_sweep_summary").mkdir(parents=True)
     (source_dir / "audit" / "h200_causal_patch_qwen7b_summary").mkdir(parents=True)
+    (source_dir / "audit" / "primary_audit").mkdir(parents=True)
+    (source_dir / "audit" / "causal_audit").mkdir(parents=True)
+    (source_dir / "audit" / "active_primary_summary").mkdir(parents=True)
+    (source_dir / "audit" / "active_causal_summary").mkdir(parents=True)
     (source_dir / "figures").mkdir()
     (source_dir / "main.tex").write_text("main\n", encoding="utf-8")
     (source_dir / "references.bib").write_text("refs\n", encoding="utf-8")
@@ -2629,6 +2676,14 @@ def _write_arxiv_bundle(
         source_dir / "audit" / "h200_qwen_full_sweep_summary" / "human_audit_deltas_table.tex",
         source_dir / "audit" / "h200_causal_patch_qwen7b_summary" / "human_audit_summary_table.tex",
         source_dir / "audit" / "h200_causal_patch_qwen7b_summary" / "human_audit_deltas_table.tex",
+        source_dir / "audit" / "primary_audit" / "human_audit_summary_table.tex",
+        source_dir / "audit" / "primary_audit" / "human_audit_deltas_table.tex",
+        source_dir / "audit" / "causal_audit" / "human_audit_summary_table.tex",
+        source_dir / "audit" / "causal_audit" / "human_audit_deltas_table.tex",
+        source_dir / "audit" / "active_primary_summary" / "human_audit_summary_table.tex",
+        source_dir / "audit" / "active_primary_summary" / "human_audit_deltas_table.tex",
+        source_dir / "audit" / "active_causal_summary" / "human_audit_summary_table.tex",
+        source_dir / "audit" / "active_causal_summary" / "human_audit_deltas_table.tex",
     ]
     for path in [*generated_files, *audit_files]:
         path.write_text(f"{path.name}\n", encoding="utf-8")
@@ -2648,6 +2703,10 @@ def _write_arxiv_bundle(
         "copied_audit": [
             str(source_dir / "audit" / "h200_qwen_full_sweep_summary"),
             str(source_dir / "audit" / "h200_causal_patch_qwen7b_summary"),
+            str(source_dir / "audit" / "primary_audit"),
+            str(source_dir / "audit" / "causal_audit"),
+            str(source_dir / "audit" / "active_primary_summary"),
+            str(source_dir / "audit" / "active_causal_summary"),
         ],
         "missing_figures": [],
         "missing_generated": [],

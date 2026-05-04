@@ -42,9 +42,9 @@ def test_latex_manuscript_is_formal_registered_protocol() -> None:
     assert r"\maybeinputtable{../generated/active_primary/main_results_table.tex}" in tex
     assert r"\maybeinputtable{../generated/claim_assessment/claim_assessment_table.tex}" in tex
     assert r"\maybeinputtable{../generated/claim_assessment/claim_interpretation.tex}" in tex
-    assert r"\maybeinputtable{../audit/h200_qwen_full_sweep_summary/human_audit_summary_table.tex}" in tex
-    assert r"\maybeinputtable{../audit/h200_causal_patch_qwen7b_summary/human_audit_summary_table.tex}" in tex
-    assert r"\maybeinputtable{../audit/h200_causal_patch_qwen7b_summary/human_audit_deltas_table.tex}" in tex
+    assert r"\maybeinputtable{../audit/active_primary_summary/human_audit_summary_table.tex}" in tex
+    assert r"\maybeinputtable{../audit/active_causal_summary/human_audit_summary_table.tex}" in tex
+    assert r"\maybeinputtable{../audit/active_causal_summary/human_audit_deltas_table.tex}" in tex
     assert "causal_restoration_fraction.pdf" in tex
     assert r"\PrimaryTopSSEIPolicy" in tex
     assert r"\bibliography{../references}" in tex
@@ -171,11 +171,11 @@ def test_arxiv_rewrite_uses_local_bibliography_and_figures() -> None:
     assert Path("paper/generated/claim_assessment") in GENERATED_DIRS
     assert Path("paper/generated/claim_assessment") in REQUIRED_GENERATED_DIRS
     assert Path("paper/generated/h200_qwen32b_public_followup") in OPTIONAL_GENERATED_DIRS
-    assert "audit/h200_qwen_full_sweep_summary" in _rewrite_main_tex_for_arxiv(
-        "../audit/h200_qwen_full_sweep_summary/human_audit_summary_table.tex"
+    assert "audit/active_primary_summary" in _rewrite_main_tex_for_arxiv(
+        "../audit/active_primary_summary/human_audit_summary_table.tex"
     )
-    assert "audit/h200_causal_patch_qwen7b_summary" in _rewrite_main_tex_for_arxiv(
-        "../audit/h200_causal_patch_qwen7b_summary/human_audit_summary_table.tex"
+    assert "audit/active_causal_summary" in _rewrite_main_tex_for_arxiv(
+        "../audit/active_causal_summary/human_audit_summary_table.tex"
     )
     assert "../../results" not in rewritten
 
@@ -234,14 +234,28 @@ def test_active_paper_asset_sync_copies_selected_sources(tmp_path: Path) -> None
     causal_results = tmp_path / "results" / "causal"
     primary_generated = tmp_path / "generated" / "merged_primary"
     causal_generated = tmp_path / "generated" / "causal"
+    primary_audit = tmp_path / "audit" / "merged_primary_summary"
+    causal_audit = tmp_path / "audit" / "causal_summary"
     active_primary = tmp_path / "generated" / "active_primary"
     active_causal = tmp_path / "generated" / "active_causal"
+    active_primary_audit = tmp_path / "audit" / "active_primary_summary"
+    active_causal_audit = tmp_path / "audit" / "active_causal_summary"
     for path in [
         primary_generated / "result_macros.tex",
         primary_generated / "main_results_table.tex",
         primary_generated / "suite_level_effects_table.tex",
         causal_generated / "result_macros.tex",
         causal_generated / "causal_restoration_table.tex",
+        primary_audit / "audit_manifest.json",
+        primary_audit / "human_audit_summary.json",
+        primary_audit / "human_audit_summary.md",
+        primary_audit / "human_audit_summary_table.tex",
+        primary_audit / "human_audit_deltas_table.tex",
+        causal_audit / "audit_manifest.json",
+        causal_audit / "human_audit_summary.json",
+        causal_audit / "human_audit_summary.md",
+        causal_audit / "human_audit_summary_table.tex",
+        causal_audit / "human_audit_deltas_table.tex",
     ]:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(f"{path.name}\n", encoding="utf-8")
@@ -262,8 +276,12 @@ def test_active_paper_asset_sync_copies_selected_sources(tmp_path: Path) -> None
         causal_results_dir=causal_results,
         primary_generated_dir=primary_generated,
         causal_generated_dir=causal_generated,
+        primary_audit_dir=primary_audit,
+        causal_audit_dir=causal_audit,
         active_primary_dir=active_primary,
         active_causal_dir=active_causal,
+        active_primary_audit_dir=active_primary_audit,
+        active_causal_audit_dir=active_causal_audit,
     )
 
     assert missing == []
@@ -275,6 +293,13 @@ def test_active_paper_asset_sync_copies_selected_sources(tmp_path: Path) -> None
         (active_primary / "active_asset_manifest.json").read_text(encoding="utf-8")
     )
     assert manifest["results_dir"] == str(primary_results)
+    assert (
+        active_primary_audit / "human_audit_summary_table.tex"
+    ).read_text(encoding="utf-8") == "human_audit_summary_table.tex\n"
+    audit_manifest = json.loads(
+        (active_primary_audit / "active_audit_manifest.json").read_text(encoding="utf-8")
+    )
+    assert audit_manifest["audit_dir"] == str(primary_audit)
 
 
 def test_arxiv_packager_rejects_malformed_figure_pdfs(tmp_path: Path) -> None:

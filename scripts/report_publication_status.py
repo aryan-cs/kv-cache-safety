@@ -58,14 +58,16 @@ ACTIVE_ARXIV_BUNDLE_FILES = [
     "generated/active_causal/causal_restoration_table.tex",
     "generated/active_causal/result_macros.tex",
 ]
+ACTIVE_ARXIV_AUDIT_FILES = [
+    "audit/active_primary_summary/human_audit_summary_table.tex",
+    "audit/active_primary_summary/human_audit_deltas_table.tex",
+    "audit/active_causal_summary/human_audit_summary_table.tex",
+    "audit/active_causal_summary/human_audit_deltas_table.tex",
+]
 STATIC_ARXIV_BUNDLE_FILES = [
     "generated/claim_assessment/abstract_status_sentence.tex",
     "generated/claim_assessment/claim_assessment_table.tex",
     "generated/claim_assessment/claim_interpretation.tex",
-    "audit/h200_qwen_full_sweep_summary/human_audit_summary_table.tex",
-    "audit/h200_qwen_full_sweep_summary/human_audit_deltas_table.tex",
-    "audit/h200_causal_patch_qwen7b_summary/human_audit_summary_table.tex",
-    "audit/h200_causal_patch_qwen7b_summary/human_audit_deltas_table.tex",
 ]
 REQUIRED_ARXIV_BUNDLE_FILES = [
     "generated/h200_qwen_full_sweep/main_results_table.tex",
@@ -74,6 +76,7 @@ REQUIRED_ARXIV_BUNDLE_FILES = [
     "generated/h200_causal_patch_qwen7b/causal_restoration_table.tex",
     "generated/h200_causal_patch_qwen7b/result_macros.tex",
     *ACTIVE_ARXIV_BUNDLE_FILES,
+    *ACTIVE_ARXIV_AUDIT_FILES,
     *STATIC_ARXIV_BUNDLE_FILES,
 ]
 REQUIRED_ARXIV_FIGURE_FILES = [f"figures/{name}" for name in FIGURE_SOURCES]
@@ -101,9 +104,13 @@ PRIMARY_REQUIRED_SUITES = [
 def _required_arxiv_bundle_files(
     primary_generated_dir: Path = Path("paper/generated/h200_qwen_full_sweep"),
     causal_generated_dir: Path = Path("paper/generated/h200_causal_patch_qwen7b"),
+    primary_audit_dir: Path = Path("paper/audit/h200_qwen_full_sweep_summary"),
+    causal_audit_dir: Path = Path("paper/audit/h200_causal_patch_qwen7b_summary"),
 ) -> list[str]:
     primary_name = primary_generated_dir.name
     causal_name = causal_generated_dir.name
+    primary_audit_name = primary_audit_dir.name
+    causal_audit_name = causal_audit_dir.name
     return [
         f"generated/{primary_name}/main_results_table.tex",
         f"generated/{primary_name}/suite_level_effects_table.tex",
@@ -111,6 +118,11 @@ def _required_arxiv_bundle_files(
         f"generated/{causal_name}/causal_restoration_table.tex",
         f"generated/{causal_name}/result_macros.tex",
         *ACTIVE_ARXIV_BUNDLE_FILES,
+        f"audit/{primary_audit_name}/human_audit_summary_table.tex",
+        f"audit/{primary_audit_name}/human_audit_deltas_table.tex",
+        f"audit/{causal_audit_name}/human_audit_summary_table.tex",
+        f"audit/{causal_audit_name}/human_audit_deltas_table.tex",
+        *ACTIVE_ARXIV_AUDIT_FILES,
         *STATIC_ARXIV_BUNDLE_FILES,
     ]
 
@@ -317,6 +329,8 @@ def publication_status(
         arxiv_archive,
         primary_generated_dir=primary_generated_dir,
         causal_generated_dir=causal_generated_dir,
+        primary_audit_dir=primary_audit_dir,
+        causal_audit_dir=causal_audit_dir,
     )
 
     gates = {
@@ -1098,6 +1112,8 @@ def _final_pdf_expected_sources(
     claim_generated_dir = claim_assessment_path.parent
     active_primary_dir = primary_generated_dir.parent / "active_primary"
     active_causal_dir = causal_generated_dir.parent / "active_causal"
+    active_primary_audit_dir = primary_audit_dir.parent / "active_primary_summary"
+    active_causal_audit_dir = causal_audit_dir.parent / "active_causal_summary"
     return [
         ("latex_main", Path("paper/latex/main.tex")),
         ("bibliography", Path("paper/references.bib")),
@@ -1128,9 +1144,27 @@ def _final_pdf_expected_sources(
         ("primary_audit_manifest", primary_audit_dir / "audit_manifest.json"),
         ("primary_audit_summary_table", primary_audit_dir / "human_audit_summary_table.tex"),
         ("primary_audit_deltas_table", primary_audit_dir / "human_audit_deltas_table.tex"),
+        ("active_primary_audit_manifest", active_primary_audit_dir / "active_audit_manifest.json"),
+        (
+            "active_primary_audit_summary_table",
+            active_primary_audit_dir / "human_audit_summary_table.tex",
+        ),
+        (
+            "active_primary_audit_deltas_table",
+            active_primary_audit_dir / "human_audit_deltas_table.tex",
+        ),
         ("causal_audit_manifest", causal_audit_dir / "audit_manifest.json"),
         ("causal_audit_summary_table", causal_audit_dir / "human_audit_summary_table.tex"),
         ("causal_audit_deltas_table", causal_audit_dir / "human_audit_deltas_table.tex"),
+        ("active_causal_audit_manifest", active_causal_audit_dir / "active_audit_manifest.json"),
+        (
+            "active_causal_audit_summary_table",
+            active_causal_audit_dir / "human_audit_summary_table.tex",
+        ),
+        (
+            "active_causal_audit_deltas_table",
+            active_causal_audit_dir / "human_audit_deltas_table.tex",
+        ),
         ("primary_figure", primary_results_dir / "figures" / "safety_capability_phase_portrait.pdf"),
         ("primary_figure", primary_results_dir / "figures" / "selective_safety_erasure_heatmap.pdf"),
         ("primary_figure", primary_results_dir / "figures" / "prompt_effect_constellation.pdf"),
@@ -1154,6 +1188,8 @@ def _arxiv_status(
     *,
     primary_generated_dir: Path = Path("paper/generated/h200_qwen_full_sweep"),
     causal_generated_dir: Path = Path("paper/generated/h200_causal_patch_qwen7b"),
+    primary_audit_dir: Path = Path("paper/audit/h200_qwen_full_sweep_summary"),
+    causal_audit_dir: Path = Path("paper/audit/h200_causal_patch_qwen7b_summary"),
 ) -> dict[str, Any]:
     manifest_path = source_dir / "manifest.json"
     manifest = _read_json(manifest_path)
@@ -1207,6 +1243,17 @@ def _arxiv_status(
         ]:
             if required_name not in copied_generated_names:
                 failures.append(f"missing_required_generated:{required_name}")
+        copied_audit_names = {
+            Path(str(path)).name for path in manifest.get("copied_audit", [])
+        }
+        for required_name in [
+            primary_audit_dir.name,
+            causal_audit_dir.name,
+            "active_primary_summary",
+            "active_causal_summary",
+        ]:
+            if required_name not in copied_audit_names:
+                failures.append(f"missing_required_audit:{required_name}")
         for required_figure in REQUIRED_ARXIV_FIGURE_FILES:
             figure_path = source_dir / required_figure
             if not figure_path.exists():
@@ -1230,6 +1277,8 @@ def _arxiv_status(
         required_bundle_files = _required_arxiv_bundle_files(
             primary_generated_dir=primary_generated_dir,
             causal_generated_dir=causal_generated_dir,
+            primary_audit_dir=primary_audit_dir,
+            causal_audit_dir=causal_audit_dir,
         )
         for required_file in [*required_bundle_files, *REQUIRED_ARXIV_FIGURE_FILES]:
             if not (source_dir / required_file).exists():
