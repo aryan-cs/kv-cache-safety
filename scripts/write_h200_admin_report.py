@@ -93,11 +93,16 @@ def admin_report(status: dict[str, Any]) -> str:
         first = wait_history["first"]
         latest = wait_history["latest"]
         minimum = wait_history["min_memory"]
+        threshold = wait_history.get("gate_threshold") or {}
         lines.extend(
             [
                 "## Wait History",
                 "",
                 f"- Samples: `{wait_history['sample_count']}`",
+                (
+                    f"- Gate threshold: memory `<= {threshold.get('memory_used_mib', 'unknown')} MiB`, "
+                    f"utilization `<= {threshold.get('utilization_pct', 'unknown')}%`"
+                ),
                 (
                     f"- First sample: `{first['timestamp_utc']}` "
                     f"`{first['memory_used_mib']} MiB`, `{first['utilization_pct']}%`"

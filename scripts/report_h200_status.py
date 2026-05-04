@@ -33,6 +33,10 @@ WAIT_SAMPLE_RE = re.compile(
     r"^(?P<timestamp>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z) "
     r"memory\.used=(?P<memory>\d+)MiB utilization=(?P<utilization>\d+)%$"
 )
+WAIT_THRESHOLD_RE = re.compile(
+    r"^Waiting for H200 GPU: memory\.used <= (?P<memory>\d+) MiB "
+    r"and utilization <= (?P<utilization>\d+)%$"
+)
 
 
 def main() -> None:
@@ -169,12 +173,17 @@ def render_markdown(status: dict[str, Any]) -> str:
         first = wait_history["first"]
         latest = wait_history["latest"]
         minimum = wait_history["min_memory"]
+        threshold = wait_history.get("gate_threshold") or {}
         lines.extend(
             [
                 "",
                 "## Wait History",
                 "",
                 f"- samples: `{wait_history['sample_count']}`",
+                (
+                    f"- gate threshold: memory `<= {threshold.get('memory_used_mib', 'unknown')} MiB`, "
+                    f"utilization `<= {threshold.get('utilization_pct', 'unknown')}%`"
+                ),
                 (
                     f"- first sample: `{first['timestamp_utc']}` "
                     f"`{first['memory_used_mib']} MiB`, `{first['utilization_pct']}%`"
@@ -440,7 +449,11 @@ def _latest_launcher_log(repo_dir: Path) -> Path | None:
 
 def _wait_history(path: Path) -> dict[str, Any]:
     samples = []
+    threshold = {"memory_used_mib": 20_000, "utilization_pct": 20}
     for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+        parsed_threshold = _parse_wait_threshold(line)
+        if parsed_threshold is not None:
+            threshold = parsed_threshold
         sample = _parse_wait_sample(line)
         if sample is not None:
             samples.append(sample)
@@ -459,8 +472,19 @@ def _wait_history(path: Path) -> dict[str, Any]:
         "min_utilization_pct": min(item["utilization_pct"] for item in samples),
         "max_utilization_pct": max(item["utilization_pct"] for item in samples),
         "memory_drop_mib": first["memory_used_mib"] - latest["memory_used_mib"],
-        "latest_gate_passed": latest["memory_used_mib"] <= 20_000
-        and latest["utilization_pct"] <= 20,
+        "gate_threshold": threshold,
+        "latest_gate_passed": latest["memory_used_mib"] <= threshold["memory_used_mib"]
+        and latest["utilization_pct"] <= threshold["utilization_pct"],
+    }
+
+
+def _parse_wait_threshold(line: str) -> dict[str, int] | None:
+    match = WAIT_THRESHOLD_RE.match(line.strip())
+    if match is None:
+        return None
+    return {
+        "memory_used_mib": int(match.group("memory")),
+        "utilization_pct": int(match.group("utilization")),
     }
 
 

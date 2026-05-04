@@ -12,6 +12,7 @@ from report_h200_status import (
     _parse_compute_app_line,
     _parse_gpu_query_line,
     _parse_wait_sample,
+    _parse_wait_threshold,
     _run,
     _trim_diagnostic_output,
     _wait_history,
@@ -56,6 +57,15 @@ def test_parse_wait_sample() -> None:
     assert _parse_wait_sample("not a wait sample") is None
 
 
+def test_parse_wait_threshold() -> None:
+    parsed = _parse_wait_threshold(
+        "Waiting for H200 GPU: memory.used <= 20000 MiB and utilization <= 20%"
+    )
+
+    assert parsed == {"memory_used_mib": 20000, "utilization_pct": 20}
+    assert _parse_wait_threshold("not a threshold") is None
+
+
 def test_wait_history_summarizes_launcher_memory_trend(tmp_path: Path) -> None:
     log = tmp_path / "wait.log"
     log.write_text(
@@ -77,6 +87,25 @@ def test_wait_history_summarizes_launcher_memory_trend(tmp_path: Path) -> None:
     assert history["latest"]["memory_used_mib"] == 19000
     assert history["min_memory"]["memory_used_mib"] == 19000
     assert history["memory_drop_mib"] == 123461
+    assert history["gate_threshold"] == {"memory_used_mib": 20000, "utilization_pct": 20}
+    assert history["latest_gate_passed"] is True
+
+
+def test_wait_history_uses_custom_gate_threshold(tmp_path: Path) -> None:
+    log = tmp_path / "wait.log"
+    log.write_text(
+        "\n".join(
+            [
+                "Waiting for H200 GPU: memory.used <= 90000 MiB and utilization <= 99%",
+                "2026-05-04T03:59:11Z memory.used=82139MiB utilization=95%",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    history = _wait_history(log)
+
+    assert history["gate_threshold"] == {"memory_used_mib": 90000, "utilization_pct": 99}
     assert history["latest_gate_passed"] is True
 
 
@@ -179,6 +208,7 @@ def test_render_markdown_summarizes_blocked_launcher() -> None:
                         "utilization_pct": 95,
                     },
                     "memory_drop_mib": 60322,
+                    "gate_threshold": {"memory_used_mib": 20000, "utilization_pct": 20},
                     "latest_gate_passed": False,
                 },
             },
@@ -192,6 +222,7 @@ def test_render_markdown_summarizes_blocked_launcher() -> None:
     assert "none reported by `nvidia-smi --query-accounted-apps`" in text
     assert "NVIDIA PIDS Query" in text
     assert "Wait History" in text
+    assert "gate threshold: memory `<= 20000 MiB`, utilization `<= 20%`" in text
     assert "memory drop from first to latest: `60322 MiB`" in text
     assert "release or restart the notebook allocation" in text
     assert "`results/h200_qwen_full_sweep`: missing" in text

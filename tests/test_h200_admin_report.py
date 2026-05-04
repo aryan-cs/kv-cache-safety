@@ -56,6 +56,7 @@ def test_admin_report_summarizes_hidden_gpu_context_without_results() -> None:
                         "utilization_pct": 95,
                     },
                     "memory_drop_mib": 60322,
+                    "gate_threshold": {"memory_used_mib": 20000, "utilization_pct": 20},
                     "latest_gate_passed": False,
                 }
             },
@@ -67,6 +68,7 @@ def test_admin_report_summarizes_hidden_gpu_context_without_results() -> None:
     assert "Visible compute apps: `0`" in report
     assert "Processes                             : None" in report
     assert "Wait History" in report
+    assert "Gate threshold: memory `<= 20000 MiB`, utilization `<= 20%`" in report
     assert "Memory drop from first to latest: `60322 MiB`" in report
     assert "release or restart the notebook allocation" in report
     assert "nvidia-smi --gpu-reset" in report
