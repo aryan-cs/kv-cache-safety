@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 from pathlib import Path
 from typing import Any
@@ -15,10 +16,7 @@ def main() -> None:
     parser.add_argument("--output-json", type=Path, default=None)
     args = parser.parse_args()
 
-    report = compare_manifests(
-        json.loads(args.expected.read_text(encoding="utf-8")),
-        json.loads(args.actual.read_text(encoding="utf-8")),
-    )
+    report = compare_manifest_files(args.expected, args.actual)
     if args.output_json is not None:
         args.output_json.parent.mkdir(parents=True, exist_ok=True)
         args.output_json.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
@@ -58,6 +56,26 @@ def compare_manifests(expected: dict[str, Any], actual: dict[str, Any]) -> dict[
         "actual_file_count": len(actual_files),
         "failures": failures,
     }
+
+
+def compare_manifest_files(expected_path: Path, actual_path: Path) -> dict[str, Any]:
+    report = compare_manifests(
+        json.loads(expected_path.read_text(encoding="utf-8")),
+        json.loads(actual_path.read_text(encoding="utf-8")),
+    )
+    report["expected_manifest_path"] = str(expected_path)
+    report["expected_manifest_sha256"] = _file_sha256(expected_path)
+    report["actual_manifest_path"] = str(actual_path)
+    report["actual_manifest_sha256"] = _file_sha256(actual_path)
+    return report
+
+
+def _file_sha256(path: Path) -> str:
+    h = hashlib.sha256()
+    with path.open("rb") as f:
+        for chunk in iter(lambda: f.read(1024 * 1024), b""):
+            h.update(chunk)
+    return h.hexdigest()
 
 
 def _file_map(manifest: dict[str, Any]) -> dict[str, dict[str, Any]]:

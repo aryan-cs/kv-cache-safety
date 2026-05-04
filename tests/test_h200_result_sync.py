@@ -7,7 +7,7 @@ import pytest
 sys.path.insert(0, str(Path("scripts").resolve()))
 
 from check_h200_fetch_manifest import check_h200_fetch_manifest
-from compare_artifact_manifests import compare_manifests
+from compare_artifact_manifests import compare_manifest_files, compare_manifests
 from write_artifact_manifest import artifact_manifest
 
 
@@ -98,16 +98,20 @@ def test_h200_fetch_manifest_check_requires_fetched_primary_and_causal_raw_files
         ]:
             (run_dir / filename).write_text(f"{required_path}/{filename}\n", encoding="utf-8")
     local_manifest_path = tmp_path / "logs" / "h200" / "h200_artifact_manifest_local.json"
+    remote_manifest_path = tmp_path / "logs" / "h200" / "h200_artifact_manifest_remote.json"
     compare_report_path = tmp_path / "logs" / "h200" / "h200_artifact_manifest_compare.json"
     local_manifest_path.parent.mkdir(parents=True)
-    local_manifest_path.write_text(
-        json_dump(artifact_manifest(tmp_path, [Path(path) for path in required_paths])),
+    manifest_text = json_dump(artifact_manifest(tmp_path, [Path(path) for path in required_paths]))
+    local_manifest_path.write_text(manifest_text, encoding="utf-8")
+    remote_manifest_path.write_text(manifest_text, encoding="utf-8")
+    compare_report_path.write_text(
+        json_dump(compare_manifest_files(remote_manifest_path, local_manifest_path)),
         encoding="utf-8",
     )
-    compare_report_path.write_text(json_dump({"passed": True, "failures": []}), encoding="utf-8")
 
     report = check_h200_fetch_manifest(
         root=tmp_path,
+        remote_manifest_path=remote_manifest_path,
         local_manifest_path=local_manifest_path,
         compare_report_path=compare_report_path,
         required_paths=required_paths,
@@ -130,15 +134,21 @@ def test_h200_fetch_manifest_check_rejects_stale_or_incomplete_fetch(tmp_path: P
     ]:
         (run_dir / filename).write_text(f"{filename}\n", encoding="utf-8")
     local_manifest_path = tmp_path / "logs" / "h200" / "h200_artifact_manifest_local.json"
+    remote_manifest_path = tmp_path / "logs" / "h200" / "h200_artifact_manifest_remote.json"
     compare_report_path = tmp_path / "logs" / "h200" / "h200_artifact_manifest_compare.json"
     local_manifest_path.parent.mkdir(parents=True)
     local_manifest = artifact_manifest(tmp_path, [Path("results/h200_qwen_full_sweep")])
     local_manifest_path.write_text(json_dump(local_manifest), encoding="utf-8")
-    compare_report_path.write_text(json_dump({"passed": True, "failures": []}), encoding="utf-8")
+    remote_manifest_path.write_text(json_dump(local_manifest), encoding="utf-8")
+    compare_report_path.write_text(
+        json_dump(compare_manifest_files(remote_manifest_path, local_manifest_path)),
+        encoding="utf-8",
+    )
     (run_dir / "generations.jsonl").write_text("stale local edit\n", encoding="utf-8")
 
     report = check_h200_fetch_manifest(
         root=tmp_path,
+        remote_manifest_path=remote_manifest_path,
         local_manifest_path=local_manifest_path,
         compare_report_path=compare_report_path,
         required_paths=[
@@ -156,6 +166,47 @@ def test_h200_fetch_manifest_check_rejects_stale_or_incomplete_fetch(tmp_path: P
         "manifest_lacks_required_raw_file:"
         "results/h200_causal_patch_qwen7b/generations.jsonl"
     ) in report["failures"]
+
+
+def test_h200_fetch_manifest_check_rejects_stale_compare_report(tmp_path: Path) -> None:
+    run_dir = tmp_path / "results" / "h200_qwen_full_sweep"
+    run_dir.mkdir(parents=True)
+    for filename in [
+        "config.resolved.yaml",
+        "environment.json",
+        "manifest.json",
+        "prompts.jsonl",
+        "generations.jsonl",
+        "cache_stats.parquet",
+    ]:
+        (run_dir / filename).write_text(f"{filename}\n", encoding="utf-8")
+    local_manifest_path = tmp_path / "logs" / "h200" / "h200_artifact_manifest_local.json"
+    remote_manifest_path = tmp_path / "logs" / "h200" / "h200_artifact_manifest_remote.json"
+    compare_report_path = tmp_path / "logs" / "h200" / "h200_artifact_manifest_compare.json"
+    local_manifest_path.parent.mkdir(parents=True)
+    manifest_text = json_dump(artifact_manifest(tmp_path, [Path("results/h200_qwen_full_sweep")]))
+    local_manifest_path.write_text(manifest_text, encoding="utf-8")
+    remote_manifest_path.write_text(manifest_text, encoding="utf-8")
+    compare_report_path.write_text(
+        json_dump(compare_manifest_files(remote_manifest_path, local_manifest_path)),
+        encoding="utf-8",
+    )
+    local_manifest_path.write_text(
+        json_dump(artifact_manifest(tmp_path, [Path("results/h200_qwen_full_sweep")])),
+        encoding="utf-8",
+    )
+    local_manifest_path.write_text(local_manifest_path.read_text(encoding="utf-8") + "\n")
+
+    report = check_h200_fetch_manifest(
+        root=tmp_path,
+        remote_manifest_path=remote_manifest_path,
+        local_manifest_path=local_manifest_path,
+        compare_report_path=compare_report_path,
+        required_paths=["results/h200_qwen_full_sweep"],
+    )
+
+    assert report["passed"] is False
+    assert "artifact_manifest_compare_actual_manifest_sha256_stale" in report["failures"]
 
 
 def json_dump(value: object) -> str:

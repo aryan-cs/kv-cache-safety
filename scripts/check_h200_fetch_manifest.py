@@ -31,6 +31,11 @@ def main() -> None:
     )
     parser.add_argument("--root", type=Path, default=Path("."))
     parser.add_argument(
+        "--remote-manifest",
+        type=Path,
+        default=Path("logs/h200/h200_artifact_manifest_remote.json"),
+    )
+    parser.add_argument(
         "--local-manifest",
         type=Path,
         default=Path("logs/h200/h200_artifact_manifest_local.json"),
@@ -46,6 +51,7 @@ def main() -> None:
     required_paths = args.required_path or DEFAULT_REQUIRED_PATHS
     report = check_h200_fetch_manifest(
         root=args.root,
+        remote_manifest_path=args.remote_manifest,
         local_manifest_path=args.local_manifest,
         compare_report_path=args.compare_report,
         required_paths=required_paths,
@@ -61,6 +67,7 @@ def main() -> None:
 def check_h200_fetch_manifest(
     *,
     root: Path,
+    remote_manifest_path: Path,
     local_manifest_path: Path,
     compare_report_path: Path,
     required_paths: list[str],
@@ -76,6 +83,13 @@ def check_h200_fetch_manifest(
         failures.append("artifact_manifest_compare_not_passed")
         for failure in compare_report.get("failures") or []:
             failures.append(f"artifact_manifest_compare_failure:{failure}")
+    failures.extend(
+        _compare_report_manifest_hash_failures(
+            compare_report,
+            remote_manifest_path=remote_manifest_path,
+            local_manifest_path=local_manifest_path,
+        )
+    )
 
     requested_paths = {str(path) for path in local_manifest.get("requested_paths") or []}
     missing_paths = {str(path) for path in local_manifest.get("missing_paths") or []}
@@ -130,6 +144,31 @@ def _raw_file_failures(root: Path, files: dict[str, Any], required_path: str) ->
             failures.append(f"required_raw_file_byte_mismatch:{rel_path}")
         if row.get("sha256") != file_sha256(path):
             failures.append(f"required_raw_file_sha256_mismatch:{rel_path}")
+    return failures
+
+
+def _compare_report_manifest_hash_failures(
+    compare_report: dict[str, Any],
+    *,
+    remote_manifest_path: Path,
+    local_manifest_path: Path,
+) -> list[str]:
+    failures = []
+    expected_remote_sha = compare_report.get("expected_manifest_sha256")
+    if not expected_remote_sha:
+        failures.append("artifact_manifest_compare_lacks_expected_manifest_sha256")
+    elif not remote_manifest_path.exists():
+        failures.append(f"missing_remote_manifest_copy:{remote_manifest_path}")
+    elif expected_remote_sha != file_sha256(remote_manifest_path):
+        failures.append("artifact_manifest_compare_expected_manifest_sha256_stale")
+
+    expected_local_sha = compare_report.get("actual_manifest_sha256")
+    if not expected_local_sha:
+        failures.append("artifact_manifest_compare_lacks_actual_manifest_sha256")
+    elif not local_manifest_path.exists():
+        failures.append(f"missing_local_manifest:{local_manifest_path}")
+    elif expected_local_sha != file_sha256(local_manifest_path):
+        failures.append("artifact_manifest_compare_actual_manifest_sha256_stale")
     return failures
 
 
