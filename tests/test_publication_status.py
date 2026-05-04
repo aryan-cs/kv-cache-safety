@@ -23,6 +23,7 @@ def test_publication_status_reports_missing_artifacts_as_blockers(tmp_path: Path
     assert "primary_results_complete" in status["blockers"]
     assert "claim_assessment_passed" in status["blockers"]
     assert "paper_pdf_exists" in status["blockers"]
+    assert "paper_pdf_valid" in status["blockers"]
 
 
 def test_publication_status_can_ignore_pdf_when_prechecking_complete_build(tmp_path: Path) -> None:
@@ -53,6 +54,7 @@ def test_publication_status_can_ignore_pdf_when_prechecking_complete_build(tmp_p
     assert status["publication_ready"] is True
     assert status["paper_pdf_required"] is False
     assert "paper_pdf_exists" not in status["blockers"]
+    assert "paper_pdf_valid" not in status["blockers"]
 
 
 def test_publication_markdown_marks_existing_pdf_as_draft_until_evidence_ready(
@@ -105,6 +107,38 @@ def test_publication_status_accepts_complete_real_artifacts(tmp_path: Path) -> N
     assert status["publication_ready"] is True
     assert status["blockers"] == []
     assert "Publication ready: `true`" in render_markdown(status)
+
+
+def test_publication_status_rejects_non_pdf_final_paper(tmp_path: Path) -> None:
+    primary = tmp_path / "primary"
+    causal = tmp_path / "causal"
+    primary_audit = tmp_path / "primary_audit"
+    causal_audit = tmp_path / "causal_audit"
+    _write_run(primary)
+    _write_run(causal)
+    _write_audit(primary_audit, primary)
+    _write_audit(causal_audit, causal)
+    claim_path = tmp_path / "claim_assessment.json"
+    claim_path.write_text(
+        json.dumps(_passing_claim_assessment(primary, causal, primary_audit, causal_audit)),
+        encoding="utf-8",
+    )
+    pdf_path = tmp_path / "paper.pdf"
+    pdf_path.write_text("not a real pdf", encoding="utf-8")
+
+    status = publication_status(
+        primary_results_dir=primary,
+        causal_results_dir=causal,
+        primary_audit_dir=primary_audit,
+        causal_audit_dir=causal_audit,
+        claim_assessment_path=claim_path,
+        paper_pdf=pdf_path,
+    )
+
+    assert status["publication_ready"] is False
+    assert "paper_pdf_valid" in status["blockers"]
+    assert status["paper_pdf"]["failure"] == "missing PDF signature"
+    assert "paper PDF: `invalid`" in render_markdown(status)
 
 
 def test_publication_status_requires_complete_arxiv_bundle_when_requested(tmp_path: Path) -> None:

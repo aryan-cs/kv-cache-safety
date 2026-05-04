@@ -146,6 +146,7 @@ def publication_status(
         "causal_human_audit_complete": causal_audit["complete"],
         "claim_assessment_passed": claim_assessment["passed"],
         "paper_pdf_exists": pdf["exists"] or not require_paper_pdf,
+        "paper_pdf_valid": pdf["valid"] or not require_paper_pdf,
     }
     if require_arxiv_bundle:
         gates["arxiv_bundle_ready"] = arxiv["complete"]
@@ -307,12 +308,27 @@ def _claim_status(
 
 
 def _pdf_status(path: Path) -> dict[str, Any]:
+    failure = _pdf_failure(path)
     return {
         "path": str(path),
         "exists": path.exists(),
+        "valid": path.exists() and not failure,
+        "failure": failure,
         "bytes": path.stat().st_size if path.exists() else None,
         "sha256": file_sha256(path),
     }
+
+
+def _pdf_failure(path: Path) -> str:
+    if not path.exists():
+        return "missing"
+    try:
+        prefix = path.read_bytes()[:5]
+    except OSError as exc:
+        return str(exc)
+    if prefix != b"%PDF-":
+        return "missing PDF signature"
+    return ""
 
 
 def _arxiv_status(source_dir: Path, archive: Path) -> dict[str, Any]:
@@ -517,6 +533,9 @@ def _pdf_line(status: dict[str, Any], *, evidence_ready: bool) -> str:
     if not status["exists"]:
         state = "missing"
         suffix = ""
+    elif not status.get("valid"):
+        state = "invalid"
+        suffix = f" ({status.get('failure', 'invalid PDF')})"
     elif evidence_ready:
         state = "exists"
         suffix = ""
