@@ -7,6 +7,7 @@ sys.path.insert(0, str(Path("scripts").resolve()))
 
 from check_publication_readiness import _check_figure_manifest, _figure_artifact_failure
 from make_figures import (
+    _paired_safety_forest_rows,
     _phase_portrait_rows,
     _prompt_effect_constellation_rows,
     _safety_state_atlas_rows,
@@ -240,6 +241,34 @@ def test_selective_rows_for_figures_prefers_suite_level_ssei() -> None:
             "capability_degradation": 0.02,
         }
     ]
+
+
+def test_paired_safety_forest_rows_keep_csv_labels_single_line() -> None:
+    rows = _paired_safety_forest_rows(
+        {
+            "selective_safety_erasure": {
+                "public_refusal_safety::sliding_window__budget64": {
+                    "paired_safety_degradation_ci": {
+                        "mean": 0.1,
+                        "ci_low": 0.05,
+                        "ci_high": 0.15,
+                        "cluster_n": 10,
+                    }
+                }
+            }
+        }
+    )
+
+    assert rows == [
+        {
+            "label": "public_refusal_safety / sliding_window__budget64",
+            "mean": 0.1,
+            "ci_low": 0.05,
+            "ci_high": 0.15,
+            "cluster_n": 10,
+        }
+    ]
+    assert "\n" not in rows[0]["label"]
 
 
 def test_prompt_effect_constellation_rows_pair_against_baseline() -> None:

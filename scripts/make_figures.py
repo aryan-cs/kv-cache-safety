@@ -270,20 +270,7 @@ def main() -> None:
                 )
                 plt.close(fig)
 
-            forest_rows = []
-            for key, value in metrics.get("selective_safety_erasure", {}).items():
-                ci = value.get("paired_safety_degradation_ci", {})
-                if ci.get("mean") is None or ci.get("ci_low") is None or ci.get("ci_high") is None:
-                    continue
-                forest_rows.append(
-                    {
-                        "label": key.replace("::", "\n"),
-                        "mean": ci["mean"],
-                        "ci_low": ci["ci_low"],
-                        "ci_high": ci["ci_high"],
-                        "cluster_n": ci.get("cluster_n"),
-                    }
-                )
+            forest_rows = _paired_safety_forest_rows(metrics)
             if forest_rows:
                 forest_df = pd.DataFrame(forest_rows).sort_values("mean")
                 fig_height = max(4, 0.35 * len(forest_df))
@@ -295,7 +282,10 @@ def main() -> None:
                 ]
                 ax.errorbar(forest_df["mean"], y, xerr=xerr, fmt="o", capsize=3)
                 ax.axvline(0, color="black", linewidth=0.8)
-                ax.set_yticks(list(y), labels=forest_df["label"])
+                ax.set_yticks(
+                    list(y),
+                    labels=[label.replace(" / ", "\n") for label in forest_df["label"]],
+                )
                 ax.set_xlabel("Paired safety degradation")
                 ax.set_title("Paired Safety Degradation With Prompt-Clustered CIs")
                 fig.tight_layout()
@@ -693,6 +683,24 @@ def _selective_rows_for_figures(metrics: dict[str, Any]) -> list[dict[str, Any]]
             }
         )
     return policy_rows
+
+
+def _paired_safety_forest_rows(metrics: dict[str, Any]) -> list[dict[str, Any]]:
+    rows = []
+    for key, value in metrics.get("selective_safety_erasure", {}).items():
+        ci = value.get("paired_safety_degradation_ci", {})
+        if ci.get("mean") is None or ci.get("ci_low") is None or ci.get("ci_high") is None:
+            continue
+        rows.append(
+            {
+                "label": key.replace("::", " / "),
+                "mean": ci["mean"],
+                "ci_low": ci["ci_low"],
+                "ci_high": ci["ci_high"],
+                "cluster_n": ci.get("cluster_n"),
+            }
+        )
+    return rows
 
 
 def _phase_portrait_rows(selective_df: Any) -> Any:
