@@ -12,6 +12,7 @@ target_ci_width="${TARGET_CI_WIDTH:-0.08}"
 causal_ci_width="${CAUSAL_CI_WIDTH:-0.12}"
 qwen32_ci_width="${QWEN32_CI_WIDTH:-0.10}"
 require_human_audit="${REQUIRE_HUMAN_AUDIT:-1}"
+require_cache_mediated_claim="${REQUIRE_CACHE_MEDIATED_CLAIM:-1}"
 
 require_result_artifacts() {
   local results_dir="$1"
@@ -140,6 +141,18 @@ rebuild_qwen32_if_present() {
     --require-public-provenance
 }
 
+assess_claims() {
+  local claim_args=(
+    --primary-results-dir "$primary_results"
+    --causal-results-dir "$causal_results"
+    --output-dir paper/generated/claim_assessment
+  )
+  if [[ "$require_cache_mediated_claim" == "1" ]]; then
+    claim_args+=(--require-cache-mediated-claim)
+  fi
+  uv run python scripts/assess_claims.py "${claim_args[@]}"
+}
+
 if [[ "$require_human_audit" == "1" ]]; then
   require_human_audit_artifacts "$primary_audit_summary"
   require_human_audit_artifacts "$causal_audit_summary"
@@ -151,6 +164,7 @@ uv run pytest -q
 
 rebuild_primary
 rebuild_causal
+assess_claims
 rebuild_qwen32_if_present
 
 bash scripts/build_paper_pdf.sh
