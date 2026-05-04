@@ -94,6 +94,22 @@ def render_markdown(status: dict[str, Any]) -> str:
         )
     else:
         lines.append(f"- unavailable: `{gpu.get('error')}`")
+    if gpu.get("available"):
+        lines.append("")
+        lines.append("### Visible Compute Apps")
+        lines.append("")
+        compute_apps = gpu.get("compute_apps") or []
+        if compute_apps:
+            for app in compute_apps:
+                lines.append(
+                    f"- pid `{app['pid']}`, memory `{app['used_memory_mib']} MiB`: "
+                    f"`{app['process_name']}`"
+                )
+        else:
+            lines.append("- none reported by `nvidia-smi --query-compute-apps`")
+        pmon = str(gpu.get("pmon") or "").strip()
+        if pmon:
+            lines.extend(["", "### Process Monitor Snapshot", "", "```text", pmon, "```"])
     lines.extend(["", "## Processes", ""])
     if status["processes"]:
         for row in status["processes"]:
@@ -134,6 +150,7 @@ def _gpu_status() -> dict[str, Any]:
         return {"available": False, "error": f"could not parse nvidia-smi output: {line}"}
     pmon = _run(["nvidia-smi", "pmon", "-c", "1"], cwd=None)
     parsed["pmon"] = pmon.stdout.strip() if pmon.returncode == 0 else pmon.stderr.strip()
+    parsed["compute_apps"] = _compute_apps()
     return parsed
 
 
@@ -158,6 +175,36 @@ def _gpu_gate_likely_blocked(gpu: dict[str, Any]) -> bool:
     if not gpu.get("available"):
         return False
     return int(gpu.get("memory_used_mib") or 0) > 20_000 or int(gpu.get("utilization_pct") or 0) > 20
+
+
+def _compute_apps() -> list[dict[str, Any]]:
+    result = _run(
+        [
+            "nvidia-smi",
+            "--query-compute-apps=pid,process_name,used_memory",
+            "--format=csv,noheader,nounits",
+        ],
+        cwd=None,
+    )
+    if result.returncode != 0:
+        return []
+    rows = []
+    for line in result.stdout.splitlines():
+        parsed = _parse_compute_app_line(line)
+        if parsed is not None:
+            rows.append(parsed)
+    return rows
+
+
+def _parse_compute_app_line(line: str) -> dict[str, Any] | None:
+    parts = [part.strip() for part in line.split(",")]
+    if len(parts) != 3 or not parts[0]:
+        return None
+    try:
+        used_memory_mib = int(parts[2])
+    except ValueError:
+        return None
+    return {"pid": parts[0], "process_name": parts[1], "used_memory_mib": used_memory_mib}
 
 
 def _process_rows() -> list[dict[str, str]]:

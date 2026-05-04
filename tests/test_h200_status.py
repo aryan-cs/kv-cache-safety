@@ -6,6 +6,7 @@ sys.path.insert(0, str(Path("scripts").resolve()))
 from report_h200_status import (
     _artifact_status,
     _gpu_gate_likely_blocked,
+    _parse_compute_app_line,
     _parse_gpu_query_line,
     _run,
     render_markdown,
@@ -28,6 +29,14 @@ def test_parse_gpu_query_line() -> None:
 
 def test_parse_gpu_query_line_rejects_malformed_output() -> None:
     assert _parse_gpu_query_line("not enough fields") is None
+
+
+def test_parse_compute_app_line() -> None:
+    parsed = _parse_compute_app_line("1234, python, 4096")
+
+    assert parsed == {"pid": "1234", "process_name": "python", "used_memory_mib": 4096}
+    assert _parse_compute_app_line("not enough fields") is None
+    assert _parse_compute_app_line("1234, python, N/A") is None
 
 
 def test_run_reports_missing_executable() -> None:
@@ -62,6 +71,8 @@ def test_render_markdown_summarizes_blocked_launcher() -> None:
                 "memory_used_mib": 142461,
                 "memory_total_mib": 143771,
                 "utilization_pct": 100,
+                "compute_apps": [],
+                "pmon": "# gpu pid type sm mem\n0 - - - -",
             },
             "processes": [
                 {
@@ -76,4 +87,6 @@ def test_render_markdown_summarizes_blocked_launcher() -> None:
     )
 
     assert "GPU gate likely blocked: `true`" in text
+    assert "none reported by `nvidia-smi --query-compute-apps`" in text
+    assert "Process Monitor Snapshot" in text
     assert "`results/h200_qwen_full_sweep`: missing" in text
