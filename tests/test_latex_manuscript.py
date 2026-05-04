@@ -50,6 +50,8 @@ def test_latex_manuscript_is_formal_registered_protocol() -> None:
     assert "mock-model" not in tex
     assert "Replace this box" not in tex
     assert "Failure Examples" not in tex
+    assert "seven interventions" not in tex
+    assert "Attention-H2O retention is treated as a diagnostic extension" in tex
 
 
 def test_latex_references_cover_primary_model_and_cache_work() -> None:

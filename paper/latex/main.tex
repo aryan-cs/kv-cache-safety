@@ -162,16 +162,16 @@ All experiments use open-weight models, public datasets, and local evaluation co
 
 \subsection{Cache Policies}
 
-We compare uncompressed generation against seven interventions:
+The primary sweep compares uncompressed generation against six registered interventions:
 \begin{itemize}
   \item \textbf{sliding window:} retain only the last $N$ cached tokens;
   \item \textbf{sink plus recent:} retain the first $S$ tokens and last $N$ tokens;
   \item \textbf{random matched:} evict random tokens at the same budget as a structured policy;
-  \item \textbf{attention H2O:} retain high-attention historical tokens where attention scores are available;
   \item \textbf{KV int8 simulation:} quantize and dequantize key/value tensors with an int8 symmetric approximation;
   \item \textbf{KV int4 simulation:} apply a more aggressive int4 approximation;
   \item \textbf{policy pinned:} protect system or policy spans while applying an eviction budget to other spans.
 \end{itemize}
+Attention-H2O retention is treated as a diagnostic extension when attention-score artifacts are present, not as a required primary-policy gate.
 
 Each policy logs retained and evicted token counts by role, layer count, decode step, policy label, and cache-norm statistics where available. These logs support both figures and sanity checks that compression was active.
 
