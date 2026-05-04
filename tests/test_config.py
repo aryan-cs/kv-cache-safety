@@ -72,9 +72,19 @@ def test_h200_launcher_revalidates_after_gpu_gate() -> None:
 
     assert 'sync_and_validate "Pre-gate"' in script
     assert 'sync_and_validate "Post-gate"' in script
+    assert "scripts/wait_for_h200_gpu.sh" in script
     assert script.index('sync_and_validate "Post-gate"') > script.index(
         "bash scripts/wait_for_h200_gpu.sh"
     )
+    assert "bash -n" in script
+
+
+def test_h200_wait_script_logs_visible_gpu_users() -> None:
+    script = Path("scripts/wait_for_h200_gpu.sh").read_text(encoding="utf-8")
+
+    assert "--query-compute-apps=pid,process_name,used_memory" in script
+    assert "nvidia-smi pmon -c 1" in script
+    assert "log_visible_gpu_users" in script
 
 
 def test_h200_readiness_uses_paper_grade_prompt_thresholds() -> None:

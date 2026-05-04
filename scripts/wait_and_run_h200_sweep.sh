@@ -70,7 +70,11 @@ sync_and_validate() {
 
   uv run ruff check .
   uv run pytest -q
-  bash -n scripts/run_h200_sweep.sh scripts/run_h200_ci_extension.sh scripts/run_qwen32b_followup.sh
+  bash -n \
+    scripts/wait_for_h200_gpu.sh \
+    scripts/run_h200_sweep.sh \
+    scripts/run_h200_ci_extension.sh \
+    scripts/run_qwen32b_followup.sh
 }
 
 sync_and_validate "Pre-gate"
