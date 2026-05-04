@@ -12,6 +12,8 @@ add_src_to_path()
 
 from cache_safety_erasure.utils.io import utc_timestamp, write_json
 
+DEFAULT_SUPPORT_BUNDLE = Path("logs/h200/h200_support_bundle_latest.tar.gz")
+
 
 def main() -> None:
     parser = argparse.ArgumentParser(
@@ -35,15 +37,19 @@ def main() -> None:
         type=Path,
         default=Path("logs/h200/h200_admin_report.md"),
     )
-    parser.add_argument("--output", type=Path, default=None)
+    parser.add_argument(
+        "--output",
+        type=Path,
+        default=DEFAULT_SUPPORT_BUNDLE,
+        help="Output tarball path. Defaults to the stable latest-path used by support reports.",
+    )
     args = parser.parse_args()
 
-    output = args.output or Path("logs/h200") / f"h200_support_bundle_{utc_timestamp()}.tar.gz"
     bundle = package_support_bundle(
         status_json=args.status_json,
         status_md=args.status_md,
         admin_md=args.admin_md,
-        output=output,
+        output=args.output,
     )
     print(f"Wrote {bundle}")
 

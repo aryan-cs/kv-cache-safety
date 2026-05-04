@@ -131,6 +131,7 @@ def test_h200_report_fetcher_copies_expected_reports() -> None:
     assert "scp -q" in script
     assert "bash scripts/fetch_h200_reports.sh" in readme
     assert "scripts/package_h200_support_bundle.py" in readme
+    assert "--output logs/h200/h200_support_bundle_latest.tar.gz" in readme
     assert "configs/experiments/h200_qwen_full_sweep.yaml" in readme
 
 

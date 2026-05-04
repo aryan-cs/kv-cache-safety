@@ -7,7 +7,15 @@ import pytest
 
 sys.path.insert(0, str(Path("scripts").resolve()))
 
-from package_h200_support_bundle import package_support_bundle, support_bundle_inputs
+from package_h200_support_bundle import (
+    DEFAULT_SUPPORT_BUNDLE,
+    package_support_bundle,
+    support_bundle_inputs,
+)
+
+
+def test_support_bundle_default_matches_admin_report_handoff_path() -> None:
+    assert DEFAULT_SUPPORT_BUNDLE == Path("logs/h200/h200_support_bundle_latest.tar.gz")
 
 
 def test_support_bundle_packages_only_infrastructure_diagnostics(tmp_path: Path) -> None:
