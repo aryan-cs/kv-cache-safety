@@ -114,6 +114,69 @@ def test_empty_cache_stats_sink_writes_readable_schema(tmp_path: Path) -> None:
     assert parquet_file.schema_arrow.names == CACHE_STATS_COLUMNS
 
 
+def test_cache_stats_sink_migrates_legacy_sparse_schema_on_resume(tmp_path: Path) -> None:
+    import sys
+
+    import pandas as pd
+    import pyarrow.parquet as pq
+
+    sys.path.insert(0, str(Path("scripts").resolve()))
+    from run_experiment import _CacheStatsSink
+
+    path = tmp_path / "cache_stats.parquet"
+    pd.DataFrame(
+        [
+            {
+                "prompt_id": "legacy",
+                "seed": 0,
+                "policy": "policy_pinned__budget128__sink8",
+                "decode_step": 0,
+                "original_seq_len": 64,
+                "retained_count": 64,
+                "evicted_count": 0,
+                "retained_indices": "0,1",
+                "evicted_indices": "",
+                "cache_l2_before": 1.0,
+                "cache_l2_after": 1.0,
+                "retained_generated_tokens": 0.0,
+                "sink_tokens": 8.0,
+                "protected_spans": "system,policy",
+            }
+        ]
+    ).to_parquet(path, index=False)
+
+    sink = _CacheStatsSink(path, resume=True)
+    sink.write(
+        [
+            {
+                "prompt_id": "new",
+                "seed": 1,
+                "policy": "attention_h2o__budget128",
+                "decode_step": 2,
+                "original_seq_len": 128,
+                "retained_count": 128,
+                "evicted_count": 0,
+                "retained_indices": "0,1",
+                "evicted_indices": "",
+                "cache_l2_before": 2.0,
+                "cache_l2_after": 1.75,
+                "quantization_bits": 4,
+                "attention_scores_used": True,
+                "patched_from_baseline": False,
+            }
+        ]
+    )
+    sink.close()
+
+    table = pq.read_table(path)
+    assert table.column("prompt_id").to_pylist() == ["legacy", "new"]
+    schema = table.schema
+    assert str(schema.field("sink_tokens").type) == "int64"
+    assert str(schema.field("retained_generated_tokens").type) == "int64"
+    assert str(schema.field("attention_scores_used").type) == "bool"
+    assert str(schema.field("protected_spans").type) == "large_string"
+
+
 def test_latex_table_export_escapes_policy_names(tmp_path: Path) -> None:
     import sys
 

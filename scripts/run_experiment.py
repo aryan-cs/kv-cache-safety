@@ -306,7 +306,8 @@ class _CacheStatsSink:
     def write(self, rows: list[dict[str, Any]]) -> None:
         if not rows:
             return
-        table = _cache_stats_table(rows)
+        schema = _cache_stats_schema()
+        table = _align_table_to_schema(_cache_stats_table(rows), schema)
         if self.writer is None:
             write_path = self.path
             if self.resume and self.path.exists():
@@ -316,9 +317,9 @@ class _CacheStatsSink:
                 import pyarrow.parquet as pq
             except ModuleNotFoundError as exc:
                 raise RuntimeError("pyarrow is required for cache_stats.parquet.") from exc
-            self.writer = pq.ParquetWriter(write_path, table.schema)
+            self.writer = pq.ParquetWriter(write_path, schema)
             if self.temp_path is not None:
-                _copy_existing_cache_stats(self.path, self.writer, table.schema)
+                _copy_existing_cache_stats(self.path, self.writer, schema)
         self.writer.write_table(table)
 
     def close(self) -> None:
