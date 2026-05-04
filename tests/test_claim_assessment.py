@@ -225,6 +225,8 @@ def test_claim_assessment_latex_table_is_formal_and_escaped() -> None:
     assert r"\label{tab:claim-assessment}" in table
     assert r"95\% CI" in table
     assert "kv\\_int4\\_sim" in table
+    assert "audit-support gate all pass" in table
+    assert "all three rows pass" not in table
 
 
 def test_claim_interpretation_allows_full_claim_only_when_all_gates_pass() -> None:
@@ -233,8 +235,9 @@ def test_claim_interpretation_allows_full_claim_only_when_all_gates_pass() -> No
     latex = render_interpretation_latex(assessment)
     markdown = render_interpretation_markdown(assessment)
 
-    assert "The manuscript may describe the observed effect as cache-mediated safety erasure" in latex
+    assert "The observed effect is described as cache-mediated safety erasure" in latex
     assert "All registered claim gates passed" in markdown
+    assert "Required manuscript action" not in latex
 
 
 def test_claim_assessment_writes_publication_abstract_status_only_after_gate() -> None:
@@ -257,7 +260,9 @@ def test_claim_assessment_writes_publication_abstract_status_only_after_gate() -
     assert r"\renewcommand{\EmpiricalStatusSentence}" in passed_latex
     assert "support the cache-mediated safety erasure claim" in passed_latex
     assert "human-audit gate has not cleared" in failed_latex
-    assert "publication-ready positive safety claims" in failed_latex
+    assert "automated, unaudited evidence" in failed_latex
+    assert "must" not in failed_latex.lower()
+    assert "should" not in failed_latex.lower()
 
 
 def test_claim_assessment_human_audit_uses_matched_patch_signature() -> None:
@@ -298,8 +303,10 @@ def test_claim_interpretation_blocks_causal_claim_for_selective_only_result() ->
 
     latex = render_interpretation_latex(assessment)
 
-    assert "must not claim cache-mediated safety erasure" in latex
+    assert "rather than cache-mediated safety erasure" in latex
     assert "selective cache-induced safety degradation" in latex
+    assert "must" not in latex.lower()
+    assert "pre-results protocol" not in latex.lower()
 
 
 def test_claim_assessment_require_flag_failure(tmp_path: Path) -> None:
