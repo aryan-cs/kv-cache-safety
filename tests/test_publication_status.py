@@ -20,6 +20,7 @@ REQUIRED_AUDIT_LABELS = [
     "human_unsafe_compliance",
     "human_system_leakage",
 ]
+PDF_BYTES = b"%PDF-1.7\n1 0 obj\n<<>>\nendobj\ntrailer\n<<>>\n%%EOF\n"
 
 
 def test_publication_status_reports_missing_artifacts_as_blockers(tmp_path: Path) -> None:
@@ -74,7 +75,7 @@ def test_publication_markdown_marks_existing_pdf_as_draft_until_evidence_ready(
     tmp_path: Path,
 ) -> None:
     pdf_path = tmp_path / "paper.pdf"
-    pdf_path.write_bytes(b"%PDF-1.7\n")
+    pdf_path.write_bytes(PDF_BYTES)
 
     status = publication_status(
         primary_results_dir=tmp_path / "primary",
@@ -106,7 +107,7 @@ def test_publication_status_accepts_complete_real_artifacts(tmp_path: Path) -> N
         encoding="utf-8",
     )
     pdf_path = tmp_path / "paper.pdf"
-    pdf_path.write_bytes(b"%PDF-1.7\n")
+    pdf_path.write_bytes(PDF_BYTES)
 
     status = publication_status(
         primary_results_dir=primary,
@@ -154,6 +155,37 @@ def test_publication_status_rejects_non_pdf_final_paper(tmp_path: Path) -> None:
     assert "paper PDF: `invalid`" in render_markdown(status)
 
 
+def test_publication_status_rejects_header_only_pdf(tmp_path: Path) -> None:
+    primary = tmp_path / "primary"
+    causal = tmp_path / "causal"
+    primary_audit = tmp_path / "primary_audit"
+    causal_audit = tmp_path / "causal_audit"
+    _write_run(primary)
+    _write_run(causal)
+    _write_audit(primary_audit, primary)
+    _write_audit(causal_audit, causal)
+    claim_path = tmp_path / "claim_assessment.json"
+    claim_path.write_text(
+        json.dumps(_passing_claim_assessment(primary, causal, primary_audit, causal_audit)),
+        encoding="utf-8",
+    )
+    pdf_path = tmp_path / "paper.pdf"
+    pdf_path.write_bytes(b"%PDF-1.7\n")
+
+    status = publication_status(
+        primary_results_dir=primary,
+        causal_results_dir=causal,
+        primary_audit_dir=primary_audit,
+        causal_audit_dir=causal_audit,
+        claim_assessment_path=claim_path,
+        paper_pdf=pdf_path,
+    )
+
+    assert status["publication_ready"] is False
+    assert "paper_pdf_valid" in status["blockers"]
+    assert status["paper_pdf"]["failure"] == "PDF too small"
+
+
 def test_publication_status_requires_complete_arxiv_bundle_when_requested(tmp_path: Path) -> None:
     primary = tmp_path / "primary"
     causal = tmp_path / "causal"
@@ -172,7 +204,7 @@ def test_publication_status_requires_complete_arxiv_bundle_when_requested(tmp_pa
         encoding="utf-8",
     )
     pdf_path = tmp_path / "paper.pdf"
-    pdf_path.write_bytes(b"%PDF-1.7\n")
+    pdf_path.write_bytes(PDF_BYTES)
 
     status = publication_status(
         primary_results_dir=primary,
@@ -208,7 +240,7 @@ def test_publication_status_rejects_malformed_arxiv_figure_pdf(tmp_path: Path) -
         encoding="utf-8",
     )
     pdf_path = tmp_path / "paper.pdf"
-    pdf_path.write_bytes(b"%PDF-1.7\n")
+    pdf_path.write_bytes(PDF_BYTES)
 
     status = publication_status(
         primary_results_dir=primary,
@@ -255,7 +287,7 @@ def test_publication_status_rejects_relative_malformed_arxiv_figure_pdf(
         encoding="utf-8",
     )
     pdf_path = tmp_path / "paper.pdf"
-    pdf_path.write_bytes(b"%PDF-1.7\n")
+    pdf_path.write_bytes(PDF_BYTES)
 
     status = publication_status(
         primary_results_dir=primary,
@@ -291,14 +323,14 @@ def test_publication_status_rejects_stale_arxiv_provenance_source(
     _write_audit(causal_audit, causal)
     _write_arxiv_bundle(arxiv_dir, archive)
     copied_figure = arxiv_dir / REQUIRED_ARXIV_FIGURE_FILES[0]
-    copied_figure.write_bytes(b"%PDF-1.7\nchanged\n")
+    copied_figure.write_bytes(PDF_BYTES + b"changed\n%%EOF\n")
     claim_path = tmp_path / "claim_assessment.json"
     claim_path.write_text(
         json.dumps(_passing_claim_assessment(primary, causal, primary_audit, causal_audit)),
         encoding="utf-8",
     )
     pdf_path = tmp_path / "paper.pdf"
-    pdf_path.write_bytes(b"%PDF-1.7\n")
+    pdf_path.write_bytes(PDF_BYTES)
 
     status = publication_status(
         primary_results_dir=primary,
@@ -314,7 +346,7 @@ def test_publication_status_rejects_stale_arxiv_provenance_source(
 
     assert status["publication_ready"] is False
     assert any(
-        failure.startswith("provenance_source_hash_stale:")
+        failure.startswith("provenance_bundle_hash_stale:")
         for failure in status["arxiv_bundle"]["failures"]
     )
 
@@ -341,7 +373,7 @@ def test_publication_status_requires_arxiv_file_provenance(tmp_path: Path) -> No
         encoding="utf-8",
     )
     pdf_path = tmp_path / "paper.pdf"
-    pdf_path.write_bytes(b"%PDF-1.7\n")
+    pdf_path.write_bytes(PDF_BYTES)
 
     status = publication_status(
         primary_results_dir=primary,
@@ -383,7 +415,7 @@ def test_publication_status_rejects_arxiv_archive_missing_manifest_assets(
         encoding="utf-8",
     )
     pdf_path = tmp_path / "paper.pdf"
-    pdf_path.write_bytes(b"%PDF-1.7\n")
+    pdf_path.write_bytes(PDF_BYTES)
 
     status = publication_status(
         primary_results_dir=primary,
@@ -437,7 +469,7 @@ def test_publication_status_rejects_unsafe_or_duplicate_archive_members(
         encoding="utf-8",
     )
     pdf_path = tmp_path / "paper.pdf"
-    pdf_path.write_bytes(b"%PDF-1.7\n")
+    pdf_path.write_bytes(PDF_BYTES)
 
     status = publication_status(
         primary_results_dir=primary,
@@ -481,7 +513,7 @@ def test_publication_status_rejects_unmanifested_empirical_archive_files(
         encoding="utf-8",
     )
     pdf_path = tmp_path / "paper.pdf"
-    pdf_path.write_bytes(b"%PDF-1.7\n")
+    pdf_path.write_bytes(PDF_BYTES)
 
     status = publication_status(
         primary_results_dir=primary,
@@ -524,7 +556,7 @@ def test_publication_status_requires_named_arxiv_figures(tmp_path: Path) -> None
         encoding="utf-8",
     )
     pdf_path = tmp_path / "paper.pdf"
-    pdf_path.write_bytes(b"%PDF-1.7\n")
+    pdf_path.write_bytes(PDF_BYTES)
 
     status = publication_status(
         primary_results_dir=primary,
@@ -580,7 +612,7 @@ def test_publication_status_rejects_arxiv_main_with_repo_local_paths(
         encoding="utf-8",
     )
     pdf_path = tmp_path / "paper.pdf"
-    pdf_path.write_bytes(b"%PDF-1.7\n")
+    pdf_path.write_bytes(PDF_BYTES)
 
     status = publication_status(
         primary_results_dir=primary,
@@ -628,7 +660,7 @@ def test_publication_status_rejects_missing_required_bundle_provenance(
         encoding="utf-8",
     )
     pdf_path = tmp_path / "paper.pdf"
-    pdf_path.write_bytes(b"%PDF-1.7\n")
+    pdf_path.write_bytes(PDF_BYTES)
 
     status = publication_status(
         primary_results_dir=primary,
@@ -672,7 +704,7 @@ def test_publication_status_rejects_raw_evidence_files_in_arxiv_archive(
         encoding="utf-8",
     )
     pdf_path = tmp_path / "paper.pdf"
-    pdf_path.write_bytes(b"%PDF-1.7\n")
+    pdf_path.write_bytes(PDF_BYTES)
 
     status = publication_status(
         primary_results_dir=primary,
@@ -715,7 +747,7 @@ def test_publication_status_rejects_manifest_invalid_figures(tmp_path: Path) -> 
         encoding="utf-8",
     )
     pdf_path = tmp_path / "paper.pdf"
-    pdf_path.write_bytes(b"%PDF-1.7\n")
+    pdf_path.write_bytes(PDF_BYTES)
 
     status = publication_status(
         primary_results_dir=primary,
@@ -751,7 +783,7 @@ def test_publication_status_rejects_draft_arxiv_bundle_when_required(tmp_path: P
         encoding="utf-8",
     )
     pdf_path = tmp_path / "paper.pdf"
-    pdf_path.write_bytes(b"%PDF-1.7\n")
+    pdf_path.write_bytes(PDF_BYTES)
 
     status = publication_status(
         primary_results_dir=primary,
@@ -771,6 +803,102 @@ def test_publication_status_rejects_draft_arxiv_bundle_when_required(tmp_path: P
     assert "arXiv bundle: `stale`" in render_markdown(status)
 
 
+def test_publication_status_rejects_invalid_generated_or_audit_arxiv_flags(
+    tmp_path: Path,
+) -> None:
+    primary = tmp_path / "primary"
+    causal = tmp_path / "causal"
+    primary_audit = tmp_path / "primary_audit"
+    causal_audit = tmp_path / "causal_audit"
+    arxiv_dir = tmp_path / "arxiv_source"
+    archive = tmp_path / "arxiv_source.tar.gz"
+    _write_run(primary)
+    _write_run(causal)
+    _write_audit(primary_audit, primary)
+    _write_audit(causal_audit, causal)
+    _write_arxiv_bundle(
+        arxiv_dir,
+        archive,
+        manifest_overrides={
+            "invalid_generated": ["generated/claim_assessment/placeholder.tex"],
+            "invalid_audit": ["audit/h200_qwen_full_sweep_summary/placeholder.tex"],
+        },
+    )
+    claim_path = tmp_path / "claim_assessment.json"
+    claim_path.write_text(
+        json.dumps(_passing_claim_assessment(primary, causal, primary_audit, causal_audit)),
+        encoding="utf-8",
+    )
+    pdf_path = tmp_path / "paper.pdf"
+    pdf_path.write_bytes(PDF_BYTES)
+
+    status = publication_status(
+        primary_results_dir=primary,
+        causal_results_dir=causal,
+        primary_audit_dir=primary_audit,
+        causal_audit_dir=causal_audit,
+        claim_assessment_path=claim_path,
+        paper_pdf=pdf_path,
+        arxiv_source_dir=arxiv_dir,
+        arxiv_archive=archive,
+        require_arxiv_bundle=True,
+    )
+
+    assert status["publication_ready"] is False
+    assert "invalid_generated" in status["arxiv_bundle"]["failures"]
+    assert "invalid_audit" in status["arxiv_bundle"]["failures"]
+
+
+def test_publication_status_rejects_self_referential_arxiv_provenance(
+    tmp_path: Path,
+) -> None:
+    primary = tmp_path / "primary"
+    causal = tmp_path / "causal"
+    primary_audit = tmp_path / "primary_audit"
+    causal_audit = tmp_path / "causal_audit"
+    arxiv_dir = tmp_path / "arxiv_source"
+    archive = tmp_path / "arxiv_source.tar.gz"
+    _write_run(primary)
+    _write_run(causal)
+    _write_audit(primary_audit, primary)
+    _write_audit(causal_audit, causal)
+    _write_arxiv_bundle(arxiv_dir, archive)
+    manifest_path = arxiv_dir / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    for row in manifest["copied_file_provenance"]:
+        if row["kind"] == "figure":
+            row["source_path"] = row["bundle_path"]
+            row["source_sha256"] = row["bundle_sha256"]
+            row["source_bytes"] = row["bundle_bytes"]
+            break
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    claim_path = tmp_path / "claim_assessment.json"
+    claim_path.write_text(
+        json.dumps(_passing_claim_assessment(primary, causal, primary_audit, causal_audit)),
+        encoding="utf-8",
+    )
+    pdf_path = tmp_path / "paper.pdf"
+    pdf_path.write_bytes(PDF_BYTES)
+
+    status = publication_status(
+        primary_results_dir=primary,
+        causal_results_dir=causal,
+        primary_audit_dir=primary_audit,
+        causal_audit_dir=causal_audit,
+        claim_assessment_path=claim_path,
+        paper_pdf=pdf_path,
+        arxiv_source_dir=arxiv_dir,
+        arxiv_archive=archive,
+        require_arxiv_bundle=True,
+    )
+
+    assert status["publication_ready"] is False
+    assert any(
+        failure.startswith("provenance_source_self_referential:")
+        for failure in status["arxiv_bundle"]["failures"]
+    )
+
+
 def test_publication_status_rejects_stale_audit_source_hashes(tmp_path: Path) -> None:
     primary = tmp_path / "primary"
     causal = tmp_path / "causal"
@@ -787,7 +915,7 @@ def test_publication_status_rejects_stale_audit_source_hashes(tmp_path: Path) ->
         encoding="utf-8",
     )
     pdf_path = tmp_path / "paper.pdf"
-    pdf_path.write_bytes(b"%PDF-1.7\n")
+    pdf_path.write_bytes(PDF_BYTES)
 
     status = publication_status(
         primary_results_dir=primary,
@@ -820,7 +948,7 @@ def test_publication_status_rejects_audits_without_inter_annotator_pairs(
         encoding="utf-8",
     )
     pdf_path = tmp_path / "paper.pdf"
-    pdf_path.write_bytes(b"%PDF-1.7\n")
+    pdf_path.write_bytes(PDF_BYTES)
 
     status = publication_status(
         primary_results_dir=primary,
@@ -855,7 +983,7 @@ def test_publication_status_rejects_stale_audit_input_hashes(tmp_path: Path) -> 
         encoding="utf-8",
     )
     pdf_path = tmp_path / "paper.pdf"
-    pdf_path.write_bytes(b"%PDF-1.7\n")
+    pdf_path.write_bytes(PDF_BYTES)
 
     status = publication_status(
         primary_results_dir=primary,
@@ -888,7 +1016,7 @@ def test_publication_status_rejects_stale_claim_source_hashes(tmp_path: Path) ->
     claim_path = tmp_path / "claim_assessment.json"
     claim_path.write_text(json.dumps(claim), encoding="utf-8")
     pdf_path = tmp_path / "paper.pdf"
-    pdf_path.write_bytes(b"%PDF-1.7\n")
+    pdf_path.write_bytes(PDF_BYTES)
 
     status = publication_status(
         primary_results_dir=primary,
@@ -925,7 +1053,7 @@ def test_publication_status_rejects_claim_inconsistent_with_source_metrics(
         encoding="utf-8",
     )
     pdf_path = tmp_path / "paper.pdf"
-    pdf_path.write_bytes(b"%PDF-1.7\n")
+    pdf_path.write_bytes(PDF_BYTES)
 
     status = publication_status(
         primary_results_dir=primary,
@@ -974,7 +1102,7 @@ def test_publication_status_rejects_preliminary_claim_assessment_without_audit_g
         encoding="utf-8",
     )
     pdf_path = tmp_path / "paper.pdf"
-    pdf_path.write_bytes(b"%PDF-1.7\n")
+    pdf_path.write_bytes(PDF_BYTES)
 
     status = publication_status(
         primary_results_dir=primary,
@@ -1028,7 +1156,7 @@ def test_publication_status_rejects_gate_only_claim_assessment(tmp_path: Path) -
         encoding="utf-8",
     )
     pdf_path = tmp_path / "paper.pdf"
-    pdf_path.write_bytes(b"%PDF-1.7\n")
+    pdf_path.write_bytes(PDF_BYTES)
 
     status = publication_status(
         primary_results_dir=primary,
@@ -1064,6 +1192,41 @@ def test_publication_status_rejects_smoke_or_mock_runs(tmp_path: Path) -> None:
     assert "smoke_run" in status["primary_results"]["disqualifiers"]
 
 
+def test_publication_status_rejects_wrong_registered_h200_identity(tmp_path: Path) -> None:
+    primary = tmp_path / "primary"
+    causal = tmp_path / "causal"
+    primary_audit = tmp_path / "primary_audit"
+    causal_audit = tmp_path / "causal_audit"
+    _write_run(primary, manifest_overrides={"model_id": "Qwen/Qwen2.5-7B-Instruct"})
+    _write_run(causal)
+    environment = json.loads((primary / "environment.json").read_text(encoding="utf-8"))
+    environment["cuda_devices"] = [{"name": "Apple MPS", "total_memory": 24 * 1024**3}]
+    (primary / "environment.json").write_text(json.dumps(environment), encoding="utf-8")
+    _write_audit(primary_audit, primary)
+    _write_audit(causal_audit, causal)
+    claim_path = tmp_path / "claim_assessment.json"
+    claim_path.write_text(
+        json.dumps(_passing_claim_assessment(primary, causal, primary_audit, causal_audit)),
+        encoding="utf-8",
+    )
+    pdf_path = tmp_path / "paper.pdf"
+    pdf_path.write_bytes(PDF_BYTES)
+
+    status = publication_status(
+        primary_results_dir=primary,
+        causal_results_dir=causal,
+        primary_audit_dir=primary_audit,
+        causal_audit_dir=causal_audit,
+        claim_assessment_path=claim_path,
+        paper_pdf=pdf_path,
+    )
+
+    assert status["publication_ready"] is False
+    assert "primary_results_complete" in status["blockers"]
+    assert any("expected='Qwen/Qwen2.5-14B-Instruct'" in failure for failure in status["primary_results"]["readiness_failures"])
+    assert "environment_lacks_h200_gpu" in status["primary_results"]["readiness_failures"]
+
+
 def test_publication_status_rejects_obvious_run_readiness_failures(tmp_path: Path) -> None:
     primary = tmp_path / "primary"
     causal = tmp_path / "causal"
@@ -1080,7 +1243,7 @@ def test_publication_status_rejects_obvious_run_readiness_failures(tmp_path: Pat
         encoding="utf-8",
     )
     pdf_path = tmp_path / "paper.pdf"
-    pdf_path.write_bytes(b"%PDF-1.7\n")
+    pdf_path.write_bytes(PDF_BYTES)
 
     status = publication_status(
         primary_results_dir=primary,
@@ -1094,11 +1257,51 @@ def test_publication_status_rejects_obvious_run_readiness_failures(tmp_path: Pat
     assert status["publication_ready"] is False
     assert "primary_results_complete" in status["blockers"]
     assert any(
-        failure.startswith("generation_row_count=1; expected=2")
+        failure.startswith("generation_row_count=1; expected=")
         for failure in status["primary_results"]["readiness_failures"]
     )
     assert any(
         failure == "figures_manifest_source_hash_stale:generations.jsonl"
+        for failure in status["primary_results"]["readiness_failures"]
+    )
+
+
+def test_publication_status_recomputes_prompt_generation_matrix(tmp_path: Path) -> None:
+    primary = tmp_path / "primary"
+    causal = tmp_path / "causal"
+    primary_audit = tmp_path / "primary_audit"
+    causal_audit = tmp_path / "causal_audit"
+    _write_run(primary)
+    _write_run(causal)
+    prompt_lines = (primary / "prompts.jsonl").read_text(encoding="utf-8").splitlines()
+    (primary / "prompts.jsonl").write_text("\n".join(prompt_lines[:-1]) + "\n", encoding="utf-8")
+    _write_audit(primary_audit, primary)
+    _write_audit(causal_audit, causal)
+    claim_path = tmp_path / "claim_assessment.json"
+    claim_path.write_text(
+        json.dumps(_passing_claim_assessment(primary, causal, primary_audit, causal_audit)),
+        encoding="utf-8",
+    )
+    pdf_path = tmp_path / "paper.pdf"
+    pdf_path.write_bytes(PDF_BYTES)
+
+    status = publication_status(
+        primary_results_dir=primary,
+        causal_results_dir=causal,
+        primary_audit_dir=primary_audit,
+        causal_audit_dir=causal_audit,
+        claim_assessment_path=claim_path,
+        paper_pdf=pdf_path,
+    )
+
+    assert status["publication_ready"] is False
+    assert "primary_results_complete" in status["blockers"]
+    assert any(
+        failure.startswith("prompt_count_mismatch:public_capability_arc=")
+        for failure in status["primary_results"]["readiness_failures"]
+    )
+    assert any(
+        failure.startswith("generation_matrix_extra_rows:")
         for failure in status["primary_results"]["readiness_failures"]
     )
 
@@ -1122,7 +1325,7 @@ def test_publication_status_rejects_empty_figure_manifest(tmp_path: Path) -> Non
         encoding="utf-8",
     )
     pdf_path = tmp_path / "paper.pdf"
-    pdf_path.write_bytes(b"%PDF-1.7\n")
+    pdf_path.write_bytes(PDF_BYTES)
 
     status = publication_status(
         primary_results_dir=primary,
@@ -1162,7 +1365,7 @@ def test_publication_status_rejects_public_prompt_without_provenance(
         encoding="utf-8",
     )
     pdf_path = tmp_path / "paper.pdf"
-    pdf_path.write_bytes(b"%PDF-1.7\n")
+    pdf_path.write_bytes(PDF_BYTES)
 
     status = publication_status(
         primary_results_dir=primary,
@@ -1202,7 +1405,7 @@ def test_publication_status_requires_registered_primary_suites(tmp_path: Path) -
         encoding="utf-8",
     )
     pdf_path = tmp_path / "paper.pdf"
-    pdf_path.write_bytes(b"%PDF-1.7\n")
+    pdf_path.write_bytes(PDF_BYTES)
 
     status = publication_status(
         primary_results_dir=primary,
@@ -1248,7 +1451,7 @@ def test_publication_status_requires_registered_primary_policies(tmp_path: Path)
         encoding="utf-8",
     )
     pdf_path = tmp_path / "paper.pdf"
-    pdf_path.write_bytes(b"%PDF-1.7\n")
+    pdf_path.write_bytes(PDF_BYTES)
 
     status = publication_status(
         primary_results_dir=primary,
@@ -1291,7 +1494,7 @@ def test_publication_status_requires_causal_patch_controls(tmp_path: Path) -> No
         encoding="utf-8",
     )
     pdf_path = tmp_path / "paper.pdf"
-    pdf_path.write_bytes(b"%PDF-1.7\n")
+    pdf_path.write_bytes(PDF_BYTES)
 
     status = publication_status(
         primary_results_dir=primary,
@@ -1329,7 +1532,7 @@ def test_publication_status_rejects_wide_primary_safety_intervals(tmp_path: Path
         encoding="utf-8",
     )
     pdf_path = tmp_path / "paper.pdf"
-    pdf_path.write_bytes(b"%PDF-1.7\n")
+    pdf_path.write_bytes(PDF_BYTES)
 
     status = publication_status(
         primary_results_dir=primary,
@@ -1350,50 +1553,85 @@ def test_publication_status_rejects_wide_primary_safety_intervals(tmp_path: Path
 
 def _write_run(path: Path, manifest_overrides: dict | None = None) -> None:
     (path / "figures").mkdir(parents=True)
-    prompt_counts = {
-        "system_leakage": 2,
-        "public_system_leakage": 650,
-        "public_refusal_safety": 650,
-        "public_benign_overrefusal": 650,
-        "public_xstest_safe": 200,
-        "public_capability_arc": 650,
-    }
-    cache_policy_configs = [
-        {"name": "none"},
-        {"name": "sliding_window", "budget": 64},
-        {"name": "sink_recent", "budget": 128, "sink_tokens": 8},
-        {"name": "random_matched", "budget": 128, "seed": 991},
-        {"name": "kv_int8_sim"},
-        {"name": "kv_int4_sim"},
-        {"name": "policy_pinned", "budget": 128, "sink_tokens": 8},
-        {
-            "name": "kv_int4_sim",
-            "patch_from_baseline": {
-                "token_roles": ["system"],
-                "max_tokens": 16,
-                "selection": "first",
-                "components": ["key", "value"],
+    profile = "causal" if "causal" in path.name else "primary"
+    if profile == "causal":
+        prompt_counts = {
+            "system_leakage": 2,
+            "public_system_leakage": 650,
+            "public_refusal_safety": 650,
+        }
+        cache_policy_configs = [
+            {"name": "none"},
+            {"name": "kv_int4_sim"},
+            {
+                "name": "kv_int4_sim",
+                "patch_from_baseline": {
+                    "token_roles": ["system"],
+                    "max_tokens": 16,
+                    "selection": "first",
+                    "components": ["key", "value"],
+                },
             },
-        },
-        {
-            "name": "kv_int4_sim",
-            "patch_from_baseline": {
-                "token_roles": ["user"],
-                "match_token_count_to_roles": ["system"],
-                "max_tokens": 16,
-                "selection": "first",
-                "components": ["key", "value"],
+            {
+                "name": "kv_int4_sim",
+                "patch_from_baseline": {
+                    "token_roles": ["system"],
+                    "max_tokens": 16,
+                    "selection": "first",
+                    "components": ["key"],
+                },
             },
-        },
-    ]
-    manifest = {
-        "model_provider": "hf",
-        "model_id": "Qwen/Qwen2.5-14B-Instruct",
-        "run_name": "h200_qwen_full_sweep",
-        "git_dirty": False,
-        "git_commit": "abc123",
-        "expected_generation_count": 2,
-        "cache_policy_labels": [
+            {
+                "name": "kv_int4_sim",
+                "patch_from_baseline": {
+                    "token_roles": ["system"],
+                    "max_tokens": 16,
+                    "selection": "first",
+                    "components": ["value"],
+                },
+            },
+            {
+                "name": "kv_int4_sim",
+                "patch_from_baseline": {
+                    "token_roles": ["user"],
+                    "match_token_count_to_roles": ["system"],
+                    "max_tokens": 16,
+                    "selection": "first",
+                    "components": ["key", "value"],
+                },
+            },
+            {"name": "policy_pinned", "budget": 128, "sink_tokens": 8},
+        ]
+        cache_policy_labels = [
+            "none",
+            "kv_int4_sim",
+            "kv_int4_sim__patchkey-value__rolesystem__max16__selfirst",
+            "kv_int4_sim__patchkey__rolesystem__max16__selfirst",
+            "kv_int4_sim__patchvalue__rolesystem__max16__selfirst",
+            "kv_int4_sim__patchkey-value__roleuser__matchsystem__max16__selfirst",
+            "policy_pinned__budget128__sink8",
+        ]
+        run_name = "h200_causal_patch_qwen7b"
+        model_id = "Qwen/Qwen2.5-7B-Instruct"
+    else:
+        prompt_counts = {
+            "system_leakage": 2,
+            "public_system_leakage": 650,
+            "public_refusal_safety": 650,
+            "public_benign_overrefusal": 650,
+            "public_xstest_safe": 200,
+            "public_capability_arc": 650,
+        }
+        cache_policy_configs = [
+            {"name": "none"},
+            {"name": "sliding_window", "budget": 64},
+            {"name": "sink_recent", "budget": 128, "sink_tokens": 8},
+            {"name": "random_matched", "budget": 128, "seed": 991},
+            {"name": "kv_int8_sim"},
+            {"name": "kv_int4_sim"},
+            {"name": "policy_pinned", "budget": 128, "sink_tokens": 8},
+        ]
+        cache_policy_labels = [
             "none",
             "sliding_window__budget64",
             "sink_recent__budget128__sink8",
@@ -1401,10 +1639,21 @@ def _write_run(path: Path, manifest_overrides: dict | None = None) -> None:
             "kv_int8_sim",
             "kv_int4_sim",
             "policy_pinned__budget128__sink8",
-            "kv_int4_sim__patchkey-value__rolesystem__max16__selfirst",
-            "kv_int4_sim__patchkey-value__roleuser__matchsystem__max16__selfirst",
-        ],
+        ]
+        run_name = "h200_qwen_full_sweep"
+        model_id = "Qwen/Qwen2.5-14B-Instruct"
+    seeds = [0]
+    manifest = {
+        "model_provider": "hf",
+        "model_id": model_id,
+        "run_name": run_name,
+        "git_dirty": False,
+        "git_commit": "abc123",
+        "config_sha256": f"{profile}-config-sha",
+        "expected_generation_count": sum(prompt_counts.values()) * len(cache_policy_labels),
+        "cache_policy_labels": cache_policy_labels,
         "cache_policy_configs": cache_policy_configs,
+        "seeds": seeds,
         "prompt_counts": prompt_counts,
         "prompt_suites": list(prompt_counts),
         "prompt_suite_manifests": {
@@ -1417,16 +1666,46 @@ def _write_run(path: Path, manifest_overrides: dict | None = None) -> None:
         },
     }
     manifest.update(manifest_overrides or {})
-    for name in ["config.resolved.yaml", "environment.json", "cache_stats.parquet"]:
+    for name in ["config.resolved.yaml", "cache_stats.parquet"]:
         (path / name).write_text("artifact\n", encoding="utf-8")
+    (path / "environment.json").write_text(
+        json.dumps(
+            {
+                "git_commit": "abc123",
+                "git_dirty": False,
+                "torch_cuda_available": True,
+                "cuda_device_count": 1,
+                "cuda_devices": [
+                    {
+                        "index": 0,
+                        "name": "NVIDIA H200 NVL",
+                        "total_memory": 141 * 1024**3,
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    prompt_rows = _prompt_rows(prompt_counts)
     (path / "prompts.jsonl").write_text(
-        '{"suite":"public_refusal_safety","prompt_id":"p1",'
-        '"metadata":{"source_dataset":"unit","source_split":"test"}}\n',
+        "\n".join(json.dumps(row) for row in prompt_rows) + "\n",
         encoding="utf-8",
     )
     (path / "generations.jsonl").write_text(
-        '{"suite":"public_refusal_safety","prompt_id":"p1","policy":"none","seed":0}\n'
-        '{"suite":"public_refusal_safety","prompt_id":"p1","policy":"kv_int4_sim","seed":0}\n',
+        "\n".join(
+            json.dumps(
+                {
+                    "suite": row["suite"],
+                    "prompt_id": row["prompt_id"],
+                    "policy": policy,
+                    "seed": seed,
+                }
+            )
+            for row in prompt_rows
+            for policy in manifest["cache_policy_labels"]
+            for seed in manifest["seeds"]
+        )
+        + "\n",
         encoding="utf-8",
     )
     (path / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
@@ -1442,7 +1721,7 @@ def _write_run(path: Path, manifest_overrides: dict | None = None) -> None:
             '<svg xmlns="http://www.w3.org/2000/svg"></svg>\n',
             encoding="utf-8",
         )
-        pdf_path.write_bytes(b"%PDF-1.7\n")
+        pdf_path.write_bytes(PDF_BYTES)
         csv_path.write_text("x,y\n1,1\n", encoding="utf-8")
         figure_rows.append(
             {
@@ -1468,6 +1747,25 @@ def _write_run(path: Path, manifest_overrides: dict | None = None) -> None:
         json.dumps(figure_manifest),
         encoding="utf-8",
     )
+
+
+def _prompt_rows(prompt_counts: dict[str, int]) -> list[dict]:
+    rows = []
+    for suite, count in prompt_counts.items():
+        for idx in range(count):
+            row = {
+                "suite": suite,
+                "prompt_id": f"{suite}_p{idx}",
+                "metadata": {},
+            }
+            if suite.startswith("public_"):
+                row["metadata"] = {
+                    "source_dataset": "unit",
+                    "source_split": "test",
+                    "source_id": f"{suite}-{idx}",
+                }
+            rows.append(row)
+    return rows
 
 
 def _write_audit(
@@ -1700,7 +1998,7 @@ def _write_arxiv_bundle(
     legacy_figure = source_dir / "figures" / "figure.pdf"
     for figure in [*figure_files, legacy_figure]:
         if valid_figure_pdf:
-            figure.write_bytes(b"%PDF-1.7\n")
+            figure.write_bytes(PDF_BYTES)
         else:
             figure.write_text("not a pdf\n", encoding="utf-8")
     generated_files = [
@@ -1771,18 +2069,28 @@ def _rewrite_arxiv_archive(source_dir: Path, archive: Path) -> None:
 
 def _arxiv_provenance_rows(paths: list[Path], source_dir: Path) -> list[dict]:
     rows = []
+    source_root = source_dir.parent / "arxiv_source_inputs"
     for path in paths:
+        relative_path = path.relative_to(source_dir)
+        source_path = source_root / relative_path
+        source_path.parent.mkdir(parents=True, exist_ok=True)
+        source_path.write_bytes(path.read_bytes())
+        kind = {
+            "figures": "figure",
+            "generated": "generated",
+            "audit": "audit",
+        }.get(relative_path.parts[0], "test")
         rows.append(
             {
-                "kind": "test",
-                "source_path": str(path),
-                "source_sha256": _sha256(path),
-                "source_bytes": path.stat().st_size,
+                "kind": kind,
+                "source_path": str(source_path),
+                "source_sha256": _sha256(source_path),
+                "source_bytes": source_path.stat().st_size,
                 "bundle_path": str(path),
                 "bundle_sha256": _sha256(path),
                 "bundle_bytes": path.stat().st_size,
                 "direct_copy": path.name != "main.tex",
-                "relative_bundle_path": path.relative_to(source_dir).as_posix(),
+                "relative_bundle_path": relative_path.as_posix(),
             }
         )
     return rows

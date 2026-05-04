@@ -97,6 +97,17 @@ PRIMARY_REQUIRED_POLICIES = [
 CAUSAL_REQUIRED_POLICIES = ["none", "kv_int4_sim", "policy_pinned"]
 PRIMARY_MAX_CI_WIDTH = 0.08
 CAUSAL_MAX_CI_WIDTH = 0.12
+PROFILE_CONTRACTS = {
+    "primary": {
+        "run_name": "h200_qwen_full_sweep",
+        "model_id": "Qwen/Qwen2.5-14B-Instruct",
+    },
+    "causal": {
+        "run_name": "h200_causal_patch_qwen7b",
+        "model_id": "Qwen/Qwen2.5-7B-Instruct",
+    },
+}
+MIN_H200_DEVICE_MEMORY_BYTES = 100 * 1024**3
 EXPECTED_CLAIM_IDS = [
     "H1_behavioral_cache_sensitivity",
     "H2_selective_safety_degradation",
@@ -298,6 +309,7 @@ def render_markdown(status: dict[str, Any]) -> str:
 def _run_status(results_dir: Path, *, profile: str) -> dict[str, Any]:
     missing = [name for name in REQUIRED_RUN_ARTIFACTS if not (results_dir / name).exists()]
     manifest = _read_json(results_dir / "manifest.json")
+    environment = _read_json(results_dir / "environment.json")
     metrics = _read_json(results_dir / "metrics.json")
     disqualifiers: list[str] = []
     if manifest:
@@ -313,6 +325,10 @@ def _run_status(results_dir: Path, *, profile: str) -> dict[str, Any]:
         if "smoke" in run_name.lower() or "smoke" in results_dir.name.lower():
             disqualifiers.append("smoke_run")
     readiness_failures = _run_readiness_failures(results_dir, manifest, profile=profile)
+    if manifest:
+        readiness_failures.extend(
+            _profile_identity_failures(manifest, environment, profile=profile)
+        )
     return {
         "path": str(results_dir),
         "complete": not missing and not disqualifiers and not readiness_failures,
@@ -352,9 +368,41 @@ def _run_readiness_failures(
     if not manifest.get("prompt_counts"):
         failures.append("manifest_lacks_prompt_counts")
     failures.extend(_profile_contract_failures(results_dir, manifest, profile=profile))
+    failures.extend(_prompt_generation_matrix_failures(results_dir, manifest))
     failures.extend(_prompt_suite_provenance_failures(results_dir, manifest))
     failures.extend(_figure_source_failures(results_dir))
     failures.extend(_figure_manifest_failures(results_dir, profile=profile))
+    return failures
+
+
+def _profile_identity_failures(
+    manifest: dict[str, Any], environment: dict[str, Any], *, profile: str
+) -> list[str]:
+    contract = PROFILE_CONTRACTS.get(profile, {})
+    failures = []
+    for key in ["run_name", "model_id"]:
+        expected = contract.get(key)
+        observed = manifest.get(key)
+        if expected and observed != expected:
+            failures.append(f"{key}={observed!r}; expected={expected!r}")
+    if not manifest.get("config_sha256"):
+        failures.append("manifest_lacks_config_sha256")
+    if environment.get("git_commit") and manifest.get("git_commit") != environment.get("git_commit"):
+        failures.append("manifest_environment_git_commit_mismatch")
+    if environment.get("git_dirty"):
+        failures.append("dirty_environment_git_tree")
+    if environment:
+        if environment.get("torch_cuda_available") is not True:
+            failures.append("environment_lacks_cuda")
+        cuda_devices = environment.get("cuda_devices") or []
+        h200_devices = [
+            device
+            for device in cuda_devices
+            if "h200" in str(device.get("name", "")).lower()
+            and int(device.get("total_memory") or 0) >= MIN_H200_DEVICE_MEMORY_BYTES
+        ]
+        if not h200_devices:
+            failures.append("environment_lacks_h200_gpu")
     return failures
 
 
@@ -467,6 +515,116 @@ def _coerce_nonnegative_int(value: object, *, default: int) -> int:
         return max(0, int(value))
     except (TypeError, ValueError):
         return default
+
+
+def _prompt_generation_matrix_failures(results_dir: Path, manifest: dict[str, Any]) -> list[str]:
+    prompts_path = results_dir / "prompts.jsonl"
+    generations_path = results_dir / "generations.jsonl"
+    if not prompts_path.exists() or not generations_path.exists():
+        return []
+    prompt_rows, prompt_failures = _read_jsonl_objects(prompts_path, label="prompts")
+    generation_rows, generation_failures = _read_jsonl_objects(
+        generations_path, label="generations"
+    )
+    failures = [*prompt_failures, *generation_failures]
+    if prompt_failures or generation_failures:
+        return failures
+
+    prompt_counts: dict[str, int] = {}
+    prompt_keys: list[tuple[str, str]] = []
+    malformed_prompts = 0
+    for row in prompt_rows:
+        suite = row.get("suite")
+        prompt_id = row.get("prompt_id")
+        if suite is None or prompt_id is None:
+            malformed_prompts += 1
+            continue
+        suite_key = str(suite)
+        prompt_key = str(prompt_id)
+        prompt_counts[suite_key] = prompt_counts.get(suite_key, 0) + 1
+        prompt_keys.append((suite_key, prompt_key))
+    if malformed_prompts:
+        failures.append(f"prompts_jsonl_malformed_matrix_keys:{malformed_prompts}")
+
+    manifest_counts = {
+        str(suite): _coerce_nonnegative_int(count, default=-1)
+        for suite, count in (manifest.get("prompt_counts") or {}).items()
+    }
+    for suite in sorted(set(manifest_counts) | set(prompt_counts)):
+        if prompt_counts.get(suite, 0) != manifest_counts.get(suite, -1):
+            failures.append(
+                f"prompt_count_mismatch:{suite}={prompt_counts.get(suite, 0)}; "
+                f"manifest={manifest_counts.get(suite)}"
+            )
+
+    policy_labels = [str(label) for label in manifest.get("cache_policy_labels") or []]
+    seeds = [_coerce_nonnegative_int(seed, default=-1) for seed in manifest.get("seeds") or []]
+    if not policy_labels or not seeds or malformed_prompts:
+        return failures
+
+    expected_keys = {
+        (suite, prompt_id, policy, seed)
+        for suite, prompt_id in prompt_keys
+        for policy in policy_labels
+        for seed in seeds
+    }
+    observed_keys = []
+    malformed_generations = 0
+    for row in generation_rows:
+        try:
+            observed_keys.append(
+                (
+                    str(row["suite"]),
+                    str(row["prompt_id"]),
+                    str(row["policy"]),
+                    int(row["seed"]),
+                )
+            )
+        except (KeyError, TypeError, ValueError):
+            malformed_generations += 1
+    if malformed_generations:
+        failures.append(f"generations_jsonl_malformed_matrix_keys:{malformed_generations}")
+    observed_key_set = set(observed_keys)
+    duplicate_count = len(observed_keys) - len(observed_key_set)
+    if duplicate_count:
+        failures.append(f"generation_matrix_duplicate_rows:{duplicate_count}")
+    missing = expected_keys - observed_key_set
+    extra = observed_key_set - expected_keys
+    if missing:
+        failures.append(
+            f"generation_matrix_missing_rows:{len(missing)}; "
+            f"first={_format_matrix_key(sorted(missing)[0])}"
+        )
+    if extra:
+        failures.append(
+            f"generation_matrix_extra_rows:{len(extra)}; "
+            f"first={_format_matrix_key(sorted(extra)[0])}"
+        )
+    return failures
+
+
+def _read_jsonl_objects(path: Path, *, label: str) -> tuple[list[dict[str, Any]], list[str]]:
+    rows = []
+    failures = []
+    with path.open("r", encoding="utf-8") as f:
+        for line_number, line in enumerate(f, start=1):
+            if not line.strip():
+                continue
+            try:
+                row = json.loads(line)
+            except json.JSONDecodeError as exc:
+                failures.append(f"invalid_{label}_jsonl:{line_number}:{exc.msg}")
+                continue
+            if not isinstance(row, dict):
+                failures.append(f"invalid_{label}_jsonl:{line_number}:non_object")
+                continue
+            rows.append(row)
+    return rows, failures
+
+
+def _format_matrix_key(key: tuple[str, str, str, int]) -> str:
+    suite, prompt_id, policy, seed = key
+    return f"suite={suite},prompt_id={prompt_id},policy={policy},seed={seed}"
 
 
 def _prompt_suite_provenance_failures(results_dir: Path, manifest: dict[str, Any]) -> list[str]:
@@ -626,11 +784,15 @@ def _pdf_failure(path: Path) -> str:
     if not path.exists():
         return "missing"
     try:
-        prefix = path.read_bytes()[:5]
+        content = path.read_bytes()
     except OSError as exc:
         return str(exc)
-    if prefix != b"%PDF-":
+    if not content.startswith(b"%PDF-"):
         return "missing PDF signature"
+    if len(content) < 32:
+        return "PDF too small"
+    if b"%%EOF" not in content[-2048:]:
+        return "missing PDF EOF marker"
     return ""
 
 
@@ -649,7 +811,14 @@ def _arxiv_status(source_dir: Path, archive: Path) -> dict[str, Any]:
             failures.append("invalid_manifest_schema")
         if manifest.get("allow_missing"):
             failures.append("allow_missing_enabled")
-        for key in ["missing_figures", "invalid_figures", "missing_generated", "missing_audit"]:
+        for key in [
+            "missing_figures",
+            "invalid_figures",
+            "missing_generated",
+            "invalid_generated",
+            "missing_audit",
+            "invalid_audit",
+        ]:
             if manifest.get(key):
                 failures.append(key)
         for source_name, manifest_key in [
@@ -871,6 +1040,7 @@ def _copied_file_provenance_failures(source_dir: Path, manifest: dict[str, Any])
         source_path = Path(str(row.get("source_path", "")))
         bundle_path = _resolve_bundle_path(source_dir, row.get("bundle_path", ""))
         label = str(row.get("bundle_path") or idx)
+        kind = str(row.get("kind") or "")
         if not source_path.exists():
             failures.append(f"provenance_source_missing:{label}")
             continue
@@ -881,6 +1051,15 @@ def _copied_file_provenance_failures(source_dir: Path, manifest: dict[str, Any])
             bundle_path.resolve().relative_to(source_dir.resolve())
         except ValueError:
             failures.append(f"provenance_bundle_outside_source:{label}")
+        if kind in {"figure", "generated", "audit"} or label.startswith(
+            ("figures/", "generated/", "audit/")
+        ):
+            try:
+                source_path.resolve().relative_to(source_dir.resolve())
+            except ValueError:
+                pass
+            else:
+                failures.append(f"provenance_source_self_referential:{label}")
         source_sha = file_sha256(source_path)
         bundle_sha = file_sha256(bundle_path)
         if row.get("source_sha256") != source_sha:
