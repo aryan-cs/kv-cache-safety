@@ -61,6 +61,11 @@ uv run python scripts/check_publication_readiness.py \
   --required-policy sink_recent \
   --required-policy kv_int4_sim \
   --require-policy-pinned \
+  --required-figure safety_capability_phase_portrait \
+  --required-figure selective_safety_erasure_heatmap \
+  --required-figure prompt_effect_constellation \
+  --required-figure cache_state_fingerprint \
+  --required-figure safety_state_atlas \
   --require-public-provenance
 uv run python scripts/export_human_audit_sample.py \
   --results-dir "$latest" \

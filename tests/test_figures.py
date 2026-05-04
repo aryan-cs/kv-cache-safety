@@ -264,3 +264,48 @@ def test_figure_manifest_rejects_stale_hash(tmp_path: Path) -> None:
     _check_figure_manifest(figures_dir, results_dir, failures, require_causal_patch=False)
 
     assert any("stale png hash" in failure for failure in failures)
+
+
+def test_figure_manifest_requires_named_figures(tmp_path: Path) -> None:
+    from cache_safety_erasure.utils.io import file_sha256, write_json
+
+    results_dir = tmp_path / "results"
+    figures_dir = results_dir / "figures"
+    figures_dir.mkdir(parents=True)
+    for name in ["manifest.json", "generations.jsonl", "metrics.json", "cache_stats.parquet"]:
+        (results_dir / name).write_text(name, encoding="utf-8")
+    for suffix in ["png", "svg", "pdf", "csv"]:
+        (figures_dir / f"present.{suffix}").write_text(suffix, encoding="utf-8")
+    write_json(
+        figures_dir / "manifest.json",
+        {
+            "source_artifacts": {
+                name: {"sha256": file_sha256(results_dir / name)}
+                for name in ["manifest.json", "generations.jsonl", "metrics.json", "cache_stats.parquet"]
+            },
+            "figures": [
+                {
+                    "name": "present",
+                    "png": str(figures_dir / "present.png"),
+                    "png_sha256": file_sha256(figures_dir / "present.png"),
+                    "svg": str(figures_dir / "present.svg"),
+                    "svg_sha256": file_sha256(figures_dir / "present.svg"),
+                    "pdf": str(figures_dir / "present.pdf"),
+                    "pdf_sha256": file_sha256(figures_dir / "present.pdf"),
+                    "data_csv": str(figures_dir / "present.csv"),
+                    "data_csv_sha256": file_sha256(figures_dir / "present.csv"),
+                }
+            ],
+        },
+    )
+    failures: list[str] = []
+
+    _check_figure_manifest(
+        figures_dir,
+        results_dir,
+        failures,
+        require_causal_patch=False,
+        required_figures=["missing_creative_figure"],
+    )
+
+    assert "missing required figure `missing_creative_figure`" in failures

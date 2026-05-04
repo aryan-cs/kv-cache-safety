@@ -77,6 +77,11 @@ rebuild_primary() {
     --required-policy kv_int8_sim \
     --required-policy kv_int4_sim \
     --require-policy-pinned \
+    --required-figure safety_capability_phase_portrait \
+    --required-figure selective_safety_erasure_heatmap \
+    --required-figure prompt_effect_constellation \
+    --required-figure cache_state_fingerprint \
+    --required-figure safety_state_atlas \
     --require-public-provenance
 }
 
@@ -106,6 +111,8 @@ rebuild_causal() {
     --required-policy kv_int4_sim \
     --require-causal-patch \
     --require-policy-pinned \
+    --required-figure causal_restoration_fraction \
+    --required-figure causal_restoration_flow \
     --require-public-provenance
 }
 
@@ -139,6 +146,11 @@ rebuild_qwen32_if_present() {
     --required-policy sink_recent \
     --required-policy kv_int4_sim \
     --require-policy-pinned \
+    --required-figure safety_capability_phase_portrait \
+    --required-figure selective_safety_erasure_heatmap \
+    --required-figure prompt_effect_constellation \
+    --required-figure cache_state_fingerprint \
+    --required-figure safety_state_atlas \
     --require-public-provenance
 }
 

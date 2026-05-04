@@ -56,6 +56,12 @@ def test_arxiv_rewrite_uses_local_bibliography_and_figures() -> None:
 
     assert r"\bibliography{references}" in rewritten
     assert "figures/safety_capability_phase_portrait.pdf" in rewritten
+    assert "figures/prompt_effect_constellation.pdf" in _rewrite_main_tex_for_arxiv(
+        "../../results/h200_qwen_full_sweep/figures/prompt_effect_constellation.pdf"
+    )
+    assert "figures/safety_state_atlas.pdf" in _rewrite_main_tex_for_arxiv(
+        "../../results/h200_qwen_full_sweep/figures/safety_state_atlas.pdf"
+    )
     assert "generated/h200_qwen_full_sweep" in _rewrite_main_tex_for_arxiv(
         "../generated/h200_qwen_full_sweep/main_results_table.tex"
     )

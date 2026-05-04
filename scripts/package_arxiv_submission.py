@@ -18,8 +18,14 @@ FIGURE_SOURCES = {
     "selective_safety_erasure_heatmap.pdf": Path(
         "results/h200_qwen_full_sweep/figures/selective_safety_erasure_heatmap.pdf"
     ),
+    "prompt_effect_constellation.pdf": Path(
+        "results/h200_qwen_full_sweep/figures/prompt_effect_constellation.pdf"
+    ),
     "cache_state_fingerprint.pdf": Path(
         "results/h200_qwen_full_sweep/figures/cache_state_fingerprint.pdf"
+    ),
+    "safety_state_atlas.pdf": Path(
+        "results/h200_qwen_full_sweep/figures/safety_state_atlas.pdf"
     ),
     "causal_restoration_flow.pdf": Path(
         "results/h200_causal_patch_qwen7b/figures/causal_restoration_flow.pdf"

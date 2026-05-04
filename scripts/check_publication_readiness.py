@@ -30,6 +30,7 @@ def main() -> None:
     parser.add_argument("--min-policies", type=int, default=3)
     parser.add_argument("--required-suite", action="append", default=[])
     parser.add_argument("--required-policy", action="append", default=[])
+    parser.add_argument("--required-figure", action="append", default=[])
     parser.add_argument("--require-public-provenance", action="store_true")
     parser.add_argument("--require-causal-patch", action="store_true")
     parser.add_argument("--require-policy-pinned", action="store_true")
@@ -136,7 +137,13 @@ def main() -> None:
     figure_dir = args.results_dir / "figures"
     if not figure_dir.exists() or not list(figure_dir.glob("*.png")):
         failures.append("missing generated PNG figures")
-    _check_figure_manifest(figure_dir, args.results_dir, failures, args.require_causal_patch)
+    _check_figure_manifest(
+        figure_dir,
+        args.results_dir,
+        failures,
+        args.require_causal_patch,
+        required_figures=args.required_figure,
+    )
     if not args.allow_inactive_compression and (args.results_dir / "cache_stats.parquet").exists():
         _check_active_compression(args.results_dir / "cache_stats.parquet", manifest, failures)
     if args.require_causal_patch and (args.results_dir / "cache_stats.parquet").exists():
@@ -217,6 +224,7 @@ def _check_figure_manifest(
     results_dir: Path,
     failures: list[str],
     require_causal_patch: bool,
+    required_figures: list[str] | None = None,
 ) -> None:
     manifest_path = figure_dir / "manifest.json"
     if not manifest_path.exists():
@@ -278,6 +286,9 @@ def _check_figure_manifest(
                 failures.append(f"figure `{name}` has stale {path_key} hash")
     if require_causal_patch and "causal_restoration_fraction" not in figure_names:
         failures.append("causal patch runs require causal_restoration_fraction figure")
+    for required_figure in required_figures or []:
+        if required_figure not in figure_names:
+            failures.append(f"missing required figure `{required_figure}`")
 
 
 def _check_paper_assets(paper_dir: Path, results_dir: Path, failures: list[str]) -> None:

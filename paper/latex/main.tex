@@ -254,9 +254,23 @@ For audited prompts, the analysis embeds each prompt-condition pair using open e
 
 \begin{figure}[t]
   \centering
+  \maybeincludegraphic{../../results/h200_qwen_full_sweep/figures/prompt_effect_constellation.pdf}{0.92\linewidth}{Prompt-level baseline-to-treatment effect vectors by suite and policy.}
+  \caption{Prompt-level effect constellation. Each arrow starts at baseline and points toward the compressed condition in a metric-derived effect space. Coherent clusters indicate prompt families where cache interventions create similar behavioral shifts.}
+  \label{fig:constellation}
+\end{figure}
+
+\begin{figure}[t]
+  \centering
   \maybeincludegraphic{../../results/h200_qwen_full_sweep/figures/cache_state_fingerprint.pdf}{0.92\linewidth}{Token-role retention heatmap for system, user, template, and generated spans.}
   \caption{Cache-state fingerprint by token role and policy. This visualization tests whether policy-relevant spans form a visibly fragile band under cache pressure.}
   \label{fig:role-retention}
+\end{figure}
+
+\begin{figure}[t]
+  \centering
+  \maybeincludegraphic{../../results/h200_qwen_full_sweep/figures/safety_state_atlas.pdf}{0.92\linewidth}{Suite-policy atlas combining selective safety degradation with role-level cache loss.}
+  \caption{Safety-state atlas. Color shows selective safety degradation while overlaid circles show token-role cache loss, making it possible to compare behavioral safety loss against system-token and user-token retention patterns.}
+  \label{fig:safety-state-atlas}
 \end{figure}
 
 \begin{figure}[t]

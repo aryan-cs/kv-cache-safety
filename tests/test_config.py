@@ -103,6 +103,8 @@ def test_publication_artifact_builder_fails_without_real_results() -> None:
     assert "scripts/report_publication_status.py" in script
     assert "publication_status.md" in script
     assert "--require-cache-mediated-claim" in script
+    assert "--required-figure prompt_effect_constellation" in script
+    assert "--required-figure safety_state_atlas" in script
 
 
 def test_h200_scripts_use_composite_public_refusal_suite() -> None:
