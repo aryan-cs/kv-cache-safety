@@ -218,12 +218,15 @@ archiving those files rather than preparing final paper assets.
 Regenerate publication-valid audit sheets from the fetched completed runs:
 
 ```bash
-bash scripts/export_publication_audit_samples.sh
+bash scripts/prepare_after_h200_fetch.sh
 ```
 
-This uses the current audit exporter, requires completed `metrics.json` files,
-creates duplicate annotator templates, and includes the hidden/system references
-needed for leakage labels while leaving model and policy identities blinded.
+This reaggregates the fetched raw results using the current local checkout,
+regenerates paper figures/tables and CI planning files, runs readiness checks,
+then exports publication-valid blinded audit sheets. It requires completed
+`metrics.json` files, creates duplicate annotator templates, and includes the
+hidden/system references needed for leakage labels while leaving model and
+policy identities blinded.
 
 Then rebuild all paper artifacts from recorded results:
 

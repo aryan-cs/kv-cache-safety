@@ -196,7 +196,6 @@ def test_h200_scripts_export_multi_annotator_audit_templates() -> None:
 
 def test_publication_audit_export_regenerates_leakage_capable_templates() -> None:
     script = Path("scripts/export_publication_audit_samples.sh").read_text(encoding="utf-8")
-    readme = Path("README.md").read_text(encoding="utf-8")
 
     assert "PRIMARY_RESULTS_DIR:-results/h200_qwen_full_sweep" in script
     assert "CAUSAL_RESULTS_DIR:-results/h200_causal_patch_qwen7b" in script
@@ -204,7 +203,22 @@ def test_publication_audit_export_regenerates_leakage_capable_templates() -> Non
     assert "metrics.json" in script
     assert "--include-hidden-reference" in script
     assert '--annotator-template-count "$audit_annotator_template_count"' in script
-    assert "bash scripts/export_publication_audit_samples.sh" in readme
+
+
+def test_prepare_after_h200_fetch_regenerates_assets_before_audits() -> None:
+    script = Path("scripts/prepare_after_h200_fetch.sh").read_text(encoding="utf-8")
+    readme = Path("README.md").read_text(encoding="utf-8")
+
+    assert "scripts/fetch_h200_results.sh" in script
+    assert 'scripts/aggregate_results.py --results-dir "$primary_results"' in script
+    assert 'scripts/make_figures.py --results-dir "$primary_results"' in script
+    assert '--paper-dir "$primary_generated_dir"' in script
+    assert "scripts/check_publication_readiness.py" in script
+    assert "bash scripts/export_publication_audit_samples.sh" in script
+    assert "scripts/post_h200_next_steps.py" in script
+    assert "scripts/assess_claims.py" not in script
+    assert "build_paper_pdf.sh" not in script
+    assert "bash scripts/prepare_after_h200_fetch.sh" in readme
 
 
 def test_publication_artifact_builder_fails_without_real_results() -> None:
