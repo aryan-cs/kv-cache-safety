@@ -5,6 +5,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path("scripts").resolve()))
 
+from check_final_pdf_text import placeholder_text_failures
 from check_latex_placeholders import missing_placeholder_artifacts, placeholder_artifact_failures
 from package_arxiv_submission import (
     GENERATED_DIRS,
@@ -71,6 +72,17 @@ def test_latex_manuscript_uses_formal_publication_wording() -> None:
         "restoration stream",
     ]:
         assert phrase not in tex
+
+
+def test_final_pdf_text_checker_rejects_draft_protocol_markers() -> None:
+    failures = placeholder_text_failures(
+        "This registered analysis protocol reports no empirical claims. "
+        "Figure unavailable."
+    )
+
+    assert "placeholder_text:registered analysis protocol" in failures
+    assert "placeholder_text:reports no empirical claims" in failures
+    assert "placeholder_text:Figure unavailable" in failures
 
 
 def test_latex_references_cover_primary_model_and_cache_work() -> None:
