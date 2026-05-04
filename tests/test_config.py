@@ -236,6 +236,16 @@ def test_publication_human_audit_aggregation_has_fail_closed_wrapper() -> None:
     assert "scripts/aggregate_human_audit.py" in script
     assert "--require-result-source-match" in script
     assert "--require-baseline-deltas" in script
+    assert 'primary_generated_dir="${PRIMARY_GENERATED_DIR:-paper/generated/$primary_run_id}"' in script
+    assert 'causal_generated_dir="${CAUSAL_GENERATED_DIR:-paper/generated/$causal_run_id}"' in script
+    assert '--primary-results-dir "$primary_results"' in script
+    assert '--causal-results-dir "$causal_results"' in script
+    assert '--primary-generated-dir "$primary_generated_dir"' in script
+    assert '--causal-generated-dir "$causal_generated_dir"' in script
+    assert '--primary-audit-dir "$primary_output_dir"' in script
+    assert '--causal-audit-dir "$causal_output_dir"' in script
+    assert '--arxiv-source-dir "$arxiv_source_dir"' in script
+    assert '--arxiv-archive "$arxiv_archive"' in script
     assert "OPEN_JUDGE_PARSE_ERROR_POLICY:-record_unlabeled" in judge_script
     assert '--on-parse-error "$judge_parse_error_policy"' in judge_script
     assert "AUDIT_SOURCE=open_judge bash scripts/aggregate_publication_human_audits.sh" in judge_script
@@ -257,13 +267,25 @@ def test_prepare_after_h200_fetch_regenerates_assets_before_audits() -> None:
     assert "Refusing to prepare paper evidence from a dirty git working tree." in script
     assert "require_raw_result_artifacts" in script
     assert "config.resolved.yaml" in script
+    assert 'primary_generated_dir="${PRIMARY_GENERATED_DIR:-paper/generated/$(basename "$primary_results")}"' in script
+    assert 'causal_generated_dir="${CAUSAL_GENERATED_DIR:-paper/generated/$(basename "$causal_results")}"' in script
     assert "metrics.json" not in script.split("require_raw_result_artifacts", maxsplit=1)[1].split("rebuild_primary", maxsplit=1)[0]
     assert 'scripts/aggregate_results.py --results-dir "$primary_results"' in script
     assert 'scripts/make_figures.py --results-dir "$primary_results"' in script
     assert '--paper-dir "$primary_generated_dir"' in script
     assert "scripts/check_publication_readiness.py" in script
+    assert 'PRIMARY_RESULTS_DIR="$primary_results" \\' in script
+    assert 'CAUSAL_RESULTS_DIR="$causal_results" \\' in script
     assert "bash scripts/export_publication_audit_samples.sh" in script
     assert "scripts/post_h200_next_steps.py" in script
+    assert '--primary-results-dir "$primary_results"' in script
+    assert '--causal-results-dir "$causal_results"' in script
+    assert '--primary-audit-dir "$primary_audit_summary"' in script
+    assert '--causal-audit-dir "$causal_audit_summary"' in script
+    assert '--primary-generated-dir "$primary_generated_dir"' in script
+    assert '--causal-generated-dir "$causal_generated_dir"' in script
+    assert '--arxiv-source-dir "$arxiv_source_dir"' in script
+    assert '--arxiv-archive "$arxiv_archive"' in script
     assert "scripts/assess_claims.py" not in script
     assert "build_paper_pdf.sh" not in script
     assert "bash scripts/prepare_after_h200_fetch.sh" in readme
@@ -389,6 +411,8 @@ def test_evidence_gated_paper_builder_allows_nonpassing_claim_pdf() -> None:
     assert "scripts/run_h200_ci_extension.sh" in finalizer
     assert "use_merged_primary_evidence" in finalizer
     assert "MERGED_PRIMARY_RUN_ID=\"$merged_primary_run_id\"" in finalizer
+    assert '--primary-generated-dir "$primary_generated"' in finalizer
+    assert '--causal-generated-dir "$causal_generated"' in finalizer
     assert "ALLOW_EVIDENCE_GATED_FALLBACK:-0" in finalizer
     assert "Evidence-gated fallback was built, but strict publication readiness did not pass." in finalizer
     assert "STAGING_ALLOW_WIDE_CI" not in finalizer

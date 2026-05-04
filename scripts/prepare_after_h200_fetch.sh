@@ -5,8 +5,10 @@ cd "$(dirname "$0")/.."
 
 primary_results="${PRIMARY_RESULTS_DIR:-results/h200_qwen_full_sweep}"
 causal_results="${CAUSAL_RESULTS_DIR:-results/h200_causal_patch_qwen7b}"
-primary_generated_dir="${PRIMARY_GENERATED_DIR:-paper/generated/h200_qwen_full_sweep}"
-causal_generated_dir="${CAUSAL_GENERATED_DIR:-paper/generated/h200_causal_patch_qwen7b}"
+primary_generated_dir="${PRIMARY_GENERATED_DIR:-paper/generated/$(basename "$primary_results")}"
+causal_generated_dir="${CAUSAL_GENERATED_DIR:-paper/generated/$(basename "$causal_results")}"
+primary_audit_summary="${PRIMARY_AUDIT_SUMMARY_DIR:-paper/audit/$(basename "$primary_results")_summary}"
+causal_audit_summary="${CAUSAL_AUDIT_SUMMARY_DIR:-paper/audit/$(basename "$causal_results")_summary}"
 publication_status_dir="${PUBLICATION_STATUS_DIR:-paper/build}"
 arxiv_source_dir="${ARXIV_SOURCE_DIR:-paper/build/arxiv_source}"
 arxiv_archive="${ARXIV_ARCHIVE:-paper/build/arxiv_source.tar.gz}"
@@ -116,6 +118,8 @@ write_publication_status() {
   uv run python scripts/report_publication_status.py \
     --primary-results-dir "$primary_results" \
     --causal-results-dir "$causal_results" \
+    --primary-audit-dir "$primary_audit_summary" \
+    --causal-audit-dir "$causal_audit_summary" \
     --primary-generated-dir "$primary_generated_dir" \
     --causal-generated-dir "$causal_generated_dir" \
     --arxiv-source-dir "$arxiv_source_dir" \
@@ -136,9 +140,19 @@ uv run pytest -q
 
 rebuild_primary
 rebuild_causal
+PRIMARY_RESULTS_DIR="$primary_results" \
+CAUSAL_RESULTS_DIR="$causal_results" \
 bash scripts/export_publication_audit_samples.sh
 write_publication_status
 uv run python scripts/post_h200_next_steps.py \
+  --primary-results-dir "$primary_results" \
+  --causal-results-dir "$causal_results" \
+  --primary-audit-dir "$primary_audit_summary" \
+  --causal-audit-dir "$causal_audit_summary" \
+  --primary-generated-dir "$primary_generated_dir" \
+  --causal-generated-dir "$causal_generated_dir" \
+  --arxiv-source-dir "$arxiv_source_dir" \
+  --arxiv-archive "$arxiv_archive" \
   --output-json paper/generated/post_h200_next_steps.json \
   --output-md paper/generated/post_h200_next_steps.md
 

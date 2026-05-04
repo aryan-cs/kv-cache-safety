@@ -295,9 +295,13 @@ write_audit_supported_claims
 uv run python scripts/post_h200_next_steps.py \
   --primary-results-dir "$primary_results" \
   --causal-results-dir "$causal_results" \
+  --primary-generated-dir "$primary_generated" \
+  --causal-generated-dir "$causal_generated" \
   --primary-audit-dir "$primary_audit_summary" \
   --causal-audit-dir "$causal_audit_summary" \
   --claim-assessment "$claim_generated/claim_assessment.json" \
+  --arxiv-source-dir paper/build/arxiv_source \
+  --arxiv-archive paper/build/arxiv_source.tar.gz \
   --output-json paper/generated/post_h200_next_steps.json \
   --output-md paper/generated/post_h200_next_steps.md
 

@@ -7,10 +7,14 @@ primary_run_id="${PRIMARY_RUN_ID:-h200_qwen_full_sweep}"
 causal_run_id="${CAUSAL_RUN_ID:-h200_causal_patch_qwen7b}"
 primary_results="${PRIMARY_RESULTS_DIR:-results/$primary_run_id}"
 causal_results="${CAUSAL_RESULTS_DIR:-results/$causal_run_id}"
+primary_generated_dir="${PRIMARY_GENERATED_DIR:-paper/generated/$primary_run_id}"
+causal_generated_dir="${CAUSAL_GENERATED_DIR:-paper/generated/$causal_run_id}"
 audit_input_dir="${AUDIT_INPUT_DIR:-paper/audit}"
 primary_output_dir="${PRIMARY_AUDIT_SUMMARY_DIR:-paper/audit/${primary_run_id}_summary}"
 causal_output_dir="${CAUSAL_AUDIT_SUMMARY_DIR:-paper/audit/${causal_run_id}_summary}"
 audit_source="${AUDIT_SOURCE:-auto}"
+arxiv_source_dir="${ARXIV_SOURCE_DIR:-paper/build/arxiv_source}"
+arxiv_archive="${ARXIV_ARCHIVE:-paper/build/arxiv_source.tar.gz}"
 
 require_file() {
   local path="$1"
@@ -96,6 +100,14 @@ uv sync --frozen --extra dev
 aggregate_run_audit "$primary_run_id" "$primary_results" "$primary_output_dir"
 aggregate_run_audit "$causal_run_id" "$causal_results" "$causal_output_dir"
 uv run python scripts/post_h200_next_steps.py \
+  --primary-results-dir "$primary_results" \
+  --causal-results-dir "$causal_results" \
+  --primary-generated-dir "$primary_generated_dir" \
+  --causal-generated-dir "$causal_generated_dir" \
+  --primary-audit-dir "$primary_output_dir" \
+  --causal-audit-dir "$causal_output_dir" \
+  --arxiv-source-dir "$arxiv_source_dir" \
+  --arxiv-archive "$arxiv_archive" \
   --output-json paper/generated/post_h200_next_steps.json \
   --output-md paper/generated/post_h200_next_steps.md
 

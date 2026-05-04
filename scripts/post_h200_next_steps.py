@@ -55,6 +55,18 @@ def main() -> None:
         default=Path("paper/audit/h200_causal_patch_qwen7b_summary"),
     )
     parser.add_argument(
+        "--primary-generated-dir",
+        type=Path,
+        default=None,
+        help="Generated paper asset directory for the selected primary result set.",
+    )
+    parser.add_argument(
+        "--causal-generated-dir",
+        type=Path,
+        default=None,
+        help="Generated paper asset directory for the selected causal result set.",
+    )
+    parser.add_argument(
         "--claim-assessment",
         type=Path,
         default=Path("paper/generated/claim_assessment/claim_assessment.json"),
@@ -79,17 +91,27 @@ def main() -> None:
     parser.add_argument("--fail-if-not-ready", action="store_true")
     args = parser.parse_args()
 
+    primary_generated_dir = (
+        args.primary_generated_dir or Path("paper/generated") / args.primary_results_dir.name
+    )
+    causal_generated_dir = (
+        args.causal_generated_dir or Path("paper/generated") / args.causal_results_dir.name
+    )
     status = publication_status(
         primary_results_dir=args.primary_results_dir,
         causal_results_dir=args.causal_results_dir,
         primary_audit_dir=args.primary_audit_dir,
         causal_audit_dir=args.causal_audit_dir,
         claim_assessment_path=args.claim_assessment,
+        primary_generated_dir=primary_generated_dir,
+        causal_generated_dir=causal_generated_dir,
         paper_pdf=args.paper_pdf,
         arxiv_source_dir=args.arxiv_source_dir,
         arxiv_archive=args.arxiv_archive,
         require_arxiv_bundle=True,
     )
+    status["primary_generated"] = {"path": str(primary_generated_dir)}
+    status["causal_generated"] = {"path": str(causal_generated_dir)}
     report = post_h200_next_steps(status)
     if args.output_json is not None:
         write_json(args.output_json, report)
@@ -129,8 +151,28 @@ def post_h200_next_steps(status: dict[str, Any]) -> dict[str, Any]:
         "claim_assessment",
         "paper/generated/claim_assessment/claim_assessment.json",
     )
-    primary_generated_path = f"paper/generated/{Path(primary_results_path).name}"
-    causal_generated_path = f"paper/generated/{Path(causal_results_path).name}"
+    primary_generated_path = _status_path(
+        status,
+        "primary_generated",
+        f"paper/generated/{Path(primary_results_path).name}",
+    )
+    causal_generated_path = _status_path(
+        status,
+        "causal_generated",
+        f"paper/generated/{Path(causal_results_path).name}",
+    )
+    arxiv_source_path = _artifact_field(
+        status,
+        "arxiv_bundle",
+        "source_dir",
+        "paper/build/arxiv_source",
+    )
+    arxiv_archive_path = _artifact_field(
+        status,
+        "arxiv_bundle",
+        "archive",
+        "paper/build/arxiv_source.tar.gz",
+    )
     claim_generated_path = str(Path(claim_assessment_path).parent)
     primary_raw_complete = bool(gates.get("primary_results_complete")) or _raw_result_available(
         status.get("primary_results")
@@ -166,6 +208,10 @@ def post_h200_next_steps(status: dict[str, Any]) -> dict[str, Any]:
                 f"CAUSAL_RESULTS_DIR={_q(causal_results_path)} "
                 f"PRIMARY_GENERATED_DIR={_q(primary_generated_path)} "
                 f"CAUSAL_GENERATED_DIR={_q(causal_generated_path)} "
+                f"PRIMARY_AUDIT_SUMMARY_DIR={_q(primary_audit_path)} "
+                f"CAUSAL_AUDIT_SUMMARY_DIR={_q(causal_audit_path)} "
+                f"ARXIV_SOURCE_DIR={_q(arxiv_source_path)} "
+                f"ARXIV_ARCHIVE={_q(arxiv_archive_path)} "
                 "bash scripts/prepare_after_h200_fetch.sh"
             ),
             detail="Fetch raw H200 evidence, then reaggregate metrics, regenerate figures and paper tables, run readiness checks, and export audit templates from the current clean local checkout.",
@@ -194,6 +240,8 @@ def post_h200_next_steps(status: dict[str, Any]) -> dict[str, Any]:
                 f"CAUSAL_RUN_ID={_q(Path(causal_results_path).name)} "
                 f"PRIMARY_RESULTS_DIR={_q(primary_results_path)} "
                 f"CAUSAL_RESULTS_DIR={_q(causal_results_path)} "
+                f"PRIMARY_GENERATED_DIR={_q(primary_generated_path)} "
+                f"CAUSAL_GENERATED_DIR={_q(causal_generated_path)} "
                 f"PRIMARY_AUDIT_SUMMARY_DIR={_q(primary_audit_path)} "
                 f"CAUSAL_AUDIT_SUMMARY_DIR={_q(causal_audit_path)} "
                 "AUDIT_SOURCE=open_judge "
@@ -240,6 +288,8 @@ def post_h200_next_steps(status: dict[str, Any]) -> dict[str, Any]:
                 f"PRIMARY_AUDIT_SUMMARY_DIR={_q(primary_audit_path)} "
                 f"CAUSAL_AUDIT_SUMMARY_DIR={_q(causal_audit_path)} "
                 f"CLAIM_GENERATED_DIR={_q(claim_generated_path)} "
+                f"ARXIV_SOURCE_DIR={_q(arxiv_source_path)} "
+                f"ARXIV_ARCHIVE={_q(arxiv_archive_path)} "
                 "bash scripts/build_publication_artifacts.sh"
             ),
             detail="Regenerate metrics, figures, tables, final PDF, and arXiv source bundle from recorded evidence.",
@@ -257,11 +307,20 @@ def post_h200_next_steps(status: dict[str, Any]) -> dict[str, Any]:
 
 
 def _status_path(status: dict[str, Any], artifact_name: str, default: str) -> str:
+    return _artifact_field(status, artifact_name, "path", default)
+
+
+def _artifact_field(
+    status: dict[str, Any],
+    artifact_name: str,
+    field_name: str,
+    default: str,
+) -> str:
     artifact = status.get(artifact_name)
     if not isinstance(artifact, dict):
         return default
-    path = artifact.get("path")
-    return str(path) if path else default
+    value = artifact.get(field_name)
+    return str(value) if value else default
 
 
 def _q(value: str) -> str:

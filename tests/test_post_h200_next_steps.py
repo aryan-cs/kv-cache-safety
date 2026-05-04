@@ -389,18 +389,38 @@ def test_post_h200_next_steps_commands_follow_selected_paths() -> None:
             },
             "primary_results": {"path": "results/h200_qwen_full_sweep_plus_ci_extension"},
             "causal_results": {"path": "results/h200_causal_patch_qwen7b"},
+            "primary_generated": {"path": "paper/generated/merged_primary_assets"},
+            "causal_generated": {"path": "paper/generated/selected_causal_assets"},
             "primary_human_audit": {
                 "path": "paper/audit/h200_qwen_full_sweep_plus_ci_extension_summary"
             },
             "causal_human_audit": {"path": "paper/audit/h200_causal_patch_qwen7b_summary"},
             "claim_assessment": {"path": "paper/generated/claim_assessment/claim_assessment.json"},
+            "arxiv_bundle": {
+                "source_dir": "paper/build/promoted_arxiv_source",
+                "archive": "paper/build/promoted_arxiv_source.tar.gz",
+            },
         }
     )
     rendered = render_markdown(report)
+    audit_command = next(
+        step["command"] for step in report["steps"] if step["name"] == "complete_human_audits"
+    )
+    build_command = next(
+        step["command"] for step in report["steps"] if step["name"] == "build_publication_bundle"
+    )
 
     assert "h200_qwen_full_sweep_plus_ci_extension" in rendered
     assert "PRIMARY_RUN_ID=h200_qwen_full_sweep_plus_ci_extension" in rendered
-    assert "paper/generated/h200_qwen_full_sweep_plus_ci_extension" in rendered
+    assert "paper/generated/merged_primary_assets" in rendered
+    assert "paper/generated/selected_causal_assets" in rendered
+    assert "paper/generated/h200_qwen_full_sweep_plus_ci_extension" not in rendered
+    assert "PRIMARY_GENERATED_DIR=paper/generated/merged_primary_assets" in audit_command
+    assert "CAUSAL_GENERATED_DIR=paper/generated/selected_causal_assets" in audit_command
+    assert "PRIMARY_GENERATED_DIR=paper/generated/merged_primary_assets" in build_command
+    assert "CAUSAL_GENERATED_DIR=paper/generated/selected_causal_assets" in build_command
+    assert "ARXIV_SOURCE_DIR=paper/build/promoted_arxiv_source" in build_command
+    assert "ARXIV_ARCHIVE=paper/build/promoted_arxiv_source.tar.gz" in build_command
     assert (
         "paper/audit/h200_qwen_full_sweep_plus_ci_extension_summary/"
         "human_audit_summary.json"
