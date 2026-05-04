@@ -257,6 +257,7 @@ def test_publication_artifact_builder_fails_without_real_results() -> None:
     script = Path("scripts/build_publication_artifacts.sh").read_text(encoding="utf-8")
 
     assert "require_result_artifacts" in script
+    assert "Refusing to build publication artifacts from a dirty git working tree." in script
     assert "Missing required result artifact" in script
     assert "require_human_audit_artifacts" in script
     assert "Missing required human-audit artifact" in script

@@ -548,6 +548,10 @@ def _check_paper_assets(paper_dir: Path, results_dir: Path, failures: list[str])
             failures.append(f"paper artifact source `{name}` hash is stale")
     if not manifest.get("analysis_git_commit"):
         failures.append("paper artifact manifest lacks analysis git commit")
+    if manifest.get("analysis_git_dirty"):
+        failures.append("paper artifact manifest was generated from a dirty analysis tree")
+    if manifest.get("source_run_git_dirty"):
+        failures.append("paper artifact manifest source run was dirty")
     try:
         run_manifest = json.loads((results_dir / "manifest.json").read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):

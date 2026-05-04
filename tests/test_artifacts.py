@@ -382,3 +382,28 @@ def test_paper_asset_freshness_detects_stale_tables_and_sources(tmp_path: Path) 
 
     assert "paper artifact table `result_macros.tex` hash is stale" in failures
     assert "paper artifact source `metrics.json` hash is stale" in failures
+
+    write_json(
+        paper_dir / "artifact_manifest.json",
+        {
+            "tables": {
+                "result_macros.tex": {
+                    "path": str(table),
+                    "sha256": file_sha256(table),
+                }
+            },
+            "source_artifacts": {
+                name: {"sha256": file_sha256(results_dir / name)}
+                for name in ["manifest.json", "metrics.json", "figures/manifest.json"]
+            },
+            "source_run_git_commit": "run-commit",
+            "source_run_git_dirty": True,
+            "analysis_git_commit": "analysis-commit",
+            "analysis_git_dirty": True,
+        },
+    )
+
+    failures = check_paper_asset_freshness(paper_dir, results_dir)
+
+    assert any("dirty analysis tree" in failure for failure in failures)
+    assert any("source run was dirty" in failure for failure in failures)

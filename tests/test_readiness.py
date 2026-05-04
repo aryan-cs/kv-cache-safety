@@ -1,3 +1,4 @@
+import json
 import sys
 from pathlib import Path
 
@@ -341,3 +342,14 @@ def test_paper_artifact_manifest_checks_tables_and_sources(tmp_path: Path) -> No
     _check_paper_assets(paper_dir, results_dir, failures)
 
     assert failures == []
+
+    manifest = json.loads((paper_dir / "artifact_manifest.json").read_text(encoding="utf-8"))
+    manifest["analysis_git_dirty"] = True
+    manifest["source_run_git_dirty"] = True
+    (paper_dir / "artifact_manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+    failures = []
+
+    _check_paper_assets(paper_dir, results_dir, failures)
+
+    assert "paper artifact manifest was generated from a dirty analysis tree" in failures
+    assert "paper artifact manifest source run was dirty" in failures

@@ -94,6 +94,10 @@ def _provenance_failures(manifest: dict[str, Any], results_dir: Path) -> list[st
     failures = []
     if not manifest.get("analysis_git_commit"):
         failures.append(f"paper artifact manifest lacks analysis git commit: {results_dir}")
+    if manifest.get("analysis_git_dirty"):
+        failures.append(f"paper artifact manifest was generated from a dirty analysis tree: {results_dir}")
+    if manifest.get("source_run_git_dirty"):
+        failures.append(f"paper artifact manifest source run was dirty: {results_dir}")
     run_manifest_path = results_dir / "manifest.json"
     try:
         run_manifest = json.loads(run_manifest_path.read_text(encoding="utf-8"))
