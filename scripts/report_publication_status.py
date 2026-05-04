@@ -464,7 +464,8 @@ def _arxiv_status(source_dir: Path, archive: Path) -> dict[str, Any]:
     if archive.exists():
         if archive.stat().st_size <= 0:
             failures.append("empty_archive")
-        archive_hashes, archive_error = _archive_hashes(archive)
+        archive_hashes, archive_error, archive_failures = _archive_hashes(archive)
+        failures.extend(archive_failures)
         if archive_error:
             failures.append(f"invalid_archive:{archive_error}")
         else:
@@ -497,20 +498,28 @@ def _read_json(path: Path) -> dict[str, Any]:
         return json.load(f)
 
 
-def _archive_hashes(archive: Path) -> tuple[dict[str, str], str]:
+def _archive_hashes(archive: Path) -> tuple[dict[str, str], str, list[str]]:
     try:
         with tarfile.open(archive, "r:gz") as tar:
             hashes = {}
+            failures = []
+            seen_members = set()
             for member in tar.getmembers():
+                if member.name in seen_members:
+                    failures.append(f"archive_duplicate:{member.name}")
+                seen_members.add(member.name)
+                path = Path(member.name)
+                if path.is_absolute() or ".." in path.parts:
+                    failures.append(f"archive_unsafe_member:{member.name}")
                 if not member.isfile():
                     continue
                 extracted = tar.extractfile(member)
                 if extracted is None:
                     continue
                 hashes[member.name] = _sha256_bytes(extracted.read())
-            return hashes, ""
+            return hashes, "", failures
     except (tarfile.TarError, OSError) as exc:
-        return {}, str(exc)
+        return {}, str(exc), []
 
 
 def _manifest_copied_files(

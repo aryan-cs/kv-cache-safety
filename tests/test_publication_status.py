@@ -1,4 +1,5 @@
 import hashlib
+import io
 import json
 import sys
 import tarfile
@@ -351,6 +352,53 @@ def test_publication_status_rejects_arxiv_archive_missing_manifest_assets(
         "archive_missing:generated/h200_qwen_full_sweep/main_results_table.tex"
         in status["arxiv_bundle"]["failures"]
     )
+
+
+def test_publication_status_rejects_unsafe_or_duplicate_archive_members(
+    tmp_path: Path,
+) -> None:
+    primary = tmp_path / "primary"
+    causal = tmp_path / "causal"
+    primary_audit = tmp_path / "primary_audit"
+    causal_audit = tmp_path / "causal_audit"
+    arxiv_dir = tmp_path / "arxiv_source"
+    archive = tmp_path / "arxiv_source.tar.gz"
+    _write_run(primary)
+    _write_run(causal)
+    _write_audit(primary_audit, primary)
+    _write_audit(causal_audit, causal)
+    _write_arxiv_bundle(arxiv_dir, archive)
+    with tarfile.open(archive, "w:gz") as tar:
+        for path in sorted(arxiv_dir.rglob("*")):
+            tar.add(path, arcname=path.relative_to(arxiv_dir))
+        tar.add(arxiv_dir / "main.tex", arcname="main.tex")
+        unsafe = tarfile.TarInfo("../escape.tex")
+        payload = b"unsafe\n"
+        unsafe.size = len(payload)
+        tar.addfile(unsafe, io.BytesIO(payload))
+    claim_path = tmp_path / "claim_assessment.json"
+    claim_path.write_text(
+        json.dumps(_passing_claim_assessment(primary, causal, primary_audit, causal_audit)),
+        encoding="utf-8",
+    )
+    pdf_path = tmp_path / "paper.pdf"
+    pdf_path.write_bytes(b"%PDF-1.7\n")
+
+    status = publication_status(
+        primary_results_dir=primary,
+        causal_results_dir=causal,
+        primary_audit_dir=primary_audit,
+        causal_audit_dir=causal_audit,
+        claim_assessment_path=claim_path,
+        paper_pdf=pdf_path,
+        arxiv_source_dir=arxiv_dir,
+        arxiv_archive=archive,
+        require_arxiv_bundle=True,
+    )
+
+    assert status["publication_ready"] is False
+    assert "archive_duplicate:main.tex" in status["arxiv_bundle"]["failures"]
+    assert "archive_unsafe_member:../escape.tex" in status["arxiv_bundle"]["failures"]
 
 
 def test_publication_status_rejects_draft_arxiv_bundle_when_required(tmp_path: Path) -> None:
