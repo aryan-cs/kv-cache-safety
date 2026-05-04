@@ -178,6 +178,10 @@ Build the current LaTeX paper draft as a readable PDF:
 bash scripts/build_paper_pdf.sh
 ```
 
+The draft PDF is refreshed in both `paper/build/cache_mediated_safety_erasure.pdf`
+and `paper/cache_mediated_safety_erasure.pdf`. It remains a pre-results draft until
+the publication-readiness gates pass.
+
 Package arXiv-style source files:
 
 ```bash

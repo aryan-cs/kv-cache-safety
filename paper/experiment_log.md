@@ -50,3 +50,15 @@ Required fields for each entry:
 - result: launcher still waiting; no experiment process running; expected result and audit artifacts missing
 - blocker: H200 reported approximately 142 GB of 143 GB memory in use with high utilization, while `nvidia-smi --query-compute-apps` and `nvidia-smi pmon` showed no visible compute process
 - decision: treat as infrastructure/allocation blocker, not experiment evidence; keep the launcher waiting and release or restart the notebook allocation externally if the context remains hidden
+
+## 2026-05-04 H200 Blocker Refresh
+
+- date: 2026-05-04
+- commit hash: `e068362`
+- status command: `uv run python scripts/report_h200_status.py --output-json logs/h200/h200_status_latest.json --output-md logs/h200/h200_status_latest.md`
+- machine / GPU: UIUC H200 notebook
+- result: launcher still waiting; no experiment process running; expected primary, causal, generated-paper, claim-assessment, and human-audit artifacts are still missing
+- blocker: H200 memory has dropped to `5422/143771 MiB`, but utilization remains about `67%` with no visible compute apps, no accounted apps, no local `/proc/*/fd` NVIDIA holders, and `nvidia-smi -q -d PIDS` reporting `Processes : None`
+- wait history: `43` samples over `210.1` minutes; latest gate block window is `utilization` for `15` samples over `70.0` minutes
+- support artifact: `logs/h200/h200_support_bundle_latest.tar.gz` contains only infrastructure diagnostics and explicitly excludes model generations and paper evidence
+- decision: keep the launcher waiting; escalate the generated admin report/support bundle or release/restart the notebook allocation externally; do not cite this as evidence
