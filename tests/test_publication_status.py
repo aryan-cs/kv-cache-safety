@@ -506,6 +506,45 @@ def test_publication_status_rejects_smoke_or_mock_runs(tmp_path: Path) -> None:
     assert "smoke_run" in status["primary_results"]["disqualifiers"]
 
 
+def test_publication_status_rejects_obvious_run_readiness_failures(tmp_path: Path) -> None:
+    primary = tmp_path / "primary"
+    causal = tmp_path / "causal"
+    primary_audit = tmp_path / "primary_audit"
+    causal_audit = tmp_path / "causal_audit"
+    _write_run(primary)
+    _write_run(causal)
+    _write_audit(primary_audit, primary)
+    _write_audit(causal_audit, causal)
+    (primary / "generations.jsonl").write_text('{"row": 1}\n', encoding="utf-8")
+    claim_path = tmp_path / "claim_assessment.json"
+    claim_path.write_text(
+        json.dumps(_passing_claim_assessment(primary, causal, primary_audit, causal_audit)),
+        encoding="utf-8",
+    )
+    pdf_path = tmp_path / "paper.pdf"
+    pdf_path.write_bytes(b"%PDF-1.7\n")
+
+    status = publication_status(
+        primary_results_dir=primary,
+        causal_results_dir=causal,
+        primary_audit_dir=primary_audit,
+        causal_audit_dir=causal_audit,
+        claim_assessment_path=claim_path,
+        paper_pdf=pdf_path,
+    )
+
+    assert status["publication_ready"] is False
+    assert "primary_results_complete" in status["blockers"]
+    assert any(
+        failure.startswith("generation_row_count=1; expected=2")
+        for failure in status["primary_results"]["readiness_failures"]
+    )
+    assert any(
+        failure == "figures_manifest_source_hash_stale:generations.jsonl"
+        for failure in status["primary_results"]["readiness_failures"]
+    )
+
+
 def _write_run(path: Path, manifest_overrides: dict | None = None) -> None:
     (path / "figures").mkdir(parents=True)
     manifest = {
@@ -514,22 +553,31 @@ def _write_run(path: Path, manifest_overrides: dict | None = None) -> None:
         "run_name": "h200_qwen_full_sweep",
         "git_dirty": False,
         "git_commit": "abc123",
-        "expected_generation_count": 10,
+        "expected_generation_count": 2,
         "cache_policy_labels": ["none", "kv_int4_sim"],
+        "cache_policy_configs": [{"name": "none"}, {"name": "kv_int4_sim"}],
         "prompt_counts": {"public_refusal_safety": 650},
     }
     manifest.update(manifest_overrides or {})
-    for name in [
-        "config.resolved.yaml",
-        "environment.json",
-        "prompts.jsonl",
-        "generations.jsonl",
-        "cache_stats.parquet",
-        "figures/manifest.json",
-    ]:
+    for name in ["config.resolved.yaml", "environment.json", "prompts.jsonl", "cache_stats.parquet"]:
         (path / name).write_text("artifact\n", encoding="utf-8")
+    (path / "generations.jsonl").write_text(
+        '{"suite":"public_refusal_safety","prompt_id":"p1","policy":"none","seed":0}\n'
+        '{"suite":"public_refusal_safety","prompt_id":"p1","policy":"kv_int4_sim","seed":0}\n',
+        encoding="utf-8",
+    )
     (path / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
     (path / "metrics.json").write_text(json.dumps({"ok": True}), encoding="utf-8")
+    figure_manifest = {
+        "source_artifacts": {
+            name: {"sha256": _sha256(path / name)}
+            for name in ["manifest.json", "generations.jsonl", "metrics.json", "cache_stats.parquet"]
+        }
+    }
+    (path / "figures" / "manifest.json").write_text(
+        json.dumps(figure_manifest),
+        encoding="utf-8",
+    )
 
 
 def _write_audit(

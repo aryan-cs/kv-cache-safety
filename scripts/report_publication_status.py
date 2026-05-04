@@ -235,11 +235,13 @@ def _run_status(results_dir: Path) -> dict[str, Any]:
             disqualifiers.append("tiny_model")
         if "smoke" in run_name.lower() or "smoke" in results_dir.name.lower():
             disqualifiers.append("smoke_run")
+    readiness_failures = _run_readiness_failures(results_dir, manifest)
     return {
         "path": str(results_dir),
-        "complete": not missing and not disqualifiers,
+        "complete": not missing and not disqualifiers and not readiness_failures,
         "missing": missing,
         "disqualifiers": disqualifiers,
+        "readiness_failures": readiness_failures,
         "manifest_present": bool(manifest),
         "metrics_present": bool(metrics),
         "model_id": manifest.get("model_id") if manifest else None,
@@ -248,6 +250,57 @@ def _run_status(results_dir: Path) -> dict[str, Any]:
         "policy_count": len(manifest.get("cache_policy_labels", [])) if manifest else None,
         "prompt_counts": manifest.get("prompt_counts") if manifest else None,
     }
+
+
+def _run_readiness_failures(results_dir: Path, manifest: dict[str, Any]) -> list[str]:
+    if not manifest:
+        return []
+    failures = []
+    if not manifest.get("cache_policy_configs"):
+        failures.append("manifest_lacks_cache_policy_configs")
+    if not manifest.get("cache_policy_labels"):
+        failures.append("manifest_lacks_cache_policy_labels")
+    if manifest.get("expected_generation_count") is None:
+        failures.append("manifest_lacks_expected_generation_count")
+    else:
+        generation_count = _jsonl_row_count(results_dir / "generations.jsonl")
+        if generation_count is not None and generation_count != int(
+            manifest["expected_generation_count"]
+        ):
+            failures.append(
+                f"generation_row_count={generation_count}; expected={manifest['expected_generation_count']}"
+            )
+    if not manifest.get("prompt_counts"):
+        failures.append("manifest_lacks_prompt_counts")
+    failures.extend(_figure_source_failures(results_dir))
+    return failures
+
+
+def _jsonl_row_count(path: Path) -> int | None:
+    if not path.exists():
+        return None
+    with path.open("r", encoding="utf-8") as f:
+        return sum(1 for line in f if line.strip())
+
+
+def _figure_source_failures(results_dir: Path) -> list[str]:
+    manifest = _read_json(results_dir / "figures" / "manifest.json")
+    if not manifest:
+        return []
+    source_artifacts = manifest.get("source_artifacts") or {}
+    failures = []
+    for name in ["manifest.json", "generations.jsonl", "metrics.json", "cache_stats.parquet"]:
+        source = source_artifacts.get(name)
+        if not isinstance(source, dict):
+            failures.append(f"figures_manifest_lacks_source:{name}")
+            continue
+        source_path = results_dir / name
+        if not source_path.exists():
+            failures.append(f"figures_manifest_source_missing:{name}")
+            continue
+        if source.get("sha256") != file_sha256(source_path):
+            failures.append(f"figures_manifest_source_hash_stale:{name}")
+    return failures
 
 
 def _audit_status(audit_dir: Path, results_dir: Path) -> dict[str, Any]:
@@ -535,6 +588,8 @@ def _artifact_line(label: str, status: dict[str, Any]) -> str:
         details.append("disqualified: " + ", ".join(status["disqualifiers"]))
     if status.get("failures"):
         details.append("failed: " + ", ".join(status["failures"]))
+    if status.get("readiness_failures"):
+        details.append("readiness: " + ", ".join(status["readiness_failures"]))
     suffix = f" ({'; '.join(details)})" if details else ""
     return f"- {label}: `{state}` at `{status['path']}`{suffix}"
 
