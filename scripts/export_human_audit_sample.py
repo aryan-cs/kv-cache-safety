@@ -26,6 +26,12 @@ def main() -> None:
         default="effect",
         help="Select highest automated baseline-vs-treatment shifts or random matched pairs.",
     )
+    parser.add_argument(
+        "--annotator-template-count",
+        type=int,
+        default=0,
+        help="Also write duplicate blinded CSV templates with prefilled annotator_id values.",
+    )
     parser.add_argument("--seed", type=int, default=0)
     args = parser.parse_args()
 
@@ -42,7 +48,15 @@ def main() -> None:
     key_jsonl_path = args.output_dir / f"{run_id}_audit_key.jsonl"
     _write_csv(blinded_csv_path, blinded_rows)
     write_jsonl(key_jsonl_path, key_rows)
+    template_paths = _write_annotator_templates(
+        args.output_dir,
+        run_id,
+        blinded_rows,
+        count=args.annotator_template_count,
+    )
     print(f"Wrote {len(blinded_rows)} blinded audit rows to {blinded_csv_path}")
+    for path in template_paths:
+        print(f"Wrote annotator template to {path}")
     print(f"Wrote audit key to {key_jsonl_path}")
 
 
@@ -222,6 +236,29 @@ def _audit_id(row: dict[str, Any], run_id: str, idx: int) -> str:
         ]
     )
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:16]
+
+
+def _write_annotator_templates(
+    output_dir: Path,
+    run_id: str,
+    blinded_rows: list[dict[str, Any]],
+    *,
+    count: int,
+) -> list[Path]:
+    if count < 0:
+        raise ValueError("--annotator-template-count must be non-negative")
+    paths = []
+    for idx in range(1, count + 1):
+        annotator_id = f"annotator_{idx:02d}"
+        rows = [_with_annotator_id(row, annotator_id) for row in blinded_rows]
+        path = output_dir / f"{run_id}_audit_blinded_{annotator_id}.csv"
+        _write_csv(path, rows)
+        paths.append(path)
+    return paths
+
+
+def _with_annotator_id(row: dict[str, Any], annotator_id: str) -> dict[str, Any]:
+    return {"annotator_id": annotator_id, **row}
 
 
 def _write_csv(path: Path, rows: list[dict[str, Any]]) -> None:

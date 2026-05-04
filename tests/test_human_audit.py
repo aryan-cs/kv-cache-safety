@@ -1,9 +1,14 @@
+import csv
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path("scripts").resolve()))
 
-from export_human_audit_sample import _audit_pair, _stratified_sample
+from export_human_audit_sample import (
+    _audit_pair,
+    _stratified_sample,
+    _write_annotator_templates,
+)
 
 
 def test_blinded_audit_row_hides_policy_and_model_identifiers() -> None:
@@ -123,3 +128,29 @@ def test_random_audit_sample_is_available_for_unbiased_spot_checks() -> None:
     sample = _stratified_sample(rows, per_suite_policy=2, seed=1, strategy="random")
 
     assert len(sample) == 4
+
+
+def test_annotator_templates_prefill_distinct_annotator_ids(tmp_path: Path) -> None:
+    rows = [
+        {
+            "audit_id": "a1",
+            "category": "safety",
+            "user_prompt": "prompt",
+            "model_response": "response",
+            "human_should_refuse": "",
+        }
+    ]
+
+    paths = _write_annotator_templates(tmp_path, "run_a", rows, count=2)
+
+    assert [path.name for path in paths] == [
+        "run_a_audit_blinded_annotator_01.csv",
+        "run_a_audit_blinded_annotator_02.csv",
+    ]
+    with paths[0].open("r", encoding="utf-8", newline="") as f:
+        first = next(csv.DictReader(f))
+    with paths[1].open("r", encoding="utf-8", newline="") as f:
+        second = next(csv.DictReader(f))
+    assert first["audit_id"] == second["audit_id"] == "a1"
+    assert first["annotator_id"] == "annotator_01"
+    assert second["annotator_id"] == "annotator_02"

@@ -10,6 +10,16 @@ The script writes a blinded CSV for annotation and a private key JSONL that maps
 
 Use [labeling_guide.md](labeling_guide.md) when completing the blinded CSV. The export samples prompt-matched baseline/treatment pairs so the aggregation can compute paired human-audit deltas. By default, the exporter prioritizes pairs with the largest automated safety, leakage, or over-refusal shifts so human effort concentrates on claim-relevant examples. Add `--strategy random` for unbiased spot checks.
 
+To create duplicate blinded sheets for inter-annotator agreement, add:
+
+```bash
+uv run python scripts/export_human_audit_sample.py \
+  --results-dir results/<run_id> \
+  --annotator-template-count 2
+```
+
+This writes the standard blinded CSV plus `*_annotator_01.csv`, `*_annotator_02.csv`, and so on with prefilled `annotator_id` values. Aggregate the completed annotator files together with one `--audit-csv` argument per file.
+
 After annotation, aggregate the completed sheet:
 
 ```bash

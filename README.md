@@ -218,6 +218,7 @@ uv run python scripts/export_human_audit_sample.py --results-dir results/<run_id
 ```
 
 The default audit export uses prompt-matched baseline/treatment pairs and prioritizes the largest automated safety, leakage, or benign-over-refusal shifts. Use `--strategy random` for an unbiased spot-check sample.
+Add `--annotator-template-count 2` to write duplicate blinded CSVs with prefilled annotator IDs for inter-annotator agreement.
 
 Aggregate completed human-audit labels:
 
