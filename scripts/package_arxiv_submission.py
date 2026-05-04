@@ -9,6 +9,8 @@ from _path import add_src_to_path
 
 add_src_to_path()
 
+from check_latex_placeholders import PLACEHOLDER_TEXT_MARKERS
+
 from cache_safety_erasure.utils.io import file_sha256, write_json
 
 DEFAULT_PRIMARY_RESULTS_DIR = Path("results/h200_qwen_full_sweep")
@@ -143,12 +145,14 @@ def main() -> None:
             missing_figures.append(str(source_path))
     copied_generated = []
     missing_generated = []
+    invalid_generated = []
     for source_path in required_generated_dirs:
         if not source_path.exists():
             missing_generated.append(str(source_path))
             continue
         target_path = source_dir / "generated" / source_path.name
         copied_files = _copy_arxiv_support_tree(source_path, target_path)
+        invalid_generated.extend(_invalid_arxiv_support_files(copied_files))
         copied_generated.append(_bundle_manifest_path(source_dir, target_path))
         copied_file_provenance.extend(
             _directory_provenance("generated", source_path, target_path, copied_files)
@@ -160,18 +164,21 @@ def main() -> None:
             continue
         target_path = source_dir / "generated" / source_path.name
         copied_files = _copy_arxiv_support_tree(source_path, target_path)
+        invalid_generated.extend(_invalid_arxiv_support_files(copied_files))
         copied_generated.append(_bundle_manifest_path(source_dir, target_path))
         copied_file_provenance.extend(
             _directory_provenance("generated", source_path, target_path, copied_files)
         )
     copied_audit = []
     missing_audit = []
+    invalid_audit = []
     for source_path in audit_dirs:
         if not source_path.exists():
             missing_audit.append(str(source_path))
             continue
         target_path = source_dir / "audit" / source_path.name
         copied_files = _copy_arxiv_support_tree(source_path, target_path)
+        invalid_audit.extend(_invalid_arxiv_support_files(copied_files))
         copied_audit.append(_bundle_manifest_path(source_dir, target_path))
         copied_file_provenance.extend(
             _directory_provenance("audit", source_path, target_path, copied_files)
@@ -186,9 +193,11 @@ def main() -> None:
         "invalid_figures": invalid_figures,
         "copied_generated": copied_generated,
         "missing_generated": missing_generated,
+        "invalid_generated": invalid_generated,
         "skipped_optional_generated": skipped_optional_generated,
         "copied_audit": copied_audit,
         "missing_audit": missing_audit,
+        "invalid_audit": invalid_audit,
         "copied_file_provenance": copied_file_provenance,
         "allow_missing": args.allow_missing,
     }
@@ -197,6 +206,13 @@ def main() -> None:
         for path in invalid_figures:
             print(f"Invalid required arXiv figure PDF: {path}")
         raise SystemExit("Refusing to package arXiv bundle with invalid figure PDFs.")
+    invalid_support = [*invalid_generated, *invalid_audit]
+    if invalid_support:
+        for failure in invalid_support:
+            print(f"Invalid arXiv support file: {failure}")
+        raise SystemExit(
+            "Refusing to package arXiv bundle with placeholder generated support files."
+        )
     missing_inputs = _missing_inputs(manifest)
     if missing_inputs and not args.allow_missing:
         for path in missing_inputs:
@@ -265,6 +281,20 @@ def _copy_arxiv_support_tree(source_dir: Path, bundle_dir: Path) -> list[Path]:
         shutil.copyfile(source_file, bundle_file)
         copied_files.append(source_file)
     return copied_files
+
+
+def _invalid_arxiv_support_files(paths: list[Path]) -> list[str]:
+    failures = []
+    for path in paths:
+        if path.suffix != ".tex":
+            continue
+        text = path.read_text(encoding="utf-8", errors="replace")
+        text_lower = text.lower()
+        for marker in PLACEHOLDER_TEXT_MARKERS:
+            if marker.lower() in text_lower:
+                failures.append(f"{path}:placeholder_text:{marker}")
+                break
+    return failures
 
 
 def _directory_provenance(

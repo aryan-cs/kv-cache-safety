@@ -11,6 +11,7 @@ from package_arxiv_submission import (
     OPTIONAL_GENERATED_DIRS,
     REQUIRED_GENERATED_DIRS,
     _copy_arxiv_support_tree,
+    _invalid_arxiv_support_files,
     _is_pdf,
     _missing_inputs,
     _rewrite_failures,
@@ -238,6 +239,24 @@ def test_arxiv_packager_excludes_raw_evidence_from_support_trees(tmp_path: Path)
     assert (bundle / "human_audit_summary_table.tex").exists()
     assert not (bundle / "audit_labels.csv").exists()
     assert not (bundle / "audit_key.jsonl").exists()
+
+
+def test_arxiv_packager_rejects_placeholder_generated_tex(tmp_path: Path) -> None:
+    generated = tmp_path / "generated"
+    generated.mkdir()
+    placeholder = generated / "main_results_table.tex"
+    valid = generated / "result_macros.tex"
+    placeholder.write_text(
+        "Results pending; no readiness-passing rows exported.\n",
+        encoding="utf-8",
+    )
+    valid.write_text(r"\renewcommand{\PrimaryRunId}{h200_qwen_full_sweep}", encoding="utf-8")
+
+    failures = _invalid_arxiv_support_files([placeholder, valid])
+
+    assert failures == [
+        f"{placeholder}:placeholder_text:Results pending; no readiness-passing rows exported."
+    ]
 
 
 def test_latex_placeholder_checker_reports_missing_artifacts(tmp_path: Path) -> None:
