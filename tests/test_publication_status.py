@@ -143,6 +143,53 @@ def test_publication_status_requires_complete_arxiv_bundle_when_requested(tmp_pa
     assert status["gates"]["arxiv_bundle_ready"] is True
 
 
+def test_publication_status_rejects_arxiv_archive_missing_manifest_assets(
+    tmp_path: Path,
+) -> None:
+    primary = tmp_path / "primary"
+    causal = tmp_path / "causal"
+    primary_audit = tmp_path / "primary_audit"
+    causal_audit = tmp_path / "causal_audit"
+    arxiv_dir = tmp_path / "arxiv_source"
+    archive = tmp_path / "arxiv_source.tar.gz"
+    _write_run(primary)
+    _write_run(causal)
+    _write_audit(primary_audit, primary)
+    _write_audit(causal_audit, causal)
+    _write_arxiv_bundle(
+        arxiv_dir,
+        archive,
+        include_manifest_assets_in_archive=False,
+    )
+    claim_path = tmp_path / "claim_assessment.json"
+    claim_path.write_text(
+        json.dumps(_passing_claim_assessment(primary, causal, primary_audit, causal_audit)),
+        encoding="utf-8",
+    )
+    pdf_path = tmp_path / "paper.pdf"
+    pdf_path.write_bytes(b"%PDF-1.7\n")
+
+    status = publication_status(
+        primary_results_dir=primary,
+        causal_results_dir=causal,
+        primary_audit_dir=primary_audit,
+        causal_audit_dir=causal_audit,
+        claim_assessment_path=claim_path,
+        paper_pdf=pdf_path,
+        arxiv_source_dir=arxiv_dir,
+        arxiv_archive=archive,
+        require_arxiv_bundle=True,
+    )
+
+    assert status["publication_ready"] is False
+    assert status["gates"]["arxiv_bundle_ready"] is False
+    assert "archive_missing:figures/figure.pdf" in status["arxiv_bundle"]["failures"]
+    assert (
+        "archive_missing:generated/h200_qwen_full_sweep/main_results_table.tex"
+        in status["arxiv_bundle"]["failures"]
+    )
+
+
 def test_publication_status_rejects_draft_arxiv_bundle_when_required(tmp_path: Path) -> None:
     primary = tmp_path / "primary"
     causal = tmp_path / "causal"
@@ -366,6 +413,7 @@ def _write_arxiv_bundle(
     archive: Path,
     *,
     manifest_overrides: dict | None = None,
+    include_manifest_assets_in_archive: bool = True,
 ) -> None:
     source_dir.mkdir(parents=True)
     (source_dir / "generated" / "h200_qwen_full_sweep").mkdir(parents=True)
@@ -378,6 +426,17 @@ def _write_arxiv_bundle(
     (source_dir / "references.bib").write_text("refs\n", encoding="utf-8")
     figure = source_dir / "figures" / "figure.pdf"
     figure.write_text("figure\n", encoding="utf-8")
+    generated_files = [
+        source_dir / "generated" / "h200_qwen_full_sweep" / "main_results_table.tex",
+        source_dir / "generated" / "h200_causal_patch_qwen7b" / "causal_restoration_table.tex",
+        source_dir / "generated" / "claim_assessment" / "claim_assessment_table.tex",
+    ]
+    audit_files = [
+        source_dir / "audit" / "h200_qwen_full_sweep_summary" / "human_audit_summary_table.tex",
+        source_dir / "audit" / "h200_causal_patch_qwen7b_summary" / "human_audit_summary_table.tex",
+    ]
+    for path in [*generated_files, *audit_files]:
+        path.write_text(f"{path.name}\n", encoding="utf-8")
     manifest = {
         "schema_version": 1,
         "allow_missing": False,
@@ -403,6 +462,10 @@ def _write_arxiv_bundle(
         tar.add(source_dir / "main.tex", arcname="main.tex")
         tar.add(source_dir / "references.bib", arcname="references.bib")
         tar.add(source_dir / "manifest.json", arcname="manifest.json")
+        if include_manifest_assets_in_archive:
+            tar.add(figure, arcname="figures/figure.pdf")
+            for path in [*generated_files, *audit_files]:
+                tar.add(path, arcname=path.relative_to(source_dir))
 
 
 def _passing_claim_assessment(

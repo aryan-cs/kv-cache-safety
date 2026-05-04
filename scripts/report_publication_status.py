@@ -359,9 +359,21 @@ def _arxiv_status(source_dir: Path, archive: Path) -> dict[str, Any]:
     if archive.exists():
         if archive.stat().st_size <= 0:
             failures.append("empty_archive")
-        for member in ["main.tex", "references.bib", "manifest.json"]:
-            if not _archive_contains(archive, member):
-                failures.append(f"archive_missing:{member}")
+        archive_hashes, archive_error = _archive_hashes(archive)
+        if archive_error:
+            failures.append(f"invalid_archive:{archive_error}")
+        else:
+            for member in ["main.tex", "references.bib", "manifest.json"]:
+                if member not in archive_hashes:
+                    failures.append(f"archive_missing:{member}")
+            if manifest:
+                for source_path in _manifest_copied_files(source_dir, manifest, failures):
+                    member = source_path.relative_to(source_dir).as_posix()
+                    archive_sha = archive_hashes.get(member)
+                    if archive_sha is None:
+                        failures.append(f"archive_missing:{member}")
+                    elif archive_sha != file_sha256(source_path):
+                        failures.append(f"archive_stale:{member}")
     return {
         "source_dir": str(source_dir),
         "archive": str(archive),
@@ -380,12 +392,47 @@ def _read_json(path: Path) -> dict[str, Any]:
         return json.load(f)
 
 
-def _archive_contains(archive: Path, member_name: str) -> bool:
+def _archive_hashes(archive: Path) -> tuple[dict[str, str], str]:
     try:
         with tarfile.open(archive, "r:gz") as tar:
-            return member_name in tar.getnames()
-    except (tarfile.TarError, OSError):
-        return False
+            hashes = {}
+            for member in tar.getmembers():
+                if not member.isfile():
+                    continue
+                extracted = tar.extractfile(member)
+                if extracted is None:
+                    continue
+                hashes[member.name] = _sha256_bytes(extracted.read())
+            return hashes, ""
+    except (tarfile.TarError, OSError) as exc:
+        return {}, str(exc)
+
+
+def _manifest_copied_files(
+    source_dir: Path, manifest: dict[str, Any], failures: list[str]
+) -> list[Path]:
+    files: list[Path] = []
+    for key in ["copied_figures", "copied_generated", "copied_audit"]:
+        for raw_path in manifest.get(key, []):
+            path = Path(str(raw_path))
+            try:
+                path.relative_to(source_dir)
+            except ValueError:
+                failures.append(f"copied_path_outside_source:{raw_path}")
+                continue
+            if path.is_file():
+                files.append(path)
+            elif path.is_dir():
+                files.extend(sorted(child for child in path.rglob("*") if child.is_file()))
+            else:
+                failures.append(f"missing_copied_path:{raw_path}")
+    return files
+
+
+def _sha256_bytes(data: bytes) -> str:
+    import hashlib
+
+    return hashlib.sha256(data).hexdigest()
 
 
 def _audit_result_source_failures(manifest: dict[str, Any], results_dir: Path) -> list[str]:
