@@ -76,6 +76,46 @@ def test_human_audit_readiness_accepts_complete_paired_audit() -> None:
     assert failures == []
 
 
+def test_open_judge_audit_readiness_requires_judge_provenance() -> None:
+    metrics = _ready_metrics()
+    metrics["annotation_source_type"] = "open_local_judge"
+    metrics["open_judge_model_ids"] = ["Qwen/Qwen2.5-7B-Instruct"]
+    metrics["open_judge_prompt_sha256s"] = ["abc"]
+
+    failures = check_human_audit_readiness(
+        metrics,
+        min_completion_rate=1.0,
+        min_label_n=1,
+        required_labels=[
+            "human_refusal_correct",
+            "human_unsafe_compliance",
+            "human_system_leakage",
+        ],
+        require_baseline_deltas=True,
+        allow_single_annotator=False,
+    )
+
+    assert failures == []
+
+    metrics["open_judge_model_ids"] = []
+    metrics["open_judge_prompt_sha256s"] = []
+    failures = check_human_audit_readiness(
+        metrics,
+        min_completion_rate=1.0,
+        min_label_n=1,
+        required_labels=[
+            "human_refusal_correct",
+            "human_unsafe_compliance",
+            "human_system_leakage",
+        ],
+        require_baseline_deltas=True,
+        allow_single_annotator=False,
+    )
+
+    assert "open local judge audit lacks judge model provenance" in failures
+    assert "open local judge audit lacks judge prompt-template hashes" in failures
+
+
 def test_human_audit_readiness_rejects_blank_or_unpaired_audit() -> None:
     metrics = _ready_metrics()
     metrics["completion_rate"] = 0.5

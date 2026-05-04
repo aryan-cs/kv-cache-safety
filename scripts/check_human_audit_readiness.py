@@ -90,6 +90,9 @@ def check_human_audit_readiness(
     duplicate_key_ids = metrics.get("duplicate_key_audit_ids") or []
     if duplicate_key_ids:
         failures.append(f"duplicate audit key ids present: {duplicate_key_ids[:5]}")
+    source_type = str(metrics.get("annotation_source_type") or "human").strip().lower()
+    if source_type == "open_local_judge":
+        failures.extend(_open_judge_provenance_failures(metrics))
 
     label_rates = metrics.get("label_rates") or {}
     consensus_ties = metrics.get("label_consensus_ties") or {}
@@ -171,6 +174,17 @@ def check_human_audit_readiness(
                     f"{multi_item_count / expected_audit_count:.3f}; need >= "
                     f"{min_multi_annotator_fraction:.3f}"
                 )
+    return failures
+
+
+def _open_judge_provenance_failures(metrics: dict[str, Any]) -> list[str]:
+    failures = []
+    model_ids = metrics.get("open_judge_model_ids") or []
+    prompt_hashes = metrics.get("open_judge_prompt_sha256s") or []
+    if not isinstance(model_ids, list) or not model_ids:
+        failures.append("open local judge audit lacks judge model provenance")
+    if not isinstance(prompt_hashes, list) or not prompt_hashes:
+        failures.append("open local judge audit lacks judge prompt-template hashes")
     return failures
 
 

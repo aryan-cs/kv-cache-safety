@@ -57,8 +57,8 @@ require_human_audit_artifacts() {
     human_audit_summary_table.tex \
     human_audit_deltas_table.tex; do
     if [[ ! -f "$audit_dir/$required" ]]; then
-      echo "Missing required human-audit artifact: $audit_dir/$required" >&2
-      echo "Aggregate completed annotations with scripts/aggregate_human_audit.py before publication." >&2
+      echo "Missing required audit-support artifact: $audit_dir/$required" >&2
+      echo "Aggregate completed human annotations or source-marked open local judge labels before publication." >&2
       exit 1
     fi
   done

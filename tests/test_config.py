@@ -266,7 +266,7 @@ def test_publication_artifact_builder_fails_without_real_results() -> None:
     assert "Refusing to build publication artifacts from a dirty git working tree." in script
     assert "Missing required result artifact" in script
     assert "require_human_audit_artifacts" in script
-    assert "Missing required human-audit artifact" in script
+    assert "Missing required audit-support artifact" in script
     assert "paper/cache_mediated_safety_erasure.pdf" in script
     assert "scripts/package_arxiv_submission.py" in script
     assert "scripts/assess_claims.py" in script
