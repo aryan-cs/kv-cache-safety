@@ -229,6 +229,103 @@ def test_latex_macro_export_writes_headline_result_macros(tmp_path: Path) -> Non
     assert "\\renewcommand{\\PrimaryRunId}{run\\_001}" in text
     assert "\\renewcommand{\\PrimaryTopSSEIPolicy}{kv\\_int4\\_sim}" in text
     assert "\\renewcommand{\\PrimaryTopSSEI}{0.250}" in text
+    assert "\\renewcommand{\\PrimaryTopSSEICILow}{0.100}" in text
+
+
+def test_export_paper_assets_writes_ci_bearing_tables(tmp_path: Path) -> None:
+    import subprocess
+    import sys
+
+    results_dir = tmp_path / "results" / "run_001"
+    paper_dir = tmp_path / "paper" / "generated" / "run_001"
+    (results_dir / "figures").mkdir(parents=True)
+    write_json(results_dir / "manifest.json", {"run_name": "run_001"})
+    write_json(results_dir / "figures" / "manifest.json", {"figures": {}})
+    write_json(
+        results_dir / "metrics.json",
+        {
+            "publication_summary": {"policies": {"kv_int4_sim": {}}},
+            "policy_level_contrasts": {
+                "kv_int4_sim": {
+                    "selective_safety_erasure_index": 0.25,
+                    "selective_safety_erasure_index_ci": {
+                        "ci_low": 0.10,
+                        "ci_high": 0.40,
+                        "n_safety": 12,
+                        "n_capability": 8,
+                    },
+                }
+            },
+            "selective_safety_erasure": {
+                "public_refusal_safety::kv_int4_sim": {
+                    "safety_degradation": 0.12,
+                    "capability_degradation": 0.02,
+                    "selective_safety_erasure_index": 0.10,
+                    "paired_safety_degradation_ci": {
+                        "paired_n": 100,
+                        "cluster_n": 95,
+                        "ci_low": 0.05,
+                        "ci_high": 0.18,
+                    },
+                }
+            },
+            "causal_restoration": {
+                "public_refusal_safety::kv_int4_sim__patchkey-value__rolesystem": {
+                    "compressed_policy": "kv_int4_sim",
+                    "safety_restoration_fraction": 0.62,
+                    "safety_restoration_fraction_ci": {"ci_low": 0.50, "ci_high": 0.72},
+                    "refusal_restoration_fraction": 0.55,
+                    "refusal_restoration_fraction_ci": {"ci_low": 0.44, "ci_high": 0.66},
+                    "leakage_avoidance_restoration_fraction": 0.20,
+                    "leakage_avoidance_restoration_fraction_ci": {
+                        "ci_low": 0.10,
+                        "ci_high": 0.30,
+                    },
+                },
+                "public_refusal_safety::kv_int4_sim__patchkey-value__roleuser__matchsystem": {
+                    "compressed_policy": "kv_int4_sim",
+                    "safety_restoration_fraction": 0.20,
+                    "safety_restoration_fraction_ci": {"ci_low": 0.12, "ci_high": 0.30},
+                    "refusal_restoration_fraction": 0.18,
+                    "refusal_restoration_fraction_ci": {"ci_low": 0.10, "ci_high": 0.26},
+                },
+                "public_refusal_safety::policy_pinned__budget128__sink8": {
+                    "compressed_policy": "kv_int4_sim",
+                    "safety_restoration_fraction": 0.45,
+                    "safety_restoration_fraction_ci": {"ci_low": 0.34, "ci_high": 0.56},
+                    "refusal_restoration_fraction": 0.41,
+                    "refusal_restoration_fraction_ci": {"ci_low": 0.30, "ci_high": 0.52},
+                },
+            },
+        },
+    )
+
+    subprocess.run(
+        [
+            sys.executable,
+            "scripts/export_paper_assets.py",
+            "--results-dir",
+            str(results_dir),
+            "--paper-dir",
+            str(paper_dir),
+            "--macro-prefix",
+            "Primary",
+        ],
+        check=True,
+    )
+
+    suite_tex = (paper_dir / "suite_level_effects_table.tex").read_text(encoding="utf-8")
+    causal_tex = (paper_dir / "causal_restoration_table.tex").read_text(encoding="utf-8")
+
+    assert "safety ci low" in suite_tex
+    assert "safety ci high" in suite_tex
+    assert "0.050" in suite_tex
+    assert "safety ci low" in causal_tex
+    assert "refusal ci low" in causal_tex
+    assert "leakage avoidance ci high" in causal_tex
+    assert "rolesystem" in causal_tex
+    assert "roleuser" in causal_tex
+    assert "policy\\_pinned" in causal_tex
 
 
 def test_paper_asset_freshness_detects_stale_tables_and_sources(tmp_path: Path) -> None:

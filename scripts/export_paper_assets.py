@@ -128,6 +128,8 @@ def main() -> None:
             "within_suite_ssei_if_capability_available",
             "paired_n",
             "cluster_n",
+            "safety_ci_low",
+            "safety_ci_high",
         ],
         selective_rows,
         caption="Suite-level degradation effects with paired prompt counts.",
@@ -142,10 +144,24 @@ def main() -> None:
                 "policy": policy,
                 "compressed_policy": values.get("compressed_policy"),
                 "safety_restoration_fraction": values.get("safety_restoration_fraction"),
+                "safety_ci_low": values.get("safety_restoration_fraction_ci", {}).get("ci_low"),
+                "safety_ci_high": values.get("safety_restoration_fraction_ci", {}).get(
+                    "ci_high"
+                ),
                 "refusal_restoration_fraction": values.get("refusal_restoration_fraction"),
+                "refusal_ci_low": values.get("refusal_restoration_fraction_ci", {}).get("ci_low"),
+                "refusal_ci_high": values.get("refusal_restoration_fraction_ci", {}).get(
+                    "ci_high"
+                ),
                 "leakage_avoidance_restoration_fraction": values.get(
                     "leakage_avoidance_restoration_fraction"
                 ),
+                "leakage_avoidance_ci_low": values.get(
+                    "leakage_avoidance_restoration_fraction_ci", {}
+                ).get("ci_low"),
+                "leakage_avoidance_ci_high": values.get(
+                    "leakage_avoidance_restoration_fraction_ci", {}
+                ).get("ci_high"),
             }
         )
     write_markdown_table(
@@ -155,8 +171,14 @@ def main() -> None:
             "policy",
             "compressed_policy",
             "safety_restoration_fraction",
+            "safety_ci_low",
+            "safety_ci_high",
             "refusal_restoration_fraction",
+            "refusal_ci_low",
+            "refusal_ci_high",
             "leakage_avoidance_restoration_fraction",
+            "leakage_avoidance_ci_low",
+            "leakage_avoidance_ci_high",
         ],
         restoration_rows,
     )
@@ -167,8 +189,14 @@ def main() -> None:
             "policy",
             "compressed_policy",
             "safety_restoration_fraction",
+            "safety_ci_low",
+            "safety_ci_high",
             "refusal_restoration_fraction",
+            "refusal_ci_low",
+            "refusal_ci_high",
             "leakage_avoidance_restoration_fraction",
+            "leakage_avoidance_ci_low",
+            "leakage_avoidance_ci_high",
         ],
         restoration_rows,
         caption="Causal restoration effects for patched and mitigation conditions.",

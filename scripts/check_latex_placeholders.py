@@ -14,6 +14,46 @@ PLACEHOLDER_TEXT_MARKERS = [
     "Results pending; no readiness-passing rows exported.",
     "results pending",
 ]
+REQUIRED_TEX_MARKERS_BY_NAME = {
+    "main_results_table.tex": [
+        "policy level ssei",
+        "policy level ssei ci low",
+        "policy level ssei ci high",
+    ],
+    "suite_level_effects_table.tex": [
+        "paired n",
+        "cluster n",
+        "safety ci low",
+        "safety ci high",
+    ],
+    "causal_restoration_table.tex": [
+        "safety ci low",
+        "safety ci high",
+        "refusal ci low",
+        "refusal ci high",
+    ],
+}
+REQUIRED_RESULT_MACROS = {
+    "h200_qwen_full_sweep": [
+        "PrimaryRunId",
+        "PrimaryPolicyCount",
+        "PrimaryTopSSEIPolicy",
+        "PrimaryTopSSEI",
+        "PrimaryTopSSEICILow",
+        "PrimaryTopSSEICIHigh",
+        "PrimarySafetyClusterCount",
+        "PrimaryCapabilityClusterCount",
+    ],
+    "h200_causal_patch_qwen7b": [
+        "CausalRunId",
+        "CausalPolicyCount",
+    ],
+}
+REQUIRED_CAUSAL_ROW_MARKERS = [
+    "rolesystem",
+    "roleuser",
+    "policy_pinned",
+]
 
 
 def main() -> None:
@@ -64,6 +104,7 @@ def placeholder_artifact_failures(tex_path: Path) -> list[str]:
                     if marker.lower() in text_lower:
                         failures.append(f"placeholder text in artifact: {raw_path}")
                         break
+                failures.extend(_semantic_tex_failures(raw_path, path.name, text))
     return sorted(set(failures))
 
 
@@ -84,6 +125,35 @@ def _is_pdf(path: Path) -> bool:
         return path.read_bytes()[:5] == b"%PDF-"
     except OSError:
         return False
+
+
+def _semantic_tex_failures(raw_path: str, name: str, text: str) -> list[str]:
+    failures: list[str] = []
+    normalized = text.lower().replace(r"\_", "_")
+    for marker in REQUIRED_TEX_MARKERS_BY_NAME.get(name, []):
+        if marker not in normalized:
+            failures.append(f"missing required table marker in artifact: {raw_path}::{marker}")
+    if name == "causal_restoration_table.tex":
+        for marker in REQUIRED_CAUSAL_ROW_MARKERS:
+            if marker not in normalized:
+                failures.append(f"missing causal control row in artifact: {raw_path}::{marker}")
+    if name == "result_macros.tex":
+        macro_values = _macro_values(text)
+        for path_marker, required_macros in REQUIRED_RESULT_MACROS.items():
+            if path_marker not in raw_path:
+                continue
+            for macro in required_macros:
+                value = macro_values.get(macro, "").strip()
+                if not value:
+                    failures.append(f"missing required macro in artifact: {raw_path}::{macro}")
+    return failures
+
+
+def _macro_values(text: str) -> dict[str, str]:
+    values: dict[str, str] = {}
+    for match in re.finditer(r"\\renewcommand\{\\([A-Za-z]+)\}\{([^{}]*)\}", text):
+        values[match.group(1)] = match.group(2)
+    return values
 
 
 if __name__ == "__main__":

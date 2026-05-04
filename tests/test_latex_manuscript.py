@@ -181,6 +181,70 @@ def test_latex_placeholder_checker_rejects_placeholder_artifacts(tmp_path: Path)
     ]
 
 
+def test_latex_placeholder_checker_requires_result_macro_values(tmp_path: Path) -> None:
+    tex = tmp_path / "main.tex"
+    generated = tmp_path / "h200_qwen_full_sweep"
+    generated.mkdir()
+    macros = generated / "result_macros.tex"
+    macros.write_text(
+        "\\renewcommand{\\PrimaryRunId}{h200_qwen_full_sweep}\n"
+        "\\renewcommand{\\PrimaryPolicyCount}{6}\n"
+        "\\renewcommand{\\PrimaryTopSSEIPolicy}{}\n",
+        encoding="utf-8",
+    )
+    tex.write_text(
+        r"\requiredartifact{h200_qwen_full_sweep/result_macros.tex}",
+        encoding="utf-8",
+    )
+
+    failures = placeholder_artifact_failures(tex)
+
+    assert (
+        "missing required macro in artifact: "
+        "h200_qwen_full_sweep/result_macros.tex::PrimaryTopSSEIPolicy"
+    ) in failures
+    assert (
+        "missing required macro in artifact: "
+        "h200_qwen_full_sweep/result_macros.tex::PrimaryTopSSEI"
+    ) in failures
+
+
+def test_latex_placeholder_checker_requires_ci_tables_and_causal_controls(
+    tmp_path: Path,
+) -> None:
+    tex = tmp_path / "main.tex"
+    suite = tmp_path / "suite_level_effects_table.tex"
+    causal = tmp_path / "causal_restoration_table.tex"
+    suite.write_text("suite & policy & paired n & cluster n \\\\\n", encoding="utf-8")
+    causal.write_text(
+        "safety ci low & safety ci high & refusal ci low & refusal ci high \\\\\n"
+        "kv\\_int4\\_sim\\_\\_patchkey-value\\_\\_rolesystem \\\\\n",
+        encoding="utf-8",
+    )
+    tex.write_text(
+        r"\maybeinputtable{suite_level_effects_table.tex}{pending}"
+        "\n"
+        r"\maybeinputtable{causal_restoration_table.tex}{pending}",
+        encoding="utf-8",
+    )
+
+    failures = placeholder_artifact_failures(tex)
+
+    assert (
+        "missing required table marker in artifact: suite_level_effects_table.tex::safety ci low"
+        in failures
+    )
+    assert (
+        "missing required table marker in artifact: suite_level_effects_table.tex::safety ci high"
+        in failures
+    )
+    assert "missing causal control row in artifact: causal_restoration_table.tex::roleuser" in failures
+    assert (
+        "missing causal control row in artifact: causal_restoration_table.tex::policy_pinned"
+        in failures
+    )
+
+
 def test_latex_placeholder_checker_requires_generated_text_artifacts(tmp_path: Path) -> None:
     tex = tmp_path / "main.tex"
     existing = tmp_path / "generated" / "ok.tex"
