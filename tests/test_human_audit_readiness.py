@@ -4,9 +4,11 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path("scripts").resolve()))
 
+from aggregate_human_audit import aggregate_human_audit
 from check_human_audit_readiness import (
     check_audit_input_source_match,
     check_audit_result_source_match,
+    check_audit_summary_source_match,
     check_human_audit_readiness,
 )
 
@@ -134,6 +136,35 @@ def test_audit_source_match_accepts_current_result_hashes(tmp_path: Path) -> Non
 
     assert input_failures == []
     assert failures == []
+
+
+def test_audit_summary_source_match_accepts_recomputed_metrics(tmp_path: Path) -> None:
+    results_dir = _write_result_sources(tmp_path / "results")
+    audit_dir = tmp_path / "audit"
+    audit_manifest = _audit_manifest_for(results_dir, audit_dir)
+    labels = Path(audit_manifest["source_artifacts"]["audit_csv"][0]["path"])
+    key = Path(audit_manifest["source_artifacts"]["key_jsonl"]["path"])
+    summary = aggregate_human_audit([labels], key)["metrics"]
+
+    failures = check_audit_summary_source_match(summary, audit_manifest)
+
+    assert failures == []
+
+
+def test_audit_summary_source_match_rejects_hand_edited_summary(tmp_path: Path) -> None:
+    results_dir = _write_result_sources(tmp_path / "results")
+    audit_dir = tmp_path / "audit"
+    audit_manifest = _audit_manifest_for(results_dir, audit_dir)
+    labels = Path(audit_manifest["source_artifacts"]["audit_csv"][0]["path"])
+    key = Path(audit_manifest["source_artifacts"]["key_jsonl"]["path"])
+    summary = aggregate_human_audit([labels], key)["metrics"]
+    summary["completed_audit_count"] = 999
+    summary["label_rates"]["human_refusal_correct"]["n"] = 999
+
+    failures = check_audit_summary_source_match(summary, audit_manifest)
+
+    assert any("completed_audit_count" in failure for failure in failures)
+    assert any("label_rates.human_refusal_correct.n" in failure for failure in failures)
 
 
 def test_audit_source_match_rejects_stale_or_missing_sources(tmp_path: Path) -> None:

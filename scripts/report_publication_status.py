@@ -14,6 +14,7 @@ from assess_claims import assess_claims
 from check_human_audit_readiness import (
     DEFAULT_REQUIRED_LABELS,
     check_audit_input_source_match,
+    check_audit_summary_source_match,
     check_human_audit_readiness,
 )
 from check_publication_readiness import _check_figure_manifest
@@ -556,6 +557,8 @@ def _audit_status(audit_dir: Path, results_dir: Path) -> dict[str, Any]:
             )
         )
     failures.extend(check_audit_input_source_match(manifest))
+    if summary and manifest:
+        failures.extend(check_audit_summary_source_match(summary, manifest))
     failures.extend(_audit_result_source_failures(manifest, results_dir))
     return {
         "path": str(audit_dir),

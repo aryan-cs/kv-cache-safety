@@ -1,3 +1,4 @@
+import csv
 import hashlib
 import io
 import json
@@ -7,6 +8,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path("scripts").resolve()))
 
+from aggregate_human_audit import aggregate_human_audit
 from report_publication_status import (
     REQUIRED_ARXIV_FIGURE_FILES,
     publication_status,
@@ -1475,65 +1477,21 @@ def _write_audit(
     include_inter_annotator: bool = True,
 ) -> None:
     path.mkdir(parents=True)
-    summary = {
-        "expected_audit_count": 10,
-        "completed_audit_count": 10,
-        "completion_rate": 1.0,
-        "unknown_audit_ids": [],
-        "duplicate_annotation_keys": [],
-        "distinct_annotator_count": 2,
-        "multi_annotator_audit_count": 10 if include_inter_annotator else 0,
-        "label_rates": {label: {"n": 10, "mean": 0.5} for label in REQUIRED_AUDIT_LABELS},
-        "label_consensus_ties": {},
-        "label_context": {
-            "human_system_leakage": {
-                "n": 10,
-                "missing_reference_count": 0,
-                "missing_reference_audit_ids": [],
-            }
-        },
-        "baseline_policy_deltas": {
-            "public_refusal_safety::kv_int4_sim::human_refusal_correct": {
-                "n": 5,
-                "treatment_minus_baseline": -0.2,
-            },
-            "public_refusal_safety::kv_int4_sim::human_unsafe_compliance": {
-                "n": 5,
-                "treatment_minus_baseline": 0.2,
-            },
-            "public_refusal_safety::kv_int4_sim::human_system_leakage": {
-                "n": 5,
-                "treatment_minus_baseline": 0.0,
-            },
-            "public_refusal_safety::kv_int4_sim__patchkey-value__rolesystem::human_unsafe_compliance": {
-                "n": 5,
-                "treatment_minus_baseline": 0.05,
-            },
-            "public_refusal_safety::kv_int4_sim__patchkey-value__roleuser__matchsystem::human_unsafe_compliance": {
-                "n": 5,
-                "treatment_minus_baseline": 0.25,
-            },
-            "public_refusal_safety::kv_int4_sim__patchkey-value__rolesystem::human_refusal_correct": {
-                "n": 5,
-                "treatment_minus_baseline": -0.05,
-            },
-            "public_refusal_safety::kv_int4_sim__patchkey-value__roleuser__matchsystem::human_refusal_correct": {
-                "n": 5,
-                "treatment_minus_baseline": -0.25,
-            },
-        },
-    }
-    if include_inter_annotator:
-        summary["inter_annotator"] = {
-            label: {"pair_count": 2, "agreement": 1.0} for label in REQUIRED_AUDIT_LABELS
-        }
     for name in ["human_audit_summary.md", "human_audit_summary_table.tex", "human_audit_deltas_table.tex"]:
         (path / name).write_text("artifact\n", encoding="utf-8")
     audit_csv = path / "audit_labels.csv"
     key_jsonl = path / "audit_key.jsonl"
     export_manifest = path / "audit_export_manifest.json"
-    audit_csv.write_text("audit_id,human_refusal_correct\n1,true\n", encoding="utf-8")
-    key_jsonl.write_text('{"audit_id":"1"}\n', encoding="utf-8")
+    key_rows, annotation_rows = _audit_fixture_rows(include_inter_annotator=include_inter_annotator)
+    key_jsonl.write_text(
+        "\n".join(json.dumps(row) for row in key_rows) + "\n",
+        encoding="utf-8",
+    )
+    with audit_csv.open("w", encoding="utf-8", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=list(annotation_rows[0]))
+        writer.writeheader()
+        writer.writerows(annotation_rows)
+    summary = aggregate_human_audit([audit_csv], key_jsonl)["metrics"]
     export_manifest.write_text(
         json.dumps(
             {
@@ -1572,6 +1530,72 @@ def _write_audit(
     }
     (path / "audit_manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
     (path / "human_audit_summary.json").write_text(json.dumps(summary), encoding="utf-8")
+
+
+def _audit_fixture_rows(*, include_inter_annotator: bool) -> tuple[list[dict], list[dict]]:
+    policies = {
+        "none": {
+            "human_refusal_correct": "yes",
+            "human_unsafe_compliance": "no",
+            "human_system_leakage": "no",
+        },
+        "kv_int4_sim": {
+            "human_refusal_correct": "no",
+            "human_unsafe_compliance": "yes",
+            "human_system_leakage": "no",
+        },
+        "kv_int4_sim__patchkey-value__rolesystem": {
+            "human_refusal_correct": "yes",
+            "human_unsafe_compliance": "no",
+            "human_system_leakage": "no",
+        },
+        "kv_int4_sim__patchkey-value__roleuser__matchsystem": {
+            "human_refusal_correct": "no",
+            "human_unsafe_compliance": "yes",
+            "human_system_leakage": "no",
+        },
+    }
+    key_rows = []
+    annotation_rows = []
+    annotators = ["r1", "r2"] if include_inter_annotator else ["r1"]
+    for prompt_idx in range(5):
+        prompt_id = f"p{prompt_idx}"
+        for policy, labels in policies.items():
+            audit_id = f"{prompt_id}-{policy}"
+            key_rows.append(
+                {
+                    "audit_id": audit_id,
+                    "run_id": "run",
+                    "model_id": "Qwen/Qwen2.5-14B-Instruct",
+                    "suite": "public_refusal_safety",
+                    "policy": policy,
+                    "prompt_id": prompt_id,
+                    "seed": 0,
+                    "category": "safety",
+                    "should_refuse": True,
+                    "refusal_expected_accuracy": labels["human_refusal_correct"] == "yes",
+                    "exact_leakage": 0.0,
+                    "capability_score": None,
+                    "system": "",
+                    "hidden_system": "",
+                }
+            )
+            for annotator_id in annotators:
+                annotation_rows.append(
+                    {
+                        "audit_id": audit_id,
+                        "annotator_id": annotator_id,
+                        "human_should_refuse": "yes",
+                        "human_refusal_correct": labels["human_refusal_correct"],
+                        "human_unsafe_compliance": labels["human_unsafe_compliance"],
+                        "human_system_leakage": labels["human_system_leakage"],
+                        "human_capability_correct": "",
+                        "human_notes": "",
+                        "system_or_policy_text": "",
+                        "hidden_system_reference": "",
+                    }
+                )
+    return key_rows, annotation_rows
 
 
 def _refresh_figure_manifest_source_hashes(path: Path) -> None:
