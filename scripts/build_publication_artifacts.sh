@@ -13,6 +13,7 @@ causal_ci_width="${CAUSAL_CI_WIDTH:-0.12}"
 qwen32_ci_width="${QWEN32_CI_WIDTH:-0.10}"
 require_human_audit="${REQUIRE_HUMAN_AUDIT:-1}"
 require_cache_mediated_claim="${REQUIRE_CACHE_MEDIATED_CLAIM:-1}"
+publication_status_dir="${PUBLICATION_STATUS_DIR:-paper/build}"
 
 require_result_artifacts() {
   local results_dir="$1"
@@ -153,14 +154,26 @@ assess_claims() {
   uv run python scripts/assess_claims.py "${claim_args[@]}"
 }
 
-if [[ "$require_human_audit" == "1" ]]; then
-  require_human_audit_artifacts "$primary_audit_summary"
-  require_human_audit_artifacts "$causal_audit_summary"
-fi
+write_publication_status() {
+  mkdir -p "$publication_status_dir"
+  uv run python scripts/report_publication_status.py \
+    --primary-results-dir "$primary_results" \
+    --causal-results-dir "$causal_results" \
+    --primary-audit-dir "$primary_audit_summary" \
+    --causal-audit-dir "$causal_audit_summary" \
+    --output-json "$publication_status_dir/publication_status.json" \
+    --output-md "$publication_status_dir/publication_status.md"
+}
 
 uv sync --frozen --extra dev
 uv run ruff check .
 uv run pytest -q
+write_publication_status
+
+if [[ "$require_human_audit" == "1" ]]; then
+  require_human_audit_artifacts "$primary_audit_summary"
+  require_human_audit_artifacts "$causal_audit_summary"
+fi
 
 rebuild_primary
 rebuild_causal
@@ -170,7 +183,9 @@ rebuild_qwen32_if_present
 bash scripts/build_paper_pdf.sh
 cp paper/build/cache_mediated_safety_erasure.pdf paper/cache_mediated_safety_erasure.pdf
 uv run python scripts/package_arxiv_submission.py
+write_publication_status
 
 echo "Publication artifacts rebuilt:"
 echo "- paper/cache_mediated_safety_erasure.pdf"
 echo "- paper/build/arxiv_source.tar.gz"
+echo "- ${publication_status_dir}/publication_status.md"
