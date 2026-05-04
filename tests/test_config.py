@@ -95,6 +95,7 @@ def test_h200_report_fetcher_copies_expected_reports() -> None:
 
     assert "H200_HOST:-uiuc-h200" in script
     assert "/home/aryang9/sandbox/llm-safety" in script
+    assert "h200_admin_report_latest.md" in script
     assert "h200_admin_report.md" in script
     assert "h200_status_latest.md" in script
     assert "h200_status_latest.json" in script

@@ -9,9 +9,22 @@ local_dir="${LOCAL_H200_LOG_DIR:-logs/h200}"
 
 mkdir -p "$local_dir"
 
-for name in h200_admin_report.md h200_status_latest.md h200_status_latest.json; do
-  scp -q "${host}:${remote_dir}/logs/h200/${name}" "${local_dir}/${name}"
-done
+fetch_remote_report() {
+  local remote_name="$1"
+  local local_name="$2"
+  local remote_path="${remote_dir}/logs/h200/${remote_name}"
+  if ssh -q "$host" "test -f '${remote_path}'"; then
+    scp -q "${host}:${remote_path}" "${local_dir}/${local_name}"
+    return 0
+  fi
+  return 1
+}
+
+if ! fetch_remote_report h200_admin_report_latest.md h200_admin_report.md; then
+  fetch_remote_report h200_admin_report.md h200_admin_report.md
+fi
+fetch_remote_report h200_status_latest.md h200_status_latest.md
+fetch_remote_report h200_status_latest.json h200_status_latest.json
 
 echo "Fetched H200 reports into ${local_dir}:"
 ls -lh \
