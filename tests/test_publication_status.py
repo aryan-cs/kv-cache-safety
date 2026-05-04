@@ -55,6 +55,27 @@ def test_publication_status_can_ignore_pdf_when_prechecking_complete_build(tmp_p
     assert "paper_pdf_exists" not in status["blockers"]
 
 
+def test_publication_markdown_marks_existing_pdf_as_draft_until_evidence_ready(
+    tmp_path: Path,
+) -> None:
+    pdf_path = tmp_path / "paper.pdf"
+    pdf_path.write_bytes(b"%PDF-1.7\n")
+
+    status = publication_status(
+        primary_results_dir=tmp_path / "primary",
+        causal_results_dir=tmp_path / "causal",
+        primary_audit_dir=tmp_path / "primary_audit",
+        causal_audit_dir=tmp_path / "causal_audit",
+        claim_assessment_path=tmp_path / "claim_assessment.json",
+        paper_pdf=pdf_path,
+    )
+    rendered = render_markdown(status)
+
+    assert status["evidence_ready"] is False
+    assert "paper PDF: `draft-only`" in rendered
+    assert "evidence gates incomplete" in rendered
+
+
 def test_publication_status_accepts_complete_real_artifacts(tmp_path: Path) -> None:
     primary = tmp_path / "primary"
     causal = tmp_path / "causal"
@@ -157,6 +178,7 @@ def test_publication_status_rejects_draft_arxiv_bundle_when_required(tmp_path: P
     assert status["publication_ready"] is False
     assert "arxiv_bundle_ready" in status["blockers"]
     assert "allow_missing_enabled" in status["arxiv_bundle"]["failures"]
+    assert "arXiv bundle: `stale`" in render_markdown(status)
 
 
 def test_publication_status_rejects_stale_audit_source_hashes(tmp_path: Path) -> None:

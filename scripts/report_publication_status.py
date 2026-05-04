@@ -150,10 +150,20 @@ def publication_status(
     if require_arxiv_bundle:
         gates["arxiv_bundle_ready"] = arxiv["complete"]
     blockers = [gate for gate, passed in gates.items() if not passed]
+    evidence_gate_names = [
+        "primary_results_complete",
+        "causal_results_complete",
+        "primary_human_audit_complete",
+        "causal_human_audit_complete",
+        "claim_assessment_passed",
+    ]
+    evidence_blockers = [gate for gate in evidence_gate_names if not gates[gate]]
     return {
         "schema_version": 1,
         "publication_ready": not blockers,
         "blockers": blockers,
+        "evidence_ready": not evidence_blockers,
+        "evidence_blockers": evidence_blockers,
         "gates": gates,
         "primary_results": primary,
         "causal_results": causal,
@@ -193,7 +203,7 @@ def render_markdown(status: dict[str, Any]) -> str:
             _artifact_line("primary human audit", status["primary_human_audit"]),
             _artifact_line("causal human audit", status["causal_human_audit"]),
             _claim_line(status["claim_assessment"]),
-            _pdf_line(status["paper_pdf"]),
+            _pdf_line(status["paper_pdf"], evidence_ready=status["evidence_ready"]),
             _arxiv_line(status["arxiv_bundle"]),
             "",
         ]
@@ -456,13 +466,26 @@ def _claim_line(status: dict[str, Any]) -> str:
     return f"- claim assessment: `{state}` at `{status['path']}`{suffix}"
 
 
-def _pdf_line(status: dict[str, Any]) -> str:
-    state = "exists" if status["exists"] else "missing"
-    return f"- paper PDF: `{state}` at `{status['path']}`"
+def _pdf_line(status: dict[str, Any], *, evidence_ready: bool) -> str:
+    if not status["exists"]:
+        state = "missing"
+        suffix = ""
+    elif evidence_ready:
+        state = "exists"
+        suffix = ""
+    else:
+        state = "draft-only"
+        suffix = " (evidence gates incomplete; not a publishable paper)"
+    return f"- paper PDF: `{state}` at `{status['path']}`{suffix}"
 
 
 def _arxiv_line(status: dict[str, Any]) -> str:
-    state = "complete" if status["complete"] else "blocked"
+    if status["complete"]:
+        state = "complete"
+    elif status.get("archive_exists"):
+        state = "stale"
+    else:
+        state = "blocked"
     suffix = ""
     if status.get("failures"):
         suffix = " (failed: " + ", ".join(status["failures"]) + ")"
