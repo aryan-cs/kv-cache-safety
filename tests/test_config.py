@@ -84,7 +84,8 @@ def test_h200_wait_script_logs_visible_gpu_users() -> None:
     script = Path("scripts/wait_for_h200_gpu.sh").read_text(encoding="utf-8")
 
     assert "--query-compute-apps=pid,process_name,used_memory" in script
-    assert "nvidia-smi pmon -c 1" in script
+    assert "NVIDIA_SMI_TIMEOUT_SECONDS" in script
+    assert "nvidia_smi_with_timeout pmon -c 1" in script
     assert "log_visible_gpu_users" in script
 
 

@@ -563,7 +563,12 @@ def _command_text(command: list[str], *, cwd: Path) -> str:
     return result.stdout.strip()
 
 
-def _run(command: list[str], *, cwd: Path | None) -> subprocess.CompletedProcess[str]:
+def _run(
+    command: list[str],
+    *,
+    cwd: Path | None,
+    timeout_seconds: float = 20,
+) -> subprocess.CompletedProcess[str]:
     try:
         return subprocess.run(
             command,
@@ -571,10 +576,18 @@ def _run(command: list[str], *, cwd: Path | None) -> subprocess.CompletedProcess
             check=False,
             capture_output=True,
             text=True,
-            timeout=20,
+            timeout=timeout_seconds,
         )
     except FileNotFoundError as exc:
         return subprocess.CompletedProcess(command, 127, "", str(exc))
+    except subprocess.TimeoutExpired as exc:
+        stdout = exc.stdout if isinstance(exc.stdout, str) else ""
+        stderr = exc.stderr if isinstance(exc.stderr, str) else ""
+        message = stderr.strip()
+        if message:
+            message = f"{message}\n"
+        message += f"timed out after {timeout_seconds:g}s: {' '.join(command)}"
+        return subprocess.CompletedProcess(command, 124, stdout, message)
 
 
 if __name__ == "__main__":

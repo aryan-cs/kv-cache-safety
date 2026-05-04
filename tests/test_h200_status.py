@@ -246,6 +246,17 @@ def test_run_reports_missing_executable() -> None:
     assert "definitely_missing_h200_status_binary" in result.stderr
 
 
+def test_run_reports_command_timeout() -> None:
+    result = _run(
+        [sys.executable, "-c", "import time; time.sleep(1)"],
+        cwd=None,
+        timeout_seconds=0.01,
+    )
+
+    assert result.returncode == 124
+    assert "timed out after" in result.stderr
+
+
 def test_artifact_status_marks_expected_h200_dirs(tmp_path: Path) -> None:
     (tmp_path / "results" / "h200_qwen_full_sweep").mkdir(parents=True)
 
