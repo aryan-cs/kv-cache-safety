@@ -217,6 +217,8 @@ def test_publication_human_audit_aggregation_has_fail_closed_wrapper() -> None:
 
     assert "PRIMARY_RUN_ID:-h200_qwen_full_sweep" in script
     assert "CAUSAL_RUN_ID:-h200_causal_patch_qwen7b" in script
+    assert "audit_blinded_annotator_open_judge_" in script
+    assert "audit_csvs=(\"${open_judge_csvs[@]}\")" in script
     assert "Missing completed annotator CSVs" in script
     assert "scripts/aggregate_human_audit.py" in script
     assert "--require-result-source-match" in script

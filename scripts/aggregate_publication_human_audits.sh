@@ -41,7 +41,13 @@ aggregate_run_audit() {
   require_file "$export_manifest" "Missing audit export manifest"
 
   shopt -s nullglob
-  local audit_csvs=("$audit_input_dir/${run_id}_audit_blinded_annotator_"*.csv)
+  local open_judge_csvs=("$audit_input_dir/${run_id}_audit_blinded_annotator_open_judge_"*.csv)
+  local audit_csvs=()
+  if [[ "${#open_judge_csvs[@]}" -gt 0 ]]; then
+    audit_csvs=("${open_judge_csvs[@]}")
+  else
+    audit_csvs=("$audit_input_dir/${run_id}_audit_blinded_annotator_"*.csv)
+  fi
   shopt -u nullglob
   if [[ "${#audit_csvs[@]}" -eq 0 ]]; then
     echo "Missing completed annotator CSVs: $audit_input_dir/${run_id}_audit_blinded_annotator_*.csv" >&2
