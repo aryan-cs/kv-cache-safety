@@ -219,7 +219,13 @@ def test_publication_artifact_builder_fails_without_real_results() -> None:
     assert "scripts/assess_claims.py" in script
     assert "scripts/plan_registered_followups.py" in script
     assert "scripts/report_publication_status.py" in script
-    assert "REQUIRE_COMPLETE_PAPER=1 bash scripts/build_paper_pdf.sh" in script
+    assert 'PRIMARY_RESULTS_DIR="$primary_results"' in script
+    assert 'CAUSAL_RESULTS_DIR="$causal_results"' in script
+    assert 'PRIMARY_PAPER_DIR="$primary_generated_dir"' in script
+    assert 'CAUSAL_PAPER_DIR="$causal_generated_dir"' in script
+    assert 'CLAIM_ASSESSMENT_PATH="$claim_generated_dir/claim_assessment.json"' in script
+    assert "REQUIRE_COMPLETE_PAPER=1" in script
+    assert "bash scripts/build_paper_pdf.sh" in script
     assert "publication_status.md" in script
     assert "--require-cache-mediated-claim" in script
     assert "--require-human-audit-support" in script
@@ -228,6 +234,15 @@ def test_publication_artifact_builder_fails_without_real_results() -> None:
     assert script.index("write_publication_status --fail-if-not-ready") < script.index(
         "uv run python scripts/package_arxiv_submission.py"
     )
+    assert '--output-dir "$arxiv_source_dir"' in script
+    assert '--archive "$arxiv_archive"' in script
+    assert '--primary-results-dir "$primary_results"' in script
+    assert '--causal-results-dir "$causal_results"' in script
+    assert '--primary-generated-dir "$primary_generated_dir"' in script
+    assert '--causal-generated-dir "$causal_generated_dir"' in script
+    assert '--claim-generated-dir "$claim_generated_dir"' in script
+    assert '--primary-audit-dir "$primary_audit_summary"' in script
+    assert '--causal-audit-dir "$causal_audit_summary"' in script
     assert "write_publication_status --require-arxiv-bundle --fail-if-not-ready" in script
     assert "REQUIRE_HUMAN_AUDIT" not in script
     assert "REQUIRE_CACHE_MEDIATED_CLAIM" not in script
