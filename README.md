@@ -113,6 +113,14 @@ setsid -f bash scripts/wait_and_run_h200_sweep.sh </dev/null > logs/h200/launche
 
 The launcher refuses to run outside `/home/aryang9/sandbox/llm-safety`, pulls `master`, checks that the tree is clean, runs the CPU-only test suite, waits until `nvidia-smi` is below `MAX_USED_MIB=20000` and `MAX_UTIL_PCT=20`, then pulls and validates `master` again before starting the selected sweep. Override `SWEEP_SCRIPT=scripts/run_h200_ci_extension.sh` or `SWEEP_SCRIPT=scripts/run_qwen32b_followup.sh` only after the earlier registered stage has passed.
 
+Summarize the H200 wait/run state without changing it:
+
+```bash
+uv run python scripts/report_h200_status.py \
+  --output-json logs/h200/status.json \
+  --output-md logs/h200/status.md
+```
+
 Run the prompt-count extension for narrower confidence intervals after the primary pilot identifies viable effects:
 
 ```bash
