@@ -57,6 +57,8 @@ publication_status_args=(
   --primary-audit-dir "$primary_audit_dir"
   --causal-audit-dir "$causal_audit_dir"
   --claim-assessment "$claim_assessment"
+  --primary-generated-dir "$primary_paper_dir"
+  --causal-generated-dir "$causal_paper_dir"
   --arxiv-source-dir "$arxiv_source_dir"
   --arxiv-archive "$arxiv_archive"
 )

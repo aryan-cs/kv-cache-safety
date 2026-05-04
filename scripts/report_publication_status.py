@@ -181,6 +181,16 @@ def main() -> None:
         default=Path("paper/generated/claim_assessment/claim_assessment.json"),
     )
     parser.add_argument(
+        "--primary-generated-dir",
+        type=Path,
+        default=Path("paper/generated/h200_qwen_full_sweep"),
+    )
+    parser.add_argument(
+        "--causal-generated-dir",
+        type=Path,
+        default=Path("paper/generated/h200_causal_patch_qwen7b"),
+    )
+    parser.add_argument(
         "--paper-pdf",
         type=Path,
         default=Path("paper/cache_mediated_safety_erasure.pdf"),
@@ -216,6 +226,8 @@ def main() -> None:
         primary_audit_dir=args.primary_audit_dir,
         causal_audit_dir=args.causal_audit_dir,
         claim_assessment_path=args.claim_assessment,
+        primary_generated_dir=args.primary_generated_dir,
+        causal_generated_dir=args.causal_generated_dir,
         paper_pdf=args.paper_pdf,
         require_paper_pdf=not args.allow_missing_paper_pdf,
         arxiv_source_dir=args.arxiv_source_dir,
@@ -240,6 +252,8 @@ def publication_status(
     causal_audit_dir: Path,
     claim_assessment_path: Path,
     paper_pdf: Path,
+    primary_generated_dir: Path = Path("paper/generated/h200_qwen_full_sweep"),
+    causal_generated_dir: Path = Path("paper/generated/h200_causal_patch_qwen7b"),
     require_paper_pdf: bool = True,
     arxiv_source_dir: Path = Path("paper/build/arxiv_source"),
     arxiv_archive: Path = Path("paper/build/arxiv_source.tar.gz"),
@@ -256,7 +270,18 @@ def publication_status(
         primary_audit_dir=primary_audit_dir,
         causal_audit_dir=causal_audit_dir,
     )
-    pdf = _pdf_status(paper_pdf)
+    pdf = _pdf_status(
+        paper_pdf,
+        expected_sources=_final_pdf_expected_sources(
+            primary_results_dir=primary_results_dir,
+            causal_results_dir=causal_results_dir,
+            primary_audit_dir=primary_audit_dir,
+            causal_audit_dir=causal_audit_dir,
+            primary_generated_dir=primary_generated_dir,
+            causal_generated_dir=causal_generated_dir,
+            claim_assessment_path=claim_assessment_path,
+        ),
+    )
     arxiv = _arxiv_status(arxiv_source_dir, arxiv_archive)
 
     gates = {
@@ -872,12 +897,16 @@ def _claim_status(
     }
 
 
-def _pdf_status(path: Path) -> dict[str, Any]:
+def _pdf_status(
+    path: Path, *, expected_sources: list[tuple[str, Path]] | None = None
+) -> dict[str, Any]:
     failure = _pdf_failure(path)
     text_failure = "" if failure else _pdf_text_failure(path)
     if text_failure:
         failure = text_failure
-    provenance_failure = "" if failure else _pdf_provenance_failure(path)
+    provenance_failure = (
+        "" if failure else _pdf_provenance_failure(path, expected_sources=expected_sources)
+    )
     if provenance_failure:
         failure = provenance_failure
     return {
@@ -918,7 +947,9 @@ def _pdf_text_failure(path: Path) -> str:
     return ""
 
 
-def _pdf_provenance_failure(path: Path) -> str:
+def _pdf_provenance_failure(
+    path: Path, *, expected_sources: list[tuple[str, Path]] | None = None
+) -> str:
     if path.name != FINAL_PDF_NAME:
         return ""
     manifest_path = _pdf_manifest_path(path)
@@ -955,11 +986,79 @@ def _pdf_provenance_failure(path: Path) -> str:
     for prefix in FINAL_PDF_REQUIRED_SOURCE_PREFIXES:
         if not any(kind.startswith(prefix) for kind in observed_kinds):
             failures.append(f"pdf_manifest_missing_source_kind:{prefix}")
+    if expected_sources is not None:
+        provenance_by_kind: dict[str, list[dict[str, Any]]] = {}
+        for row in source_rows:
+            if isinstance(row, dict):
+                provenance_by_kind.setdefault(str(row.get("kind") or ""), []).append(row)
+        for kind, expected_path in expected_sources:
+            matching_rows = provenance_by_kind.get(kind, [])
+            if not matching_rows:
+                failures.append(f"pdf_manifest_missing_expected_source:{kind}")
+                continue
+            resolved_expected = expected_path.resolve()
+            if not any(_manifest_path_matches(row, resolved_expected) for row in matching_rows):
+                failures.append(f"pdf_manifest_unexpected_source_path:{kind}")
     return "; ".join(failures)
 
 
 def _pdf_manifest_path(path: Path) -> Path:
     return path.with_name(f"{path.name}.manifest.json")
+
+
+def _manifest_path_matches(row: dict[str, Any], expected_path: Path) -> bool:
+    try:
+        observed = Path(str(row.get("path") or "")).resolve()
+    except OSError:
+        return False
+    return observed == expected_path
+
+
+def _final_pdf_expected_sources(
+    *,
+    primary_results_dir: Path,
+    causal_results_dir: Path,
+    primary_audit_dir: Path,
+    causal_audit_dir: Path,
+    primary_generated_dir: Path,
+    causal_generated_dir: Path,
+    claim_assessment_path: Path,
+) -> list[tuple[str, Path]]:
+    claim_generated_dir = claim_assessment_path.parent
+    return [
+        ("latex_main", Path("paper/latex/main.tex")),
+        ("bibliography", Path("paper/references.bib")),
+        ("primary_results_manifest", primary_results_dir / "manifest.json"),
+        ("primary_results_metrics", primary_results_dir / "metrics.json"),
+        ("primary_figures_manifest", primary_results_dir / "figures" / "manifest.json"),
+        ("causal_results_manifest", causal_results_dir / "manifest.json"),
+        ("causal_results_metrics", causal_results_dir / "metrics.json"),
+        ("causal_figures_manifest", causal_results_dir / "figures" / "manifest.json"),
+        ("primary_generated_manifest", primary_generated_dir / "artifact_manifest.json"),
+        ("primary_generated_main_table", primary_generated_dir / "main_results_table.tex"),
+        ("primary_generated_suite_table", primary_generated_dir / "suite_level_effects_table.tex"),
+        ("primary_generated_macros", primary_generated_dir / "result_macros.tex"),
+        ("causal_generated_manifest", causal_generated_dir / "artifact_manifest.json"),
+        ("causal_generated_table", causal_generated_dir / "causal_restoration_table.tex"),
+        ("causal_generated_macros", causal_generated_dir / "result_macros.tex"),
+        ("claim_assessment_json", claim_assessment_path),
+        ("claim_generated_status", claim_generated_dir / "abstract_status_sentence.tex"),
+        ("claim_generated_table", claim_generated_dir / "claim_assessment_table.tex"),
+        ("claim_generated_interpretation", claim_generated_dir / "claim_interpretation.tex"),
+        ("primary_audit_manifest", primary_audit_dir / "audit_manifest.json"),
+        ("primary_audit_summary_table", primary_audit_dir / "human_audit_summary_table.tex"),
+        ("primary_audit_deltas_table", primary_audit_dir / "human_audit_deltas_table.tex"),
+        ("causal_audit_manifest", causal_audit_dir / "audit_manifest.json"),
+        ("causal_audit_summary_table", causal_audit_dir / "human_audit_summary_table.tex"),
+        ("causal_audit_deltas_table", causal_audit_dir / "human_audit_deltas_table.tex"),
+        ("primary_figure", primary_results_dir / "figures" / "safety_capability_phase_portrait.pdf"),
+        ("primary_figure", primary_results_dir / "figures" / "selective_safety_erasure_heatmap.pdf"),
+        ("primary_figure", primary_results_dir / "figures" / "prompt_effect_constellation.pdf"),
+        ("primary_figure", primary_results_dir / "figures" / "cache_state_fingerprint.pdf"),
+        ("primary_figure", primary_results_dir / "figures" / "safety_state_atlas.pdf"),
+        ("causal_figure", causal_results_dir / "figures" / "causal_restoration_fraction.pdf"),
+        ("causal_figure", causal_results_dir / "figures" / "causal_restoration_flow.pdf"),
+    ]
 
 
 def _arxiv_status(source_dir: Path, archive: Path) -> dict[str, Any]:

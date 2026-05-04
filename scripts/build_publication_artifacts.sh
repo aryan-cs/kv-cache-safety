@@ -203,6 +203,8 @@ write_publication_status() {
     --primary-audit-dir "$primary_audit_summary" \
     --causal-audit-dir "$causal_audit_summary" \
     --claim-assessment "$claim_generated_dir/claim_assessment.json" \
+    --primary-generated-dir "$primary_generated_dir" \
+    --causal-generated-dir "$causal_generated_dir" \
     --arxiv-source-dir "$arxiv_source_dir" \
     --arxiv-archive "$arxiv_archive" \
     --output-json "$publication_status_dir/publication_status.json" \
