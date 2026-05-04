@@ -120,6 +120,18 @@ def render_markdown(status: dict[str, Any]) -> str:
                 lines.append(f"- pid `{holder['pid']}`: `{holder['command']}`")
         else:
             lines.append("- none found by scanning local `/proc/*/fd` for `/dev/nvidia*`")
+        accounted_apps = gpu.get("accounted_apps") or []
+        lines.extend(["", "### Accounted Apps", ""])
+        if accounted_apps:
+            for app in accounted_apps:
+                lines.append(
+                    f"- pid `{app['pid']}`, gpu `{app['gpu_name']}`, time `{app['time']}`"
+                )
+        else:
+            lines.append("- none reported by `nvidia-smi --query-accounted-apps`")
+        pid_query = str(gpu.get("pid_query") or "").strip()
+        if pid_query:
+            lines.extend(["", "### NVIDIA PIDS Query", "", "```text", pid_query, "```"])
         if status.get("hidden_gpu_context_likely"):
             lines.extend(
                 [
@@ -176,6 +188,8 @@ def _gpu_status() -> dict[str, Any]:
     pmon = _run(["nvidia-smi", "pmon", "-c", "1"], cwd=None)
     parsed["pmon"] = pmon.stdout.strip() if pmon.returncode == 0 else pmon.stderr.strip()
     parsed["compute_apps"] = _compute_apps()
+    parsed["accounted_apps"] = _accounted_apps()
+    parsed["pid_query"] = _nvidia_pid_query()
     parsed["device_holders"] = _nvidia_device_holders()
     return parsed
 
@@ -243,6 +257,46 @@ def _compute_apps() -> list[dict[str, Any]]:
         if parsed is not None:
             rows.append(parsed)
     return rows
+
+
+def _accounted_apps() -> list[dict[str, str]]:
+    result = _run(
+        [
+            "nvidia-smi",
+            "--query-accounted-apps=pid,gpu_name,time",
+            "--format=csv,noheader,nounits",
+        ],
+        cwd=None,
+    )
+    if result.returncode != 0:
+        return []
+    rows = []
+    for line in result.stdout.splitlines():
+        parsed = _parse_accounted_app_line(line)
+        if parsed is not None:
+            rows.append(parsed)
+    return rows
+
+
+def _parse_accounted_app_line(line: str) -> dict[str, str] | None:
+    parts = [part.strip() for part in line.split(",")]
+    if len(parts) != 3 or not parts[0]:
+        return None
+    return {"pid": parts[0], "gpu_name": parts[1], "time": parts[2]}
+
+
+def _nvidia_pid_query() -> str:
+    result = _run(["nvidia-smi", "-q", "-d", "PIDS"], cwd=None)
+    if result.returncode != 0:
+        return result.stderr.strip()
+    return _trim_diagnostic_output(result.stdout, max_lines=80)
+
+
+def _trim_diagnostic_output(text: str, *, max_lines: int) -> str:
+    lines = text.strip().splitlines()
+    if len(lines) <= max_lines:
+        return "\n".join(lines)
+    return "\n".join([*lines[:max_lines], "... truncated ..."])
 
 
 def _parse_compute_app_line(line: str) -> dict[str, Any] | None:

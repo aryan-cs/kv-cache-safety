@@ -8,9 +8,11 @@ from report_h200_status import (
     _gpu_gate_likely_blocked,
     _is_status_probe_process,
     _nvidia_device_holders,
+    _parse_accounted_app_line,
     _parse_compute_app_line,
     _parse_gpu_query_line,
     _run,
+    _trim_diagnostic_output,
     render_markdown,
 )
 
@@ -39,6 +41,19 @@ def test_parse_compute_app_line() -> None:
     assert parsed == {"pid": "1234", "process_name": "python", "used_memory_mib": 4096}
     assert _parse_compute_app_line("not enough fields") is None
     assert _parse_compute_app_line("1234, python, N/A") is None
+
+
+def test_parse_accounted_app_line() -> None:
+    parsed = _parse_accounted_app_line("1234, NVIDIA H200 NVL, 00:05:00")
+
+    assert parsed == {"pid": "1234", "gpu_name": "NVIDIA H200 NVL", "time": "00:05:00"}
+    assert _parse_accounted_app_line("not enough fields") is None
+
+
+def test_trim_diagnostic_output_bounds_long_text() -> None:
+    text = "\n".join(f"line {index}" for index in range(5))
+
+    assert _trim_diagnostic_output(text, max_lines=3) == "line 0\nline 1\nline 2\n... truncated ..."
 
 
 def test_status_probe_process_filter_skips_monitoring_shells() -> None:
@@ -93,6 +108,8 @@ def test_render_markdown_summarizes_blocked_launcher() -> None:
                 "memory_total_mib": 143771,
                 "utilization_pct": 100,
                 "compute_apps": [],
+                "accounted_apps": [],
+                "pid_query": "Processes                             : None",
                 "device_holders": [],
                 "pmon": "# gpu pid type sm mem\n0 - - - -",
             },
@@ -112,5 +129,7 @@ def test_render_markdown_summarizes_blocked_launcher() -> None:
     assert "none reported by `nvidia-smi --query-compute-apps`" in text
     assert "Process Monitor Snapshot" in text
     assert "none found by scanning local `/proc/*/fd`" in text
+    assert "none reported by `nvidia-smi --query-accounted-apps`" in text
+    assert "NVIDIA PIDS Query" in text
     assert "release or restart the notebook allocation" in text
     assert "`results/h200_qwen_full_sweep`: missing" in text
