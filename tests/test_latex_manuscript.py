@@ -15,6 +15,7 @@ from package_arxiv_submission import (
     _missing_inputs,
     _rewrite_failures,
     _rewrite_main_tex_for_arxiv,
+    build_figure_sources,
 )
 
 
@@ -131,6 +132,29 @@ def test_arxiv_rewrite_uses_local_bibliography_and_figures() -> None:
         "../audit/h200_causal_patch_qwen7b_summary/human_audit_summary_table.tex"
     )
     assert "../../results" not in rewritten
+
+
+def test_arxiv_packager_can_target_custom_result_figure_dirs(tmp_path: Path) -> None:
+    primary = tmp_path / "primary_run"
+    causal = tmp_path / "causal_run"
+    figure_sources = build_figure_sources(primary, causal)
+
+    assert figure_sources["safety_state_atlas.pdf"] == (
+        primary / "figures" / "safety_state_atlas.pdf"
+    )
+    assert figure_sources["causal_restoration_flow.pdf"] == (
+        causal / "figures" / "causal_restoration_flow.pdf"
+    )
+    rewritten = _rewrite_main_tex_for_arxiv(
+        str(Path("../..") / figure_sources["safety_state_atlas.pdf"]),
+        figure_sources=figure_sources,
+    )
+
+    assert rewritten == "figures/safety_state_atlas.pdf"
+    assert "figures/safety_state_atlas.pdf" in _rewrite_main_tex_for_arxiv(
+        "../../results/h200_qwen_full_sweep/figures/safety_state_atlas.pdf",
+        figure_sources=figure_sources,
+    )
 
 
 def test_arxiv_rewrite_current_manuscript_has_no_repo_local_paths() -> None:

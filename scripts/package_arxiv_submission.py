@@ -11,42 +11,54 @@ add_src_to_path()
 
 from cache_safety_erasure.utils.io import file_sha256, write_json
 
+DEFAULT_PRIMARY_RESULTS_DIR = Path("results/h200_qwen_full_sweep")
+DEFAULT_CAUSAL_RESULTS_DIR = Path("results/h200_causal_patch_qwen7b")
+DEFAULT_PRIMARY_GENERATED_DIR = Path("paper/generated/h200_qwen_full_sweep")
+DEFAULT_CAUSAL_GENERATED_DIR = Path("paper/generated/h200_causal_patch_qwen7b")
+DEFAULT_CLAIM_GENERATED_DIR = Path("paper/generated/claim_assessment")
+DEFAULT_QWEN32_GENERATED_DIR = Path("paper/generated/h200_qwen32b_public_followup")
+DEFAULT_PRIMARY_AUDIT_DIR = Path("paper/audit/h200_qwen_full_sweep_summary")
+DEFAULT_CAUSAL_AUDIT_DIR = Path("paper/audit/h200_causal_patch_qwen7b_summary")
+
+
+def build_figure_sources(
+    primary_results_dir: Path = DEFAULT_PRIMARY_RESULTS_DIR,
+    causal_results_dir: Path = DEFAULT_CAUSAL_RESULTS_DIR,
+) -> dict[str, Path]:
+    return {
+        "safety_capability_phase_portrait.pdf": (
+            primary_results_dir / "figures" / "safety_capability_phase_portrait.pdf"
+        ),
+        "selective_safety_erasure_heatmap.pdf": (
+            primary_results_dir / "figures" / "selective_safety_erasure_heatmap.pdf"
+        ),
+        "prompt_effect_constellation.pdf": (
+            primary_results_dir / "figures" / "prompt_effect_constellation.pdf"
+        ),
+        "cache_state_fingerprint.pdf": (
+            primary_results_dir / "figures" / "cache_state_fingerprint.pdf"
+        ),
+        "safety_state_atlas.pdf": primary_results_dir / "figures" / "safety_state_atlas.pdf",
+        "causal_restoration_fraction.pdf": (
+            causal_results_dir / "figures" / "causal_restoration_fraction.pdf"
+        ),
+        "causal_restoration_flow.pdf": (
+            causal_results_dir / "figures" / "causal_restoration_flow.pdf"
+        ),
+    }
+
+
 FIGURE_SOURCES = {
-    "safety_capability_phase_portrait.pdf": Path(
-        "results/h200_qwen_full_sweep/figures/safety_capability_phase_portrait.pdf"
-    ),
-    "selective_safety_erasure_heatmap.pdf": Path(
-        "results/h200_qwen_full_sweep/figures/selective_safety_erasure_heatmap.pdf"
-    ),
-    "prompt_effect_constellation.pdf": Path(
-        "results/h200_qwen_full_sweep/figures/prompt_effect_constellation.pdf"
-    ),
-    "cache_state_fingerprint.pdf": Path(
-        "results/h200_qwen_full_sweep/figures/cache_state_fingerprint.pdf"
-    ),
-    "safety_state_atlas.pdf": Path(
-        "results/h200_qwen_full_sweep/figures/safety_state_atlas.pdf"
-    ),
-    "causal_restoration_fraction.pdf": Path(
-        "results/h200_causal_patch_qwen7b/figures/causal_restoration_fraction.pdf"
-    ),
-    "causal_restoration_flow.pdf": Path(
-        "results/h200_causal_patch_qwen7b/figures/causal_restoration_flow.pdf"
-    ),
+    name: path for name, path in build_figure_sources().items()
 }
 REQUIRED_GENERATED_DIRS = [
-    Path("paper/generated/h200_qwen_full_sweep"),
-    Path("paper/generated/h200_causal_patch_qwen7b"),
-    Path("paper/generated/claim_assessment"),
+    DEFAULT_PRIMARY_GENERATED_DIR,
+    DEFAULT_CAUSAL_GENERATED_DIR,
+    DEFAULT_CLAIM_GENERATED_DIR,
 ]
-OPTIONAL_GENERATED_DIRS = [
-    Path("paper/generated/h200_qwen32b_public_followup"),
-]
+OPTIONAL_GENERATED_DIRS = [DEFAULT_QWEN32_GENERATED_DIR]
 GENERATED_DIRS = REQUIRED_GENERATED_DIRS + OPTIONAL_GENERATED_DIRS
-AUDIT_DIRS = [
-    Path("paper/audit/h200_qwen_full_sweep_summary"),
-    Path("paper/audit/h200_causal_patch_qwen7b_summary"),
-]
+AUDIT_DIRS = [DEFAULT_PRIMARY_AUDIT_DIR, DEFAULT_CAUSAL_AUDIT_DIR]
 ARXIV_SAFE_SUPPORT_SUFFIXES = {".tex"}
 
 
@@ -54,6 +66,14 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Build an arXiv-friendly LaTeX source bundle.")
     parser.add_argument("--output-dir", type=Path, default=Path("paper/build/arxiv_source"))
     parser.add_argument("--archive", type=Path, default=Path("paper/build/arxiv_source.tar.gz"))
+    parser.add_argument("--primary-results-dir", type=Path, default=DEFAULT_PRIMARY_RESULTS_DIR)
+    parser.add_argument("--causal-results-dir", type=Path, default=DEFAULT_CAUSAL_RESULTS_DIR)
+    parser.add_argument("--primary-generated-dir", type=Path, default=DEFAULT_PRIMARY_GENERATED_DIR)
+    parser.add_argument("--causal-generated-dir", type=Path, default=DEFAULT_CAUSAL_GENERATED_DIR)
+    parser.add_argument("--claim-generated-dir", type=Path, default=DEFAULT_CLAIM_GENERATED_DIR)
+    parser.add_argument("--qwen32-generated-dir", type=Path, default=DEFAULT_QWEN32_GENERATED_DIR)
+    parser.add_argument("--primary-audit-dir", type=Path, default=DEFAULT_PRIMARY_AUDIT_DIR)
+    parser.add_argument("--causal-audit-dir", type=Path, default=DEFAULT_CAUSAL_AUDIT_DIR)
     parser.add_argument(
         "--allow-missing",
         action="store_true",
@@ -62,12 +82,20 @@ def main() -> None:
     args = parser.parse_args()
 
     source_dir = args.output_dir
+    figure_sources = build_figure_sources(args.primary_results_dir, args.causal_results_dir)
+    required_generated_dirs = [
+        args.primary_generated_dir,
+        args.causal_generated_dir,
+        args.claim_generated_dir,
+    ]
+    optional_generated_dirs = [args.qwen32_generated_dir]
+    audit_dirs = [args.primary_audit_dir, args.causal_audit_dir]
     if source_dir.exists():
         shutil.rmtree(source_dir)
     (source_dir / "figures").mkdir(parents=True)
 
     main_tex = Path("paper/latex/main.tex").read_text(encoding="utf-8")
-    rewritten_main_tex = _rewrite_main_tex_for_arxiv(main_tex)
+    rewritten_main_tex = _rewrite_main_tex_for_arxiv(main_tex, figure_sources=figure_sources)
     rewrite_failures = _rewrite_failures(rewritten_main_tex)
     if rewrite_failures:
         for failure in rewrite_failures:
@@ -95,7 +123,7 @@ def main() -> None:
     copied_figures = []
     missing_figures = []
     invalid_figures = []
-    for output_name, source_path in FIGURE_SOURCES.items():
+    for output_name, source_path in figure_sources.items():
         target_path = source_dir / "figures" / output_name
         if source_path.exists():
             if not _is_pdf(source_path):
@@ -115,7 +143,7 @@ def main() -> None:
             missing_figures.append(str(source_path))
     copied_generated = []
     missing_generated = []
-    for source_path in REQUIRED_GENERATED_DIRS:
+    for source_path in required_generated_dirs:
         if not source_path.exists():
             missing_generated.append(str(source_path))
             continue
@@ -126,7 +154,7 @@ def main() -> None:
             _directory_provenance("generated", source_path, target_path, copied_files)
         )
     skipped_optional_generated = []
-    for source_path in OPTIONAL_GENERATED_DIRS:
+    for source_path in optional_generated_dirs:
         if not source_path.exists():
             skipped_optional_generated.append(str(source_path))
             continue
@@ -138,7 +166,7 @@ def main() -> None:
         )
     copied_audit = []
     missing_audit = []
-    for source_path in AUDIT_DIRS:
+    for source_path in audit_dirs:
         if not source_path.exists():
             missing_audit.append(str(source_path))
             continue
@@ -185,11 +213,16 @@ def main() -> None:
     print(f"Wrote {args.archive}")
 
 
-def _rewrite_main_tex_for_arxiv(text: str) -> str:
+def _rewrite_main_tex_for_arxiv(
+    text: str, *, figure_sources: dict[str, Path] | None = None
+) -> str:
     text = text.replace(r"\bibliography{../references}", r"\bibliography{references}")
     text = text.replace("../generated/", "generated/")
     text = text.replace("../audit/", "audit/")
-    for output_name, source_path in FIGURE_SOURCES.items():
+    source_items = list(FIGURE_SOURCES.items())
+    if figure_sources is not None:
+        source_items.extend(figure_sources.items())
+    for output_name, source_path in source_items:
         text = text.replace(str(Path("../..") / source_path), f"figures/{output_name}")
     return text
 
