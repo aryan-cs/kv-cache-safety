@@ -28,8 +28,8 @@ OPEN_DATASET_PRESETS = {
     },
     "jailbreakbench_behaviors": {
         "dataset": "JailbreakBench/JBB-Behaviors",
-        "config": None,
-        "split": "behaviors",
+        "config": "behaviors",
+        "split": "harmful",
         "text_columns": ["Goal", "goal", "Behavior", "behavior", "prompt"],
         "suite": "refusal_safety",
         "category": "public_jailbreakbench",
@@ -67,6 +67,12 @@ OPEN_DATASET_PRESETS = {
         "revision": "b27d6ba9a839a2d5b2ce5f48a31c97f46a34e61e",
     },
 }
+HF_COMPOSITE_PRESETS = {
+    "public_refusal_combo": {
+        "suite": "public_refusal_safety",
+        "presets": ["advbench", "jailbreakbench_behaviors"],
+    }
+}
 
 
 def main() -> None:
@@ -84,20 +90,31 @@ def main() -> None:
     args = parser.parse_args()
 
     if args.source == "hf":
-        records = load_hf_preset(args.suite, args.limit, args.output_suite, args.revision)
-        suite_name = args.output_suite or OPEN_DATASET_PRESETS[args.suite]["suite"]
+        if args.suite in HF_COMPOSITE_PRESETS:
+            records = load_hf_composite(args.suite, args.limit, args.output_suite, args.revision)
+            suite_name = args.output_suite or str(HF_COMPOSITE_PRESETS[args.suite]["suite"])
+            source_args = {
+                "preset": args.suite,
+                "component_presets": HF_COMPOSITE_PRESETS[args.suite]["presets"],
+                "limit": args.limit,
+                "output_suite": args.output_suite,
+            }
+        else:
+            records = load_hf_preset(args.suite, args.limit, args.output_suite, args.revision)
+            suite_name = args.output_suite or OPEN_DATASET_PRESETS[args.suite]["suite"]
+            source_args = {
+                "preset": args.suite,
+                "limit": args.limit,
+                "output_suite": args.output_suite,
+                "revision": args.revision or OPEN_DATASET_PRESETS[args.suite].get("revision"),
+            }
         path = write_prompt_suite(suite_name, records, args.output_dir)
         manifest_path = write_suite_manifest(
             suite_name=suite_name,
             path=path,
             records=records,
             source="hf",
-            source_args={
-                "preset": args.suite,
-                "limit": args.limit,
-                "output_suite": args.output_suite,
-                "revision": args.revision or OPEN_DATASET_PRESETS[args.suite].get("revision"),
-            },
+            source_args=source_args,
         )
         print(f"Wrote {len(records)} records from HF preset `{args.suite}` to {path}")
         print(f"Wrote suite manifest to {manifest_path}")
@@ -169,6 +186,43 @@ def load_hf_preset(
     if not rows:
         raise RuntimeError(f"No usable prompt rows found for preset `{name}`.")
     return rows
+
+
+def load_hf_composite(
+    name: str, limit: int | None, output_suite: str | None, revision: str | None = None
+) -> list[PromptRecord]:
+    if revision is not None:
+        raise SystemExit("--revision is not supported for composite HF presets.")
+    if name not in HF_COMPOSITE_PRESETS:
+        raise SystemExit(
+            f"Unknown HF composite preset `{name}`. "
+            f"Available: {', '.join(sorted(HF_COMPOSITE_PRESETS))}"
+        )
+    composite = HF_COMPOSITE_PRESETS[name]
+    suite_name = str(output_suite or composite["suite"])
+    records: list[PromptRecord] = []
+    seen_users: set[str] = set()
+    for component in composite["presets"]:
+        remaining = None if limit is None else max(0, limit - len(records))
+        if remaining == 0:
+            break
+        component_records = load_hf_preset(
+            str(component),
+            remaining,
+            suite_name,
+            OPEN_DATASET_PRESETS[str(component)].get("revision"),
+        )
+        for record in component_records:
+            normalized_user = " ".join(record.user.lower().split())
+            if normalized_user in seen_users:
+                continue
+            seen_users.add(normalized_user)
+            records.append(record)
+            if limit is not None and len(records) >= limit:
+                break
+    if not records:
+        raise RuntimeError(f"No usable prompt rows found for composite preset `{name}`.")
+    return records
 
 
 def _first_text(item: dict[str, Any], columns: list[str]) -> str | None:

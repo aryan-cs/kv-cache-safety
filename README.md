@@ -103,7 +103,7 @@ Run the primary H200 workflow:
 bash scripts/run_h200_sweep.sh
 ```
 
-The primary workflow defaults to `PUBLIC_PROMPT_LIMIT=650`, one deterministic seed, and `AUDIT_PER_SUITE_POLICY=10`. This keeps runtime lower than repeated deterministic seeds while targeting prompt-cluster counts needed for narrow confidence intervals. For a cheaper pilot, run `PUBLIC_PROMPT_LIMIT=200 AUDIT_PER_SUITE_POLICY=3 bash scripts/run_h200_sweep.sh`.
+The primary workflow defaults to `PUBLIC_PROMPT_LIMIT=650`, one deterministic seed, and `AUDIT_PER_SUITE_POLICY=10`. The public refusal suite combines AdvBench with JailbreakBench harmful behaviors so the safety prompt count clears the 600-cluster paper-readiness threshold. This keeps runtime lower than repeated deterministic seeds while targeting prompt-cluster counts needed for narrow confidence intervals. For a cheaper pilot, run `PUBLIC_PROMPT_LIMIT=200 AUDIT_PER_SUITE_POLICY=3 bash scripts/run_h200_sweep.sh`.
 
 If the H200 GPU is busy, queue the sweep behind an availability gate from the H200 checkout:
 

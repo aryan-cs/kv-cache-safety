@@ -87,6 +87,18 @@ def test_publication_artifact_builder_fails_without_real_results() -> None:
     assert "scripts/package_arxiv_submission.py" in script
 
 
+def test_h200_scripts_use_composite_public_refusal_suite() -> None:
+    for script_path in [
+        Path("scripts/run_h200_sweep.sh"),
+        Path("scripts/run_h200_ci_extension.sh"),
+        Path("scripts/run_qwen32b_followup.sh"),
+        Path("scripts/bootstrap_h200.sh"),
+    ]:
+        script = script_path.read_text(encoding="utf-8")
+        assert "--suite public_refusal_combo" in script
+        assert "--suite advbench" not in script
+
+
 def test_patch_policy_label_includes_components() -> None:
     from cache_safety_erasure.cache_policies.registry import cache_policy_label
 
