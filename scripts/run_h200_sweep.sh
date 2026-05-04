@@ -43,7 +43,7 @@ uv run python scripts/check_prepared_suites.py \
 
 uv run python scripts/preflight_h200.py \
   --config configs/experiments/qwen7b_smoke.yaml \
-  --config configs/experiments/h200_public_qwen14b.yaml \
+  --config configs/experiments/h200_qwen_full_sweep.yaml \
   --config configs/experiments/h200_causal_patch_qwen7b.yaml \
   --config configs/experiments/h200_attention_diagnostic_qwen7b.yaml
 
@@ -65,7 +65,7 @@ uv run python scripts/export_paper_assets.py --results-dir "$latest_smoke" --pap
 
 echo "Running primary H200 Qwen 14B sweep..."
 uv run python scripts/run_experiment.py \
-  --config configs/experiments/h200_public_qwen14b.yaml \
+  --config configs/experiments/h200_qwen_full_sweep.yaml \
   --run-id "$full_run_id" \
   --resume
 

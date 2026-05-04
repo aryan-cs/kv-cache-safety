@@ -11,15 +11,25 @@ causal_audit_summary="${CAUSAL_AUDIT_SUMMARY_DIR:-paper/audit/h200_causal_patch_
 target_ci_width="${TARGET_CI_WIDTH:-0.08}"
 causal_ci_width="${CAUSAL_CI_WIDTH:-0.12}"
 qwen32_ci_width="${QWEN32_CI_WIDTH:-0.10}"
+require_qwen32_followup="${REQUIRE_QWEN32_FOLLOWUP:-0}"
 publication_status_dir="${PUBLICATION_STATUS_DIR:-paper/build}"
+
+result_artifacts_complete() {
+  local results_dir="$1"
+  for required in manifest.json generations.jsonl metrics.json cache_stats.parquet; do
+    if [[ ! -f "$results_dir/$required" ]]; then
+      return 1
+    fi
+  done
+  return 0
+}
 
 require_result_artifacts() {
   local results_dir="$1"
   for required in manifest.json generations.jsonl metrics.json cache_stats.parquet; do
-    if [[ ! -f "$results_dir/$required" ]]; then
-      echo "Missing required result artifact: $results_dir/$required" >&2
-      exit 1
-    fi
+    [[ -f "$results_dir/$required" ]] && continue
+    echo "Missing required result artifact: $results_dir/$required" >&2
+    exit 1
   done
 }
 
@@ -121,6 +131,11 @@ rebuild_causal() {
 rebuild_qwen32_if_present() {
   if [[ ! -d "$qwen32_results" ]]; then
     echo "Skipping Qwen 32B follow-up artifacts; directory not found: $qwen32_results"
+    return
+  fi
+  if [[ "$require_qwen32_followup" != "1" ]] && ! result_artifacts_complete "$qwen32_results"; then
+    echo "Skipping optional Qwen 32B follow-up artifacts; directory exists but is incomplete: $qwen32_results"
+    echo "Set REQUIRE_QWEN32_FOLLOWUP=1 to make incomplete Qwen 32B artifacts fail the publication build."
     return
   fi
   require_result_artifacts "$qwen32_results"

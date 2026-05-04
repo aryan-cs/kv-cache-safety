@@ -60,7 +60,7 @@ uv run python scripts/prepare_data.py --source hf --suite arc_easy --limit 200 -
 
 preflight_args=(
   --config configs/experiments/qwen7b_smoke.yaml
-  --config configs/experiments/h200_public_qwen14b.yaml
+  --config configs/experiments/h200_qwen_full_sweep.yaml
   --config configs/experiments/h200_causal_patch_qwen7b.yaml
   --config configs/experiments/h200_attention_diagnostic_qwen7b.yaml
 )

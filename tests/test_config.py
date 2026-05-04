@@ -43,6 +43,32 @@ def test_h200_public_sweep_uses_prompt_clusters_not_repeated_deterministic_seeds
     __import__("importlib").util.find_spec("yaml") is None,
     reason="PyYAML is not installed in the base interpreter",
 )
+def test_h200_full_sweep_config_is_public_paper_contract() -> None:
+    config, raw = parse_experiment_config(Path("configs/experiments/h200_qwen_full_sweep.yaml"))
+    script = Path("scripts/run_h200_sweep.sh").read_text(encoding="utf-8")
+    bootstrap = Path("scripts/bootstrap_h200.sh").read_text(encoding="utf-8")
+
+    assert raw["run"]["name"] == "h200_qwen_full_sweep"
+    assert set(config.prompt_suites) == {
+        "system_leakage",
+        "public_system_leakage",
+        "public_refusal_safety",
+        "public_benign_overrefusal",
+        "public_xstest_safe",
+        "public_capability_arc",
+    }
+    assert "refusal_safety" not in config.prompt_suites
+    assert "capability_smoke" not in config.prompt_suites
+    assert "--config configs/experiments/h200_qwen_full_sweep.yaml" in script
+    assert "--config configs/experiments/h200_public_qwen14b.yaml" not in script
+    assert "--config configs/experiments/h200_qwen_full_sweep.yaml" in bootstrap
+    assert "--config configs/experiments/h200_public_qwen14b.yaml" not in bootstrap
+
+
+@pytest.mark.skipif(
+    __import__("importlib").util.find_spec("yaml") is None,
+    reason="PyYAML is not installed in the base interpreter",
+)
 def test_h200_ci_extension_focuses_policy_set_for_prompt_count() -> None:
     config, _raw = parse_experiment_config(
         Path("configs/experiments/h200_qwen14b_ci_extension.yaml")
@@ -155,6 +181,8 @@ def test_publication_artifact_builder_fails_without_real_results() -> None:
     assert "write_publication_status --require-arxiv-bundle --fail-if-not-ready" in script
     assert "REQUIRE_HUMAN_AUDIT" not in script
     assert "REQUIRE_CACHE_MEDIATED_CLAIM" not in script
+    assert "REQUIRE_QWEN32_FOLLOWUP" in script
+    assert "Skipping optional Qwen 32B follow-up artifacts" in script
     assert "--required-figure prompt_effect_constellation" in script
     assert "--required-figure safety_state_atlas" in script
     assert "--required-figure causal_restoration_fraction" in script
