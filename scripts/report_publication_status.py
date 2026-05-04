@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import tarfile
 from pathlib import Path
 from typing import Any
 
@@ -69,6 +70,21 @@ def main() -> None:
         action="store_true",
         help="Permit a missing PDF when checking readiness before rebuilding the final PDF.",
     )
+    parser.add_argument(
+        "--arxiv-source-dir",
+        type=Path,
+        default=Path("paper/build/arxiv_source"),
+    )
+    parser.add_argument(
+        "--arxiv-archive",
+        type=Path,
+        default=Path("paper/build/arxiv_source.tar.gz"),
+    )
+    parser.add_argument(
+        "--require-arxiv-bundle",
+        action="store_true",
+        help="Require the final arXiv source directory and archive to be complete.",
+    )
     parser.add_argument("--output-json", type=Path, default=None)
     parser.add_argument("--output-md", type=Path, default=None)
     parser.add_argument("--fail-if-not-ready", action="store_true")
@@ -82,6 +98,9 @@ def main() -> None:
         claim_assessment_path=args.claim_assessment,
         paper_pdf=args.paper_pdf,
         require_paper_pdf=not args.allow_missing_paper_pdf,
+        arxiv_source_dir=args.arxiv_source_dir,
+        arxiv_archive=args.arxiv_archive,
+        require_arxiv_bundle=args.require_arxiv_bundle,
     )
     if args.output_json is not None:
         write_json(args.output_json, status)
@@ -102,6 +121,9 @@ def publication_status(
     claim_assessment_path: Path,
     paper_pdf: Path,
     require_paper_pdf: bool = True,
+    arxiv_source_dir: Path = Path("paper/build/arxiv_source"),
+    arxiv_archive: Path = Path("paper/build/arxiv_source.tar.gz"),
+    require_arxiv_bundle: bool = False,
 ) -> dict[str, Any]:
     primary = _run_status(primary_results_dir)
     causal = _run_status(causal_results_dir)
@@ -115,6 +137,7 @@ def publication_status(
         causal_audit_dir=causal_audit_dir,
     )
     pdf = _pdf_status(paper_pdf)
+    arxiv = _arxiv_status(arxiv_source_dir, arxiv_archive)
 
     gates = {
         "primary_results_complete": primary["complete"],
@@ -124,6 +147,8 @@ def publication_status(
         "claim_assessment_passed": claim_assessment["passed"],
         "paper_pdf_exists": pdf["exists"] or not require_paper_pdf,
     }
+    if require_arxiv_bundle:
+        gates["arxiv_bundle_ready"] = arxiv["complete"]
     blockers = [gate for gate, passed in gates.items() if not passed]
     return {
         "schema_version": 1,
@@ -137,6 +162,8 @@ def publication_status(
         "claim_assessment": claim_assessment,
         "paper_pdf": pdf,
         "paper_pdf_required": require_paper_pdf,
+        "arxiv_bundle": arxiv,
+        "arxiv_bundle_required": require_arxiv_bundle,
     }
 
 
@@ -167,6 +194,7 @@ def render_markdown(status: dict[str, Any]) -> str:
             _artifact_line("causal human audit", status["causal_human_audit"]),
             _claim_line(status["claim_assessment"]),
             _pdf_line(status["paper_pdf"]),
+            _arxiv_line(status["arxiv_bundle"]),
             "",
         ]
     )
@@ -277,11 +305,77 @@ def _pdf_status(path: Path) -> dict[str, Any]:
     }
 
 
+def _arxiv_status(source_dir: Path, archive: Path) -> dict[str, Any]:
+    manifest_path = source_dir / "manifest.json"
+    manifest = _read_json(manifest_path)
+    failures = []
+    if not source_dir.exists():
+        failures.append("missing_source_dir")
+    if not manifest_path.exists():
+        failures.append("missing_manifest")
+    if not archive.exists():
+        failures.append("missing_archive")
+    if manifest:
+        if manifest.get("schema_version") != 1:
+            failures.append("invalid_manifest_schema")
+        if manifest.get("allow_missing"):
+            failures.append("allow_missing_enabled")
+        for key in ["missing_figures", "missing_generated", "missing_audit"]:
+            if manifest.get(key):
+                failures.append(key)
+        for source_name, manifest_key in [
+            ("main.tex", "main_tex_sha256"),
+            ("references.bib", "references_sha256"),
+        ]:
+            source_path = source_dir / source_name
+            if not source_path.exists():
+                failures.append(f"missing_source_file:{source_name}")
+            elif manifest.get(manifest_key) != file_sha256(source_path):
+                failures.append(f"stale_source_hash:{source_name}")
+        copied_generated_names = {
+            Path(str(path)).name for path in manifest.get("copied_generated", [])
+        }
+        for required_name in [
+            "h200_qwen_full_sweep",
+            "h200_causal_patch_qwen7b",
+            "claim_assessment",
+        ]:
+            if required_name not in copied_generated_names:
+                failures.append(f"missing_required_generated:{required_name}")
+        for key in ["copied_figures", "copied_generated", "copied_audit"]:
+            for copied_path in manifest.get(key, []):
+                if not Path(str(copied_path)).exists():
+                    failures.append(f"missing_copied_path:{copied_path}")
+    if archive.exists():
+        if archive.stat().st_size <= 0:
+            failures.append("empty_archive")
+        for member in ["main.tex", "references.bib", "manifest.json"]:
+            if not _archive_contains(archive, member):
+                failures.append(f"archive_missing:{member}")
+    return {
+        "source_dir": str(source_dir),
+        "archive": str(archive),
+        "complete": not failures,
+        "failures": failures,
+        "manifest_present": bool(manifest),
+        "archive_exists": archive.exists(),
+        "archive_sha256": file_sha256(archive),
+    }
+
+
 def _read_json(path: Path) -> dict[str, Any]:
     if not path.exists():
         return {}
     with path.open("r", encoding="utf-8") as f:
         return json.load(f)
+
+
+def _archive_contains(archive: Path, member_name: str) -> bool:
+    try:
+        with tarfile.open(archive, "r:gz") as tar:
+            return member_name in tar.getnames()
+    except (tarfile.TarError, OSError):
+        return False
 
 
 def _audit_result_source_failures(manifest: dict[str, Any], results_dir: Path) -> list[str]:
@@ -365,6 +459,14 @@ def _claim_line(status: dict[str, Any]) -> str:
 def _pdf_line(status: dict[str, Any]) -> str:
     state = "exists" if status["exists"] else "missing"
     return f"- paper PDF: `{state}` at `{status['path']}`"
+
+
+def _arxiv_line(status: dict[str, Any]) -> str:
+    state = "complete" if status["complete"] else "blocked"
+    suffix = ""
+    if status.get("failures"):
+        suffix = " (failed: " + ", ".join(status["failures"]) + ")"
+    return f"- arXiv bundle: `{state}` at `{status['archive']}`{suffix}"
 
 
 if __name__ == "__main__":

@@ -34,12 +34,15 @@ FIGURE_SOURCES = {
         "results/h200_causal_patch_qwen7b/figures/causal_restoration_flow.pdf"
     ),
 }
-GENERATED_DIRS = [
+REQUIRED_GENERATED_DIRS = [
     Path("paper/generated/h200_qwen_full_sweep"),
     Path("paper/generated/h200_causal_patch_qwen7b"),
     Path("paper/generated/claim_assessment"),
+]
+OPTIONAL_GENERATED_DIRS = [
     Path("paper/generated/h200_qwen32b_public_followup"),
 ]
+GENERATED_DIRS = REQUIRED_GENERATED_DIRS + OPTIONAL_GENERATED_DIRS
 AUDIT_DIRS = [
     Path("paper/audit/h200_qwen_full_sweep_summary"),
     Path("paper/audit/h200_causal_patch_qwen7b_summary"),
@@ -77,9 +80,17 @@ def main() -> None:
             missing_figures.append(str(source_path))
     copied_generated = []
     missing_generated = []
-    for source_path in GENERATED_DIRS:
+    for source_path in REQUIRED_GENERATED_DIRS:
         if not source_path.exists():
             missing_generated.append(str(source_path))
+            continue
+        target_path = source_dir / "generated" / source_path.name
+        shutil.copytree(source_path, target_path)
+        copied_generated.append(str(target_path))
+    skipped_optional_generated = []
+    for source_path in OPTIONAL_GENERATED_DIRS:
+        if not source_path.exists():
+            skipped_optional_generated.append(str(source_path))
             continue
         target_path = source_dir / "generated" / source_path.name
         shutil.copytree(source_path, target_path)
@@ -102,6 +113,7 @@ def main() -> None:
         "missing_figures": missing_figures,
         "copied_generated": copied_generated,
         "missing_generated": missing_generated,
+        "skipped_optional_generated": skipped_optional_generated,
         "copied_audit": copied_audit,
         "missing_audit": missing_audit,
         "allow_missing": args.allow_missing,

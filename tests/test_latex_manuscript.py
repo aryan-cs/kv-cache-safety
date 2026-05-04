@@ -4,7 +4,13 @@ from pathlib import Path
 sys.path.insert(0, str(Path("scripts").resolve()))
 
 from check_latex_placeholders import missing_placeholder_artifacts
-from package_arxiv_submission import GENERATED_DIRS, _missing_inputs, _rewrite_main_tex_for_arxiv
+from package_arxiv_submission import (
+    GENERATED_DIRS,
+    OPTIONAL_GENERATED_DIRS,
+    REQUIRED_GENERATED_DIRS,
+    _missing_inputs,
+    _rewrite_main_tex_for_arxiv,
+)
 
 
 def test_latex_manuscript_is_formal_registered_protocol() -> None:
@@ -79,6 +85,8 @@ def test_arxiv_rewrite_uses_local_bibliography_and_figures() -> None:
         "../generated/claim_assessment/claim_assessment_table.tex"
     )
     assert Path("paper/generated/claim_assessment") in GENERATED_DIRS
+    assert Path("paper/generated/claim_assessment") in REQUIRED_GENERATED_DIRS
+    assert Path("paper/generated/h200_qwen32b_public_followup") in OPTIONAL_GENERATED_DIRS
     assert "audit/h200_qwen_full_sweep_summary" in _rewrite_main_tex_for_arxiv(
         "../audit/h200_qwen_full_sweep_summary/human_audit_summary_table.tex"
     )

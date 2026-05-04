@@ -134,6 +134,7 @@ def test_publication_artifact_builder_fails_without_real_results() -> None:
     assert script.index("write_publication_status --fail-if-not-ready") < script.index(
         "uv run python scripts/package_arxiv_submission.py"
     )
+    assert "write_publication_status --require-arxiv-bundle --fail-if-not-ready" in script
     assert "REQUIRE_HUMAN_AUDIT" not in script
     assert "REQUIRE_CACHE_MEDIATED_CLAIM" not in script
     assert "--required-figure prompt_effect_constellation" in script

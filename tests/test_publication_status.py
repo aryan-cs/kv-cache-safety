@@ -1,6 +1,7 @@
 import hashlib
 import json
 import sys
+import tarfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path("scripts").resolve()))
@@ -83,6 +84,79 @@ def test_publication_status_accepts_complete_real_artifacts(tmp_path: Path) -> N
     assert status["publication_ready"] is True
     assert status["blockers"] == []
     assert "Publication ready: `true`" in render_markdown(status)
+
+
+def test_publication_status_requires_complete_arxiv_bundle_when_requested(tmp_path: Path) -> None:
+    primary = tmp_path / "primary"
+    causal = tmp_path / "causal"
+    primary_audit = tmp_path / "primary_audit"
+    causal_audit = tmp_path / "causal_audit"
+    arxiv_dir = tmp_path / "arxiv_source"
+    archive = tmp_path / "arxiv_source.tar.gz"
+    _write_run(primary)
+    _write_run(causal)
+    _write_audit(primary_audit, primary)
+    _write_audit(causal_audit, causal)
+    _write_arxiv_bundle(arxiv_dir, archive)
+    claim_path = tmp_path / "claim_assessment.json"
+    claim_path.write_text(
+        json.dumps(_passing_claim_assessment(primary, causal, primary_audit, causal_audit)),
+        encoding="utf-8",
+    )
+    pdf_path = tmp_path / "paper.pdf"
+    pdf_path.write_bytes(b"%PDF-1.7\n")
+
+    status = publication_status(
+        primary_results_dir=primary,
+        causal_results_dir=causal,
+        primary_audit_dir=primary_audit,
+        causal_audit_dir=causal_audit,
+        claim_assessment_path=claim_path,
+        paper_pdf=pdf_path,
+        arxiv_source_dir=arxiv_dir,
+        arxiv_archive=archive,
+        require_arxiv_bundle=True,
+    )
+
+    assert status["publication_ready"] is True
+    assert status["gates"]["arxiv_bundle_ready"] is True
+
+
+def test_publication_status_rejects_draft_arxiv_bundle_when_required(tmp_path: Path) -> None:
+    primary = tmp_path / "primary"
+    causal = tmp_path / "causal"
+    primary_audit = tmp_path / "primary_audit"
+    causal_audit = tmp_path / "causal_audit"
+    arxiv_dir = tmp_path / "arxiv_source"
+    archive = tmp_path / "arxiv_source.tar.gz"
+    _write_run(primary)
+    _write_run(causal)
+    _write_audit(primary_audit, primary)
+    _write_audit(causal_audit, causal)
+    _write_arxiv_bundle(arxiv_dir, archive, manifest_overrides={"allow_missing": True})
+    claim_path = tmp_path / "claim_assessment.json"
+    claim_path.write_text(
+        json.dumps(_passing_claim_assessment(primary, causal, primary_audit, causal_audit)),
+        encoding="utf-8",
+    )
+    pdf_path = tmp_path / "paper.pdf"
+    pdf_path.write_bytes(b"%PDF-1.7\n")
+
+    status = publication_status(
+        primary_results_dir=primary,
+        causal_results_dir=causal,
+        primary_audit_dir=primary_audit,
+        causal_audit_dir=causal_audit,
+        claim_assessment_path=claim_path,
+        paper_pdf=pdf_path,
+        arxiv_source_dir=arxiv_dir,
+        arxiv_archive=archive,
+        require_arxiv_bundle=True,
+    )
+
+    assert status["publication_ready"] is False
+    assert "arxiv_bundle_ready" in status["blockers"]
+    assert "allow_missing_enabled" in status["arxiv_bundle"]["failures"]
 
 
 def test_publication_status_rejects_stale_audit_source_hashes(tmp_path: Path) -> None:
@@ -263,6 +337,50 @@ def _write_audit(path: Path, results_dir: Path) -> None:
 
 def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _write_arxiv_bundle(
+    source_dir: Path,
+    archive: Path,
+    *,
+    manifest_overrides: dict | None = None,
+) -> None:
+    source_dir.mkdir(parents=True)
+    (source_dir / "generated" / "h200_qwen_full_sweep").mkdir(parents=True)
+    (source_dir / "generated" / "h200_causal_patch_qwen7b").mkdir(parents=True)
+    (source_dir / "generated" / "claim_assessment").mkdir(parents=True)
+    (source_dir / "audit" / "h200_qwen_full_sweep_summary").mkdir(parents=True)
+    (source_dir / "audit" / "h200_causal_patch_qwen7b_summary").mkdir(parents=True)
+    (source_dir / "figures").mkdir()
+    (source_dir / "main.tex").write_text("main\n", encoding="utf-8")
+    (source_dir / "references.bib").write_text("refs\n", encoding="utf-8")
+    figure = source_dir / "figures" / "figure.pdf"
+    figure.write_text("figure\n", encoding="utf-8")
+    manifest = {
+        "schema_version": 1,
+        "allow_missing": False,
+        "main_tex_sha256": _sha256(source_dir / "main.tex"),
+        "references_sha256": _sha256(source_dir / "references.bib"),
+        "copied_figures": [str(figure)],
+        "copied_generated": [
+            str(source_dir / "generated" / "h200_qwen_full_sweep"),
+            str(source_dir / "generated" / "h200_causal_patch_qwen7b"),
+            str(source_dir / "generated" / "claim_assessment"),
+        ],
+        "copied_audit": [
+            str(source_dir / "audit" / "h200_qwen_full_sweep_summary"),
+            str(source_dir / "audit" / "h200_causal_patch_qwen7b_summary"),
+        ],
+        "missing_figures": [],
+        "missing_generated": [],
+        "missing_audit": [],
+    }
+    manifest.update(manifest_overrides or {})
+    (source_dir / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+    with tarfile.open(archive, "w:gz") as tar:
+        tar.add(source_dir / "main.tex", arcname="main.tex")
+        tar.add(source_dir / "references.bib", arcname="references.bib")
+        tar.add(source_dir / "manifest.json", arcname="manifest.json")
 
 
 def _passing_claim_assessment(
