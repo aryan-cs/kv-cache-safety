@@ -223,6 +223,89 @@ def test_publication_status_rejects_malformed_arxiv_figure_pdf(tmp_path: Path) -
     )
 
 
+def test_publication_status_rejects_stale_arxiv_provenance_source(
+    tmp_path: Path,
+) -> None:
+    primary = tmp_path / "primary"
+    causal = tmp_path / "causal"
+    primary_audit = tmp_path / "primary_audit"
+    causal_audit = tmp_path / "causal_audit"
+    arxiv_dir = tmp_path / "arxiv_source"
+    archive = tmp_path / "arxiv_source.tar.gz"
+    _write_run(primary)
+    _write_run(causal)
+    _write_audit(primary_audit, primary)
+    _write_audit(causal_audit, causal)
+    _write_arxiv_bundle(arxiv_dir, archive)
+    copied_figure = arxiv_dir / "figures" / "figure.pdf"
+    copied_figure.write_bytes(b"%PDF-1.7\nchanged\n")
+    claim_path = tmp_path / "claim_assessment.json"
+    claim_path.write_text(
+        json.dumps(_passing_claim_assessment(primary, causal, primary_audit, causal_audit)),
+        encoding="utf-8",
+    )
+    pdf_path = tmp_path / "paper.pdf"
+    pdf_path.write_bytes(b"%PDF-1.7\n")
+
+    status = publication_status(
+        primary_results_dir=primary,
+        causal_results_dir=causal,
+        primary_audit_dir=primary_audit,
+        causal_audit_dir=causal_audit,
+        claim_assessment_path=claim_path,
+        paper_pdf=pdf_path,
+        arxiv_source_dir=arxiv_dir,
+        arxiv_archive=archive,
+        require_arxiv_bundle=True,
+    )
+
+    assert status["publication_ready"] is False
+    assert any(
+        failure.startswith("provenance_source_hash_stale:")
+        for failure in status["arxiv_bundle"]["failures"]
+    )
+
+
+def test_publication_status_requires_arxiv_file_provenance(tmp_path: Path) -> None:
+    primary = tmp_path / "primary"
+    causal = tmp_path / "causal"
+    primary_audit = tmp_path / "primary_audit"
+    causal_audit = tmp_path / "causal_audit"
+    arxiv_dir = tmp_path / "arxiv_source"
+    archive = tmp_path / "arxiv_source.tar.gz"
+    _write_run(primary)
+    _write_run(causal)
+    _write_audit(primary_audit, primary)
+    _write_audit(causal_audit, causal)
+    _write_arxiv_bundle(
+        arxiv_dir,
+        archive,
+        manifest_overrides={"copied_file_provenance": []},
+    )
+    claim_path = tmp_path / "claim_assessment.json"
+    claim_path.write_text(
+        json.dumps(_passing_claim_assessment(primary, causal, primary_audit, causal_audit)),
+        encoding="utf-8",
+    )
+    pdf_path = tmp_path / "paper.pdf"
+    pdf_path.write_bytes(b"%PDF-1.7\n")
+
+    status = publication_status(
+        primary_results_dir=primary,
+        causal_results_dir=causal,
+        primary_audit_dir=primary_audit,
+        causal_audit_dir=causal_audit,
+        claim_assessment_path=claim_path,
+        paper_pdf=pdf_path,
+        arxiv_source_dir=arxiv_dir,
+        arxiv_archive=archive,
+        require_arxiv_bundle=True,
+    )
+
+    assert status["publication_ready"] is False
+    assert "missing_copied_file_provenance" in status["arxiv_bundle"]["failures"]
+
+
 def test_publication_status_rejects_arxiv_archive_missing_manifest_assets(
     tmp_path: Path,
 ) -> None:
@@ -691,6 +774,16 @@ def _write_arxiv_bundle(
         "missing_generated": [],
         "missing_audit": [],
     }
+    manifest["copied_file_provenance"] = _arxiv_provenance_rows(
+        [
+            source_dir / "main.tex",
+            source_dir / "references.bib",
+            figure,
+            *generated_files,
+            *audit_files,
+        ],
+        source_dir,
+    )
     manifest.update(manifest_overrides or {})
     (source_dir / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
     with tarfile.open(archive, "w:gz") as tar:
@@ -701,6 +794,25 @@ def _write_arxiv_bundle(
             tar.add(figure, arcname="figures/figure.pdf")
             for path in [*generated_files, *audit_files]:
                 tar.add(path, arcname=path.relative_to(source_dir))
+
+
+def _arxiv_provenance_rows(paths: list[Path], source_dir: Path) -> list[dict]:
+    rows = []
+    for path in paths:
+        rows.append(
+            {
+                "kind": "test",
+                "source_path": str(path),
+                "source_sha256": _sha256(path),
+                "source_bytes": path.stat().st_size,
+                "bundle_path": str(path),
+                "bundle_sha256": _sha256(path),
+                "bundle_bytes": path.stat().st_size,
+                "direct_copy": path.name != "main.tex",
+                "relative_bundle_path": path.relative_to(source_dir).as_posix(),
+            }
+        )
+    return rows
 
 
 def _passing_claim_assessment(

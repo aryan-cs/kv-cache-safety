@@ -443,6 +443,7 @@ def _arxiv_status(source_dir: Path, archive: Path) -> dict[str, Any]:
             for copied_path in manifest.get(key, []):
                 if not Path(str(copied_path)).exists():
                     failures.append(f"missing_copied_path:{copied_path}")
+        failures.extend(_copied_file_provenance_failures(source_dir, manifest))
     if archive.exists():
         if archive.stat().st_size <= 0:
             failures.append("empty_archive")
@@ -514,6 +515,39 @@ def _manifest_copied_files(
             else:
                 failures.append(f"missing_copied_path:{raw_path}")
     return files
+
+
+def _copied_file_provenance_failures(source_dir: Path, manifest: dict[str, Any]) -> list[str]:
+    provenance = manifest.get("copied_file_provenance")
+    if not isinstance(provenance, list) or not provenance:
+        return ["missing_copied_file_provenance"]
+    failures = []
+    for idx, row in enumerate(provenance):
+        if not isinstance(row, dict):
+            failures.append(f"malformed_copied_file_provenance:{idx}")
+            continue
+        source_path = Path(str(row.get("source_path", "")))
+        bundle_path = Path(str(row.get("bundle_path", "")))
+        label = str(row.get("bundle_path") or idx)
+        if not source_path.exists():
+            failures.append(f"provenance_source_missing:{label}")
+            continue
+        if not bundle_path.exists():
+            failures.append(f"provenance_bundle_missing:{label}")
+            continue
+        try:
+            bundle_path.relative_to(source_dir)
+        except ValueError:
+            failures.append(f"provenance_bundle_outside_source:{label}")
+        source_sha = file_sha256(source_path)
+        bundle_sha = file_sha256(bundle_path)
+        if row.get("source_sha256") != source_sha:
+            failures.append(f"provenance_source_hash_stale:{label}")
+        if row.get("bundle_sha256") != bundle_sha:
+            failures.append(f"provenance_bundle_hash_stale:{label}")
+        if row.get("direct_copy") is not False and source_sha != bundle_sha:
+            failures.append(f"provenance_direct_copy_mismatch:{label}")
+    return failures
 
 
 def _sha256_bytes(data: bytes) -> str:

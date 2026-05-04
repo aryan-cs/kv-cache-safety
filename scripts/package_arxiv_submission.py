@@ -68,6 +68,20 @@ def main() -> None:
     main_tex = Path("paper/latex/main.tex").read_text(encoding="utf-8")
     (source_dir / "main.tex").write_text(_rewrite_main_tex_for_arxiv(main_tex), encoding="utf-8")
     shutil.copyfile("paper/references.bib", source_dir / "references.bib")
+    copied_file_provenance = [
+        _file_provenance(
+            kind="latex_main",
+            source_path=Path("paper/latex/main.tex"),
+            bundle_path=source_dir / "main.tex",
+            direct_copy=False,
+            transform="rewrite_main_tex_for_arxiv",
+        ),
+        _file_provenance(
+            kind="bibliography",
+            source_path=Path("paper/references.bib"),
+            bundle_path=source_dir / "references.bib",
+        ),
+    ]
 
     copied_figures = []
     missing_figures = []
@@ -80,6 +94,13 @@ def main() -> None:
                 continue
             shutil.copyfile(source_path, target_path)
             copied_figures.append(str(target_path))
+            copied_file_provenance.append(
+                _file_provenance(
+                    kind="figure",
+                    source_path=source_path,
+                    bundle_path=target_path,
+                )
+            )
         else:
             missing_figures.append(str(source_path))
     copied_generated = []
@@ -91,6 +112,7 @@ def main() -> None:
         target_path = source_dir / "generated" / source_path.name
         shutil.copytree(source_path, target_path)
         copied_generated.append(str(target_path))
+        copied_file_provenance.extend(_directory_provenance("generated", source_path, target_path))
     skipped_optional_generated = []
     for source_path in OPTIONAL_GENERATED_DIRS:
         if not source_path.exists():
@@ -99,6 +121,7 @@ def main() -> None:
         target_path = source_dir / "generated" / source_path.name
         shutil.copytree(source_path, target_path)
         copied_generated.append(str(target_path))
+        copied_file_provenance.extend(_directory_provenance("generated", source_path, target_path))
     copied_audit = []
     missing_audit = []
     for source_path in AUDIT_DIRS:
@@ -108,6 +131,7 @@ def main() -> None:
         target_path = source_dir / "audit" / source_path.name
         shutil.copytree(source_path, target_path)
         copied_audit.append(str(target_path))
+        copied_file_provenance.extend(_directory_provenance("audit", source_path, target_path))
 
     manifest = {
         "schema_version": 1,
@@ -121,6 +145,7 @@ def main() -> None:
         "skipped_optional_generated": skipped_optional_generated,
         "copied_audit": copied_audit,
         "missing_audit": missing_audit,
+        "copied_file_provenance": copied_file_provenance,
         "allow_missing": args.allow_missing,
     }
     write_json(source_dir / "manifest.json", manifest)
@@ -166,6 +191,39 @@ def _is_pdf(path: Path) -> bool:
         return path.read_bytes()[:5] == b"%PDF-"
     except OSError:
         return False
+
+
+def _directory_provenance(kind: str, source_dir: Path, bundle_dir: Path) -> list[dict[str, object]]:
+    rows = []
+    for source_file in sorted(path for path in source_dir.rglob("*") if path.is_file()):
+        bundle_file = bundle_dir / source_file.relative_to(source_dir)
+        rows.append(
+            _file_provenance(kind=kind, source_path=source_file, bundle_path=bundle_file)
+        )
+    return rows
+
+
+def _file_provenance(
+    *,
+    kind: str,
+    source_path: Path,
+    bundle_path: Path,
+    direct_copy: bool = True,
+    transform: str | None = None,
+) -> dict[str, object]:
+    row: dict[str, object] = {
+        "kind": kind,
+        "source_path": str(source_path),
+        "source_sha256": file_sha256(source_path),
+        "source_bytes": source_path.stat().st_size if source_path.exists() else None,
+        "bundle_path": str(bundle_path),
+        "bundle_sha256": file_sha256(bundle_path),
+        "bundle_bytes": bundle_path.stat().st_size if bundle_path.exists() else None,
+        "direct_copy": direct_copy,
+    }
+    if transform is not None:
+        row["transform"] = transform
+    return row
 
 
 if __name__ == "__main__":
