@@ -3,7 +3,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path("scripts").resolve()))
 
-from check_latex_placeholders import missing_placeholder_artifacts
+from check_latex_placeholders import missing_placeholder_artifacts, placeholder_artifact_failures
 from package_arxiv_submission import (
     GENERATED_DIRS,
     OPTIONAL_GENERATED_DIRS,
@@ -23,13 +23,19 @@ def test_latex_manuscript_is_formal_registered_protocol() -> None:
     assert "registered analysis protocol" in tex
     assert "reports no empirical claims" in tex
     assert r"\EmpiricalStatusSentence" in tex
+    assert r"\requiredartifact{../generated/h200_qwen_full_sweep/result_macros.tex}" in tex
+    assert r"\requiredartifact{../generated/h200_causal_patch_qwen7b/result_macros.tex}" in tex
     assert r"\requiredartifact{../generated/claim_assessment/abstract_status_sentence.tex}" in tex
+    assert "../generated/h200_qwen_full_sweep/result_macros.tex" in tex
+    assert "../generated/h200_causal_patch_qwen7b/result_macros.tex" in tex
     assert "../generated/claim_assessment/abstract_status_sentence.tex" in tex
     assert "Empirical result not yet reported" in tex
     assert r"\maybeinputtable{../generated/h200_qwen_full_sweep/main_results_table.tex}" in tex
     assert r"\maybeinputtable{../generated/claim_assessment/claim_assessment_table.tex}" in tex
     assert r"\maybeinputtable{../generated/claim_assessment/claim_interpretation.tex}" in tex
     assert r"\maybeinputtable{../audit/h200_qwen_full_sweep_summary/human_audit_summary_table.tex}" in tex
+    assert r"\maybeinputtable{../audit/h200_causal_patch_qwen7b_summary/human_audit_summary_table.tex}" in tex
+    assert r"\maybeinputtable{../audit/h200_causal_patch_qwen7b_summary/human_audit_deltas_table.tex}" in tex
     assert "causal_restoration_fraction.pdf" in tex
     assert r"\PrimaryTopSSEIPolicy" in tex
     assert r"\bibliography{../references}" in tex
@@ -91,11 +97,20 @@ def test_arxiv_rewrite_uses_local_bibliography_and_figures() -> None:
     assert "generated/claim_assessment" in _rewrite_main_tex_for_arxiv(
         "../generated/claim_assessment/abstract_status_sentence.tex"
     )
+    assert "generated/h200_qwen_full_sweep" in _rewrite_main_tex_for_arxiv(
+        "../generated/h200_qwen_full_sweep/result_macros.tex"
+    )
+    assert "generated/h200_causal_patch_qwen7b" in _rewrite_main_tex_for_arxiv(
+        "../generated/h200_causal_patch_qwen7b/result_macros.tex"
+    )
     assert Path("paper/generated/claim_assessment") in GENERATED_DIRS
     assert Path("paper/generated/claim_assessment") in REQUIRED_GENERATED_DIRS
     assert Path("paper/generated/h200_qwen32b_public_followup") in OPTIONAL_GENERATED_DIRS
     assert "audit/h200_qwen_full_sweep_summary" in _rewrite_main_tex_for_arxiv(
         "../audit/h200_qwen_full_sweep_summary/human_audit_summary_table.tex"
+    )
+    assert "audit/h200_causal_patch_qwen7b_summary" in _rewrite_main_tex_for_arxiv(
+        "../audit/h200_causal_patch_qwen7b_summary/human_audit_summary_table.tex"
     )
     assert "../../results" not in rewritten
 
@@ -136,6 +151,34 @@ def test_latex_placeholder_checker_reports_missing_artifacts(tmp_path: Path) -> 
     )
 
     assert missing_placeholder_artifacts(tex) == ["missing/table.tex"]
+    assert placeholder_artifact_failures(tex) == [
+        "invalid PDF artifact: figure.pdf",
+        "missing artifact: missing/table.tex",
+    ]
+
+
+def test_latex_placeholder_checker_rejects_placeholder_artifacts(tmp_path: Path) -> None:
+    tex = tmp_path / "main.tex"
+    generated = tmp_path / "generated"
+    generated.mkdir()
+    pending = generated / "result_macros.tex"
+    empty = generated / "claim_interpretation.tex"
+    pending.write_text(
+        r"\newcommand{\PrimaryTopSSEIPolicy}{Results pending; no readiness-passing rows exported.}",
+        encoding="utf-8",
+    )
+    empty.write_text("", encoding="utf-8")
+    tex.write_text(
+        r"\requiredartifact{generated/result_macros.tex}"
+        "\n"
+        r"\maybeinputtable{generated/claim_interpretation.tex}{pending}",
+        encoding="utf-8",
+    )
+
+    assert placeholder_artifact_failures(tex) == [
+        "empty artifact: generated/claim_interpretation.tex",
+        "placeholder text in artifact: generated/result_macros.tex",
+    ]
 
 
 def test_latex_placeholder_checker_requires_generated_text_artifacts(tmp_path: Path) -> None:
@@ -151,3 +194,6 @@ def test_latex_placeholder_checker_requires_generated_text_artifacts(tmp_path: P
     )
 
     assert missing_placeholder_artifacts(tex) == ["generated/missing_status.tex"]
+    assert placeholder_artifact_failures(tex) == [
+        "missing artifact: generated/missing_status.tex",
+    ]

@@ -48,5 +48,12 @@ fi
 
 cp "$build_dir/cache_mediated_safety_erasure.pdf" paper/cache_mediated_safety_erasure.pdf
 
+if [[ "${REQUIRE_COMPLETE_PAPER:-0}" == "1" ]]; then
+  test -s "$build_dir/cache_mediated_safety_erasure.pdf"
+  uv run python scripts/report_publication_status.py \
+    --paper-pdf "$build_dir/cache_mediated_safety_erasure.pdf" \
+    --fail-if-not-ready
+fi
+
 echo "Wrote $build_dir/cache_mediated_safety_erasure.pdf"
 echo "Wrote paper/cache_mediated_safety_erasure.pdf"

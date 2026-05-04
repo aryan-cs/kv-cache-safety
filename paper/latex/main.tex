@@ -88,6 +88,8 @@ The present manuscript is a registered analysis protocol and reports no empirica
 \IfFileExists{../generated/claim_assessment/abstract_status_sentence.tex}{%
   \input{../generated/claim_assessment/abstract_status_sentence.tex}%
 }{}
+\requiredartifact{../generated/h200_qwen_full_sweep/result_macros.tex}
+\requiredartifact{../generated/h200_causal_patch_qwen7b/result_macros.tex}
 \requiredartifact{../generated/claim_assessment/abstract_status_sentence.tex}
 
 \begin{document}
@@ -128,7 +130,7 @@ CachePrune edits KV-cache state to defend against indirect prompt injection \cit
 Refusal behavior can be steered through activation directions and may not reduce to a single global direction \citep{arditi2024refusal,joad2026more_refusal}. Recent alignment-routing work argues that policy behavior can localize to sparse routing mechanisms \citep{frank2026alignmentroutes}, while Any-Depth Alignment studies inference-time restoration of refusal behavior at different generation depths \citep{zhang2026anydepth}. These works motivate the possibility that safety state has identifiable carriers. Our experiments ask whether KV cache slices are among those carriers.
 
 \paragraph{Phenomenon-first safety papers.}
-Subliminal learning, token entanglement, and emergent misalignment are examples of safety results that became important because they identified surprising mechanisms rather than only new benchmarks \citep{cloud2025subliminal,zur2025token,betley2025emergent}. Cache-mediated safety erasure aims for the same standard: a specific, falsifiable phenomenon with controls that rule out simple performance degradation.
+Subliminal learning, token entanglement, and emergent misalignment are relevant here because each frames a safety question around a specific mechanism rather than only a new benchmark \citep{cloud2025subliminal,zur2025token,betley2025emergent}. Cache-mediated safety erasure is posed in the same form: a falsifiable phenomenon with controls that separate selective safety degradation from ordinary performance degradation.
 
 \paragraph{Evaluation anchors.}
 The registered primary sweep requires public prompt-injection, harmful-request, XSTest-safe, benign-instruction, and ARC capability suites. Broader anchors such as HarmBench, IFEval, RULER, and LongBench define extension analyses only when their corresponding artifacts are present \citep{mazeika2024harmbench,chao2024jailbreakbench,rottger2023xstest,zhou2023ifeval,hsieh2024ruler,bai2024longbench}. Primary experiments target Qwen2.5 Instruct models because they are open-weight and available at 7B, 14B, and 32B scales \citep{qwen2024qwen25}.
@@ -319,6 +321,8 @@ Causal diagnostic run: \CausalRunId. The central claim requires system-role rest
 \subsection{Human Audit and Failure Modes}
 \maybeinputtable{../audit/h200_qwen_full_sweep_summary/human_audit_summary_table.tex}{Report blinded human-audit label rates before making safety claims.}
 \maybeinputtable{../audit/h200_qwen_full_sweep_summary/human_audit_deltas_table.tex}{Report paired baseline-versus-treatment human-audit deltas for unsafe compliance, refusal correctness, leakage, and benign over-refusal.}
+\maybeinputtable{../audit/h200_causal_patch_qwen7b_summary/human_audit_summary_table.tex}{Report blinded causal-diagnostic human-audit label rates before making restoration claims.}
+\maybeinputtable{../audit/h200_causal_patch_qwen7b_summary/human_audit_deltas_table.tex}{Report paired causal-diagnostic human-audit deltas for system-role patching, matched non-policy patching, and policy-pinned mitigation.}
 Qualitative examples should be summarized at the category level rather than reproduced verbatim when they contain procedural harmful details.
 
 \section{Discussion}
