@@ -128,6 +128,10 @@ def test_publication_artifact_builder_fails_without_real_results() -> None:
     assert "REQUIRE_COMPLETE_PAPER=1 bash scripts/build_paper_pdf.sh" in script
     assert "publication_status.md" in script
     assert "--require-cache-mediated-claim" in script
+    assert "--require-human-audit-support" in script
+    assert "--fail-if-not-ready" in script
+    assert "REQUIRE_HUMAN_AUDIT" not in script
+    assert "REQUIRE_CACHE_MEDIATED_CLAIM" not in script
     assert "--required-figure prompt_effect_constellation" in script
     assert "--required-figure safety_state_atlas" in script
     assert "--required-figure causal_restoration_fraction" in script

@@ -35,7 +35,7 @@ def test_publication_status_accepts_complete_real_artifacts(tmp_path: Path) -> N
     _write_audit(causal_audit, causal)
     claim_path = tmp_path / "claim_assessment.json"
     claim_path.write_text(
-        json.dumps(_passing_claim_assessment()),
+        json.dumps(_passing_claim_assessment(primary, causal, primary_audit, causal_audit)),
         encoding="utf-8",
     )
     pdf_path = tmp_path / "paper.pdf"
@@ -67,7 +67,7 @@ def test_publication_status_rejects_stale_audit_source_hashes(tmp_path: Path) ->
     (primary / "metrics.json").write_text(json.dumps({"changed": True}), encoding="utf-8")
     claim_path = tmp_path / "claim_assessment.json"
     claim_path.write_text(
-        json.dumps(_passing_claim_assessment()),
+        json.dumps(_passing_claim_assessment(primary, causal, primary_audit, causal_audit)),
         encoding="utf-8",
     )
     pdf_path = tmp_path / "paper.pdf"
@@ -87,6 +87,36 @@ def test_publication_status_rejects_stale_audit_source_hashes(tmp_path: Path) ->
     assert "stale_result_source:metrics.json" in status["primary_human_audit"]["failures"]
 
 
+def test_publication_status_rejects_stale_claim_source_hashes(tmp_path: Path) -> None:
+    primary = tmp_path / "primary"
+    causal = tmp_path / "causal"
+    primary_audit = tmp_path / "primary_audit"
+    causal_audit = tmp_path / "causal_audit"
+    _write_run(primary)
+    _write_run(causal)
+    _write_audit(primary_audit, primary)
+    _write_audit(causal_audit, causal)
+    claim = _passing_claim_assessment(primary, causal, primary_audit, causal_audit)
+    claim["source_artifacts"]["causal_metrics"]["sha256"] = "stale"
+    claim_path = tmp_path / "claim_assessment.json"
+    claim_path.write_text(json.dumps(claim), encoding="utf-8")
+    pdf_path = tmp_path / "paper.pdf"
+    pdf_path.write_bytes(b"%PDF-1.7\n")
+
+    status = publication_status(
+        primary_results_dir=primary,
+        causal_results_dir=causal,
+        primary_audit_dir=primary_audit,
+        causal_audit_dir=causal_audit,
+        claim_assessment_path=claim_path,
+        paper_pdf=pdf_path,
+    )
+
+    assert status["publication_ready"] is False
+    assert "claim_assessment_passed" in status["blockers"]
+    assert "stale_claim_source:causal_metrics" in status["claim_assessment"]["failures"]
+
+
 def test_publication_status_rejects_preliminary_claim_assessment_without_audit_gate(
     tmp_path: Path,
 ) -> None:
@@ -104,6 +134,9 @@ def test_publication_status_rejects_preliminary_claim_assessment_without_audit_g
             {
                 "publication_gate": {"passed": True},
                 "passed_claim_count": 3,
+                "source_artifacts": _claim_source_artifacts(
+                    primary, causal, primary_audit, causal_audit
+                ),
                 "human_audit_support": {
                     "required": False,
                     "passed": True,
@@ -202,12 +235,38 @@ def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def _passing_claim_assessment() -> dict:
+def _passing_claim_assessment(
+    primary: Path,
+    causal: Path,
+    primary_audit: Path,
+    causal_audit: Path,
+) -> dict:
     return {
         "publication_gate": {"passed": True},
         "passed_claim_count": 3,
+        "source_artifacts": _claim_source_artifacts(primary, causal, primary_audit, causal_audit),
         "human_audit_support": {
             "required": True,
             "passed": True,
         },
+    }
+
+
+def _claim_source_artifacts(
+    primary: Path,
+    causal: Path,
+    primary_audit: Path,
+    causal_audit: Path,
+) -> dict:
+    return {
+        "primary_metrics": {"sha256": _sha256(primary / "metrics.json")},
+        "primary_manifest": {"sha256": _sha256(primary / "manifest.json")},
+        "causal_metrics": {"sha256": _sha256(causal / "metrics.json")},
+        "causal_manifest": {"sha256": _sha256(causal / "manifest.json")},
+        "primary_audit_summary": {
+            "sha256": _sha256(primary_audit / "human_audit_summary.json")
+        },
+        "primary_audit_manifest": {"sha256": _sha256(primary_audit / "audit_manifest.json")},
+        "causal_audit_summary": {"sha256": _sha256(causal_audit / "human_audit_summary.json")},
+        "causal_audit_manifest": {"sha256": _sha256(causal_audit / "audit_manifest.json")},
     }

@@ -10,7 +10,7 @@ from _path import add_src_to_path
 
 add_src_to_path()
 
-from cache_safety_erasure.utils.io import write_json
+from cache_safety_erasure.utils.io import file_sha256, write_json
 
 
 def main() -> None:
@@ -50,6 +50,12 @@ def main() -> None:
         min_restoration_margin=args.min_restoration_margin,
         min_human_audit_delta=args.min_human_audit_delta,
         require_human_audit_support=args.require_human_audit_support,
+    )
+    assessment["source_artifacts"] = _claim_source_artifacts(
+        primary_results_dir=args.primary_results_dir,
+        causal_results_dir=args.causal_results_dir,
+        primary_audit_summary=args.primary_audit_summary,
+        causal_audit_summary=args.causal_audit_summary,
     )
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
@@ -327,6 +333,40 @@ def _load_optional_json(path: Path | None) -> dict[str, Any] | None:
         raise SystemExit(f"Missing JSON file: {path}")
     with path.open("r", encoding="utf-8") as f:
         return json.load(f)
+
+
+def _claim_source_artifacts(
+    *,
+    primary_results_dir: Path,
+    causal_results_dir: Path,
+    primary_audit_summary: Path | None,
+    causal_audit_summary: Path | None,
+) -> dict[str, Any]:
+    artifacts = {
+        "primary_metrics": _source_artifact(primary_results_dir / "metrics.json"),
+        "primary_manifest": _source_artifact(primary_results_dir / "manifest.json"),
+        "causal_metrics": _source_artifact(causal_results_dir / "metrics.json"),
+        "causal_manifest": _source_artifact(causal_results_dir / "manifest.json"),
+    }
+    if primary_audit_summary is not None:
+        artifacts["primary_audit_summary"] = _source_artifact(primary_audit_summary)
+        artifacts["primary_audit_manifest"] = _source_artifact(
+            primary_audit_summary.parent / "audit_manifest.json"
+        )
+    if causal_audit_summary is not None:
+        artifacts["causal_audit_summary"] = _source_artifact(causal_audit_summary)
+        artifacts["causal_audit_manifest"] = _source_artifact(
+            causal_audit_summary.parent / "audit_manifest.json"
+        )
+    return artifacts
+
+
+def _source_artifact(path: Path) -> dict[str, Any]:
+    return {
+        "path": str(path),
+        "sha256": file_sha256(path),
+        "bytes": path.stat().st_size if path.exists() else None,
+    }
 
 
 def _load_metrics(results_dir: Path) -> dict[str, Any]:

@@ -100,7 +100,13 @@ def publication_status(
     causal = _run_status(causal_results_dir)
     primary_audit = _audit_status(primary_audit_dir, primary_results_dir)
     causal_audit = _audit_status(causal_audit_dir, causal_results_dir)
-    claim_assessment = _claim_status(claim_assessment_path)
+    claim_assessment = _claim_status(
+        claim_assessment_path,
+        primary_results_dir=primary_results_dir,
+        causal_results_dir=causal_results_dir,
+        primary_audit_dir=primary_audit_dir,
+        causal_audit_dir=causal_audit_dir,
+    )
     pdf = _pdf_status(paper_pdf)
 
     gates = {
@@ -216,9 +222,28 @@ def _audit_status(audit_dir: Path, results_dir: Path) -> dict[str, Any]:
     }
 
 
-def _claim_status(path: Path) -> dict[str, Any]:
+def _claim_status(
+    path: Path,
+    *,
+    primary_results_dir: Path,
+    causal_results_dir: Path,
+    primary_audit_dir: Path,
+    causal_audit_dir: Path,
+) -> dict[str, Any]:
     assessment = _read_json(path)
-    failures = _claim_failures(assessment)
+    failures = _claim_failures(
+        assessment,
+        {
+            "primary_metrics": primary_results_dir / "metrics.json",
+            "primary_manifest": primary_results_dir / "manifest.json",
+            "causal_metrics": causal_results_dir / "metrics.json",
+            "causal_manifest": causal_results_dir / "manifest.json",
+            "primary_audit_summary": primary_audit_dir / "human_audit_summary.json",
+            "primary_audit_manifest": primary_audit_dir / "audit_manifest.json",
+            "causal_audit_summary": causal_audit_dir / "human_audit_summary.json",
+            "causal_audit_manifest": causal_audit_dir / "audit_manifest.json",
+        },
+    )
     return {
         "path": str(path),
         "exists": path.exists(),
@@ -272,7 +297,7 @@ def _audit_result_source_failures(manifest: dict[str, Any], results_dir: Path) -
     return failures
 
 
-def _claim_failures(assessment: dict[str, Any]) -> list[str]:
+def _claim_failures(assessment: dict[str, Any], source_paths: dict[str, Path]) -> list[str]:
     if not assessment:
         return []
     failures = []
@@ -286,6 +311,25 @@ def _claim_failures(assessment: dict[str, Any]) -> list[str]:
             failures.append("human_audit_support_not_required")
         if audit_support.get("passed") is not True:
             failures.append("human_audit_support_failed")
+    failures.extend(_claim_source_failures(assessment, source_paths))
+    return failures
+
+
+def _claim_source_failures(assessment: dict[str, Any], source_paths: dict[str, Path]) -> list[str]:
+    source_artifacts = assessment.get("source_artifacts")
+    if not isinstance(source_artifacts, dict):
+        return ["missing_claim_source_artifacts"]
+    failures = []
+    for name, path in source_paths.items():
+        source = source_artifacts.get(name)
+        if not isinstance(source, dict):
+            failures.append(f"missing_claim_source:{name}")
+            continue
+        if not path.exists():
+            failures.append(f"missing_claim_source_file:{name}")
+            continue
+        if source.get("sha256") != file_sha256(path):
+            failures.append(f"stale_claim_source:{name}")
     return failures
 
 

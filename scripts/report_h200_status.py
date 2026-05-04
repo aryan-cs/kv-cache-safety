@@ -69,6 +69,7 @@ def h200_status(repo_dir: Path, *, log_lines: int = 40) -> dict[str, Any]:
         "experiment_running": any("run_experiment.py" in row["command"] for row in _process_rows()),
         "launcher_waiting": any("wait_for_h200_gpu" in row["command"] for row in _process_rows()),
         "gpu_gate_likely_blocked": _gpu_gate_likely_blocked(gpu),
+        "hidden_gpu_context_likely": _hidden_gpu_context_likely(gpu),
     }
 
 
@@ -82,6 +83,7 @@ def render_markdown(status: dict[str, Any]) -> str:
         f"Experiment running: `{str(status['experiment_running']).lower()}`",
         f"Launcher waiting: `{str(status['launcher_waiting']).lower()}`",
         f"GPU gate likely blocked: `{str(status['gpu_gate_likely_blocked']).lower()}`",
+        f"Hidden GPU context likely: `{str(status.get('hidden_gpu_context_likely', False)).lower()}`",
         "",
         "## GPU",
         "",
@@ -110,6 +112,17 @@ def render_markdown(status: dict[str, Any]) -> str:
         pmon = str(gpu.get("pmon") or "").strip()
         if pmon:
             lines.extend(["", "### Process Monitor Snapshot", "", "```text", pmon, "```"])
+        if status.get("hidden_gpu_context_likely"):
+            lines.extend(
+                [
+                    "",
+                    "### Blocker Diagnosis",
+                    "",
+                    "- GPU memory or utilization is high, but `nvidia-smi` reports no visible compute app. "
+                    "The blocker may be outside this namespace/cgroup, a stale driver context, "
+                    "or a notebook-level reservation.",
+                ]
+            )
     lines.extend(["", "## Processes", ""])
     if status["processes"]:
         for row in status["processes"]:
@@ -175,6 +188,27 @@ def _gpu_gate_likely_blocked(gpu: dict[str, Any]) -> bool:
     if not gpu.get("available"):
         return False
     return int(gpu.get("memory_used_mib") or 0) > 20_000 or int(gpu.get("utilization_pct") or 0) > 20
+
+
+def _hidden_gpu_context_likely(gpu: dict[str, Any]) -> bool:
+    if not _gpu_gate_likely_blocked(gpu):
+        return False
+    if gpu.get("compute_apps"):
+        return False
+    return "No running processes found" in str(gpu.get("pmon") or "") or _pmon_has_no_process_rows(
+        str(gpu.get("pmon") or "")
+    )
+
+
+def _pmon_has_no_process_rows(text: str) -> bool:
+    for line in text.splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        parts = stripped.split()
+        if len(parts) > 1 and parts[1] != "-":
+            return False
+    return True
 
 
 def _compute_apps() -> list[dict[str, Any]]:
