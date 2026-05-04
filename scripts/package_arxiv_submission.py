@@ -119,7 +119,15 @@ def main() -> None:
     parser.add_argument("--primary-generated-dir", type=Path, default=DEFAULT_PRIMARY_GENERATED_DIR)
     parser.add_argument("--causal-generated-dir", type=Path, default=DEFAULT_CAUSAL_GENERATED_DIR)
     parser.add_argument("--claim-generated-dir", type=Path, default=DEFAULT_CLAIM_GENERATED_DIR)
-    parser.add_argument("--qwen32-generated-dir", type=Path, default=DEFAULT_QWEN32_GENERATED_DIR)
+    parser.add_argument(
+        "--qwen32-generated-dir",
+        type=Path,
+        default=None,
+        help=(
+            "Optional Qwen-32B generated artifact directory. Omit unless that "
+            "follow-up was rebuilt and passed readiness in the current publication build."
+        ),
+    )
     parser.add_argument("--primary-audit-dir", type=Path, default=DEFAULT_PRIMARY_AUDIT_DIR)
     parser.add_argument("--causal-audit-dir", type=Path, default=DEFAULT_CAUSAL_AUDIT_DIR)
     parser.add_argument(
@@ -136,7 +144,7 @@ def main() -> None:
         args.causal_generated_dir,
         args.claim_generated_dir,
     ]
-    optional_generated_dirs = [args.qwen32_generated_dir]
+    optional_generated_dirs = [args.qwen32_generated_dir] if args.qwen32_generated_dir else []
     audit_dirs = [args.primary_audit_dir, args.causal_audit_dir]
     if source_dir.exists():
         shutil.rmtree(source_dir)

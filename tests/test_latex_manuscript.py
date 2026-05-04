@@ -264,6 +264,51 @@ def test_arxiv_packager_records_file_provenance(tmp_path: Path) -> None:
     assert all(not Path(path).is_absolute() for path in manifest["copied_audit"])
 
 
+def test_arxiv_packager_copies_optional_qwen32_only_when_requested(tmp_path: Path) -> None:
+    output_dir = tmp_path / "arxiv_source"
+    archive = tmp_path / "arxiv_source.tar.gz"
+    qwen32_dir = tmp_path / "h200_qwen32b_public_followup"
+    qwen32_dir.mkdir()
+    (qwen32_dir / "qwen32_note.tex").write_text("Qwen 32B follow-up note.\n", encoding="utf-8")
+
+    subprocess.run(
+        [
+            sys.executable,
+            "scripts/package_arxiv_submission.py",
+            "--output-dir",
+            str(output_dir),
+            "--archive",
+            str(archive),
+            "--allow-missing",
+        ],
+        check=True,
+    )
+    manifest_without_optional = json.loads(
+        (output_dir / "manifest.json").read_text(encoding="utf-8")
+    )
+
+    assert all("h200_qwen32b_public_followup" not in path for path in manifest_without_optional["copied_generated"])
+
+    subprocess.run(
+        [
+            sys.executable,
+            "scripts/package_arxiv_submission.py",
+            "--output-dir",
+            str(output_dir),
+            "--archive",
+            str(archive),
+            "--qwen32-generated-dir",
+            str(qwen32_dir),
+            "--allow-missing",
+        ],
+        check=True,
+    )
+    manifest_with_optional = json.loads((output_dir / "manifest.json").read_text(encoding="utf-8"))
+
+    assert "generated/h200_qwen32b_public_followup" in manifest_with_optional["copied_generated"]
+    assert (output_dir / "generated" / "h200_qwen32b_public_followup" / "qwen32_note.tex").exists()
+
+
 def test_arxiv_packager_excludes_raw_evidence_from_support_trees(tmp_path: Path) -> None:
     source = tmp_path / "audit_source"
     bundle = tmp_path / "arxiv_source" / "audit" / "audit_source"

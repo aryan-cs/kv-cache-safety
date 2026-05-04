@@ -239,6 +239,9 @@ bash scripts/build_publication_artifacts.sh
 ```
 
 This command regenerates aggregate metrics, figures, paper tables, CI planning files, the evidence-gated claim assessment, readiness checks, the readable PDF, and the arXiv source bundle. It fails if the required real result artifacts, completed human-audit summaries, or cache-mediated-safety-erasure claim gates are missing.
+Optional Qwen 32B follow-up artifacts are packaged only when that follow-up was
+rebuilt and passed readiness in the same publication build, so stale optional
+generated directories cannot enter the final arXiv bundle by accident.
 
 To see the next fail-closed step without running the full rebuild:
 

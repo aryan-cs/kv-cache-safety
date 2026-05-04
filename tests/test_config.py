@@ -297,6 +297,9 @@ def test_publication_artifact_builder_fails_without_real_results() -> None:
     assert "REQUIRE_CACHE_MEDIATED_CLAIM" not in script
     assert "REQUIRE_QWEN32_FOLLOWUP" in script
     assert "Skipping optional Qwen 32B follow-up artifacts" in script
+    assert "qwen32_package_args=()" in script
+    assert 'qwen32_package_args=(--qwen32-generated-dir "$qwen32_generated_dir")' in script
+    assert '"${qwen32_package_args[@]}"' in script
     assert "--required-figure prompt_effect_constellation" in script
     assert "--required-figure safety_state_atlas" in script
     assert "--required-figure causal_restoration_fraction" in script

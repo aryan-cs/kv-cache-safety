@@ -19,6 +19,7 @@ require_qwen32_followup="${REQUIRE_QWEN32_FOLLOWUP:-0}"
 publication_status_dir="${PUBLICATION_STATUS_DIR:-paper/build}"
 arxiv_source_dir="${ARXIV_SOURCE_DIR:-paper/build/arxiv_source}"
 arxiv_archive="${ARXIV_ARCHIVE:-paper/build/arxiv_source.tar.gz}"
+qwen32_package_args=()
 
 result_artifacts_complete() {
   local results_dir="$1"
@@ -175,6 +176,7 @@ rebuild_qwen32_if_present() {
     --required-figure cache_state_fingerprint \
     --required-figure safety_state_atlas \
     --require-public-provenance
+  qwen32_package_args=(--qwen32-generated-dir "$qwen32_generated_dir")
 }
 
 assess_claims() {
@@ -247,7 +249,7 @@ uv run python scripts/package_arxiv_submission.py \
   --primary-generated-dir "$primary_generated_dir" \
   --causal-generated-dir "$causal_generated_dir" \
   --claim-generated-dir "$claim_generated_dir" \
-  --qwen32-generated-dir "$qwen32_generated_dir" \
+  "${qwen32_package_args[@]}" \
   --primary-audit-dir "$primary_audit_summary" \
   --causal-audit-dir "$causal_audit_summary"
 write_publication_status --require-arxiv-bundle --fail-if-not-ready
