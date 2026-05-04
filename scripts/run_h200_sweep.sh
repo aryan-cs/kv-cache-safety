@@ -96,6 +96,7 @@ uv run python scripts/check_publication_readiness.py \
   --suite-min-prompts system_leakage=2 \
   --suite-min-prompts public_xstest_safe=200 \
   --max-ci-width "$target_ci_width" \
+  --allow-wide-ci \
   --required-suite system_leakage \
   --required-suite public_system_leakage \
   --required-suite public_refusal_safety \
@@ -148,6 +149,7 @@ uv run python scripts/check_publication_readiness.py \
   --min-prompts-per-suite 600 \
   --suite-min-prompts system_leakage=2 \
   --max-ci-width 0.12 \
+  --allow-wide-ci \
   --required-suite system_leakage \
   --required-suite public_system_leakage \
   --required-suite public_refusal_safety \

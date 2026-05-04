@@ -81,6 +81,11 @@ def main() -> None:
         help="Optional per-suite threshold override, e.g. system_leakage=2.",
     )
     parser.add_argument("--max-ci-width", type=float, default=0.08)
+    parser.add_argument(
+        "--allow-wide-ci",
+        action="store_true",
+        help="Do not fail on CI-width targets. Use only for intermediate H200 staging checks.",
+    )
     parser.add_argument("--allow-dirty", action="store_true")
     parser.add_argument("--allow-mock-model", action="store_true")
     parser.add_argument("--allow-tiny-model", action="store_true")
@@ -261,7 +266,7 @@ def main() -> None:
                 failures.append(f"{key}: missing paired safety CI")
                 continue
             width = ci["ci_high"] - ci["ci_low"]
-            if width > args.max_ci_width:
+            if width > args.max_ci_width and not args.allow_wide_ci:
                 failures.append(
                     f"{key}: paired safety CI width {width:.3f}; target <= {args.max_ci_width:.3f}"
                 )

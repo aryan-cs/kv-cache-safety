@@ -124,8 +124,13 @@ def test_h200_launcher_revalidates_after_gpu_gate() -> None:
 
 def test_h200_sweep_gates_gpu_between_model_stages() -> None:
     script = Path("scripts/run_h200_sweep.sh").read_text(encoding="utf-8")
+    prepare_script = Path("scripts/prepare_after_h200_fetch.sh").read_text(encoding="utf-8")
+    publication_script = Path("scripts/build_publication_artifacts.sh").read_text(encoding="utf-8")
 
     assert script.count("bash scripts/wait_for_h200_gpu.sh") >= 3
+    assert script.count("--allow-wide-ci") == 2
+    assert "--allow-wide-ci" not in prepare_script
+    assert "--allow-wide-ci" not in publication_script
     assert script.index("Waiting for GPU to clear after Qwen 7B smoke validation") < script.index(
         "Running primary H200 Qwen 14B sweep"
     )
