@@ -40,3 +40,13 @@ Required fields for each entry:
 - cache policies: pending; sweep has not started
 - main metrics: no empirical metrics yet; `scripts/wait_and_run_h200_sweep.sh` passed ruff and the full test suite, then entered the GPU gate because the H200 was saturated
 - decision: keep launcher waiting; do not cite as evidence
+
+## 2026-05-04 H200 Hidden-Context Blocker
+
+- date: 2026-05-04
+- commit hash: `a9a310a`
+- status command: `uv run python scripts/report_h200_status.py`
+- machine / GPU: UIUC H200 notebook
+- result: launcher still waiting; no experiment process running; expected result and audit artifacts missing
+- blocker: H200 reported approximately 142 GB of 143 GB memory in use with high utilization, while `nvidia-smi --query-compute-apps` and `nvidia-smi pmon` showed no visible compute process
+- decision: treat as infrastructure/allocation blocker, not experiment evidence; keep the launcher waiting and release or restart the notebook allocation externally if the context remains hidden

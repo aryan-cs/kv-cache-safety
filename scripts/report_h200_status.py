@@ -121,6 +121,10 @@ def render_markdown(status: dict[str, Any]) -> str:
                     "- GPU memory or utilization is high, but `nvidia-smi` reports no visible compute app. "
                     "The blocker may be outside this namespace/cgroup, a stale driver context, "
                     "or a notebook-level reservation.",
+                    "- Non-destructive next step: keep the launcher running, release or restart the "
+                    "notebook allocation from the UI if this is your session, then rerun this status "
+                    "report. Avoid `nvidia-smi --gpu-reset` or killing unknown processes on shared "
+                    "infrastructure unless an administrator explicitly authorizes it.",
                 ]
             )
     lines.extend(["", "## Processes", ""])

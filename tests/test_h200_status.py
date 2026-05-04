@@ -72,6 +72,7 @@ def test_render_markdown_summarizes_blocked_launcher() -> None:
             "experiment_running": False,
             "launcher_waiting": True,
             "gpu_gate_likely_blocked": True,
+            "hidden_gpu_context_likely": True,
             "gpu": {
                 "available": True,
                 "name": "NVIDIA H200 NVL",
@@ -96,4 +97,5 @@ def test_render_markdown_summarizes_blocked_launcher() -> None:
     assert "GPU gate likely blocked: `true`" in text
     assert "none reported by `nvidia-smi --query-compute-apps`" in text
     assert "Process Monitor Snapshot" in text
+    assert "release or restart the notebook allocation" in text
     assert "`results/h200_qwen_full_sweep`: missing" in text
