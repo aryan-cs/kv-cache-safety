@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import re
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -28,6 +29,10 @@ PROCESS_PATTERNS = [
     "run_h200_sweep",
     "run_experiment.py",
 ]
+WAIT_SAMPLE_RE = re.compile(
+    r"^(?P<timestamp>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z) "
+    r"memory\.used=(?P<memory>\d+)MiB utilization=(?P<utilization>\d+)%$"
+)
 
 
 def main() -> None:
@@ -52,6 +57,7 @@ def h200_status(repo_dir: Path, *, log_lines: int = 40) -> dict[str, Any]:
     repo_dir = repo_dir.resolve()
     latest_log = _latest_launcher_log(repo_dir)
     gpu = _gpu_status()
+    processes = _process_rows()
     return {
         "schema_version": 1,
         "created_at_utc": utc_timestamp(),
@@ -60,15 +66,16 @@ def h200_status(repo_dir: Path, *, log_lines: int = 40) -> dict[str, Any]:
             "commit": _command_text(["git", "rev-parse", "--short", "HEAD"], cwd=repo_dir),
             "status_short": _command_text(["git", "status", "--short"], cwd=repo_dir),
         },
-        "processes": _process_rows(),
+        "processes": processes,
         "launcher_log": {
             "path": str(latest_log) if latest_log else None,
             "tail": _tail(latest_log, log_lines) if latest_log else "",
+            "wait_history": _wait_history(latest_log) if latest_log else {"sample_count": 0},
         },
         "gpu": gpu,
         "expected_artifacts": _artifact_status(repo_dir),
-        "experiment_running": any("run_experiment.py" in row["command"] for row in _process_rows()),
-        "launcher_waiting": any("wait_for_h200_gpu" in row["command"] for row in _process_rows()),
+        "experiment_running": any("run_experiment.py" in row["command"] for row in processes),
+        "launcher_waiting": any("wait_for_h200_gpu" in row["command"] for row in processes),
         "gpu_gate_likely_blocked": _gpu_gate_likely_blocked(gpu),
         "hidden_gpu_context_likely": _hidden_gpu_context_likely(gpu),
     }
@@ -157,6 +164,33 @@ def render_markdown(status: dict[str, Any]) -> str:
     for row in status["expected_artifacts"]:
         state = "present" if row["exists"] else "missing"
         lines.append(f"- `{row['path']}`: {state}")
+    wait_history = status["launcher_log"].get("wait_history") or {}
+    if wait_history.get("sample_count"):
+        first = wait_history["first"]
+        latest = wait_history["latest"]
+        minimum = wait_history["min_memory"]
+        lines.extend(
+            [
+                "",
+                "## Wait History",
+                "",
+                f"- samples: `{wait_history['sample_count']}`",
+                (
+                    f"- first sample: `{first['timestamp_utc']}` "
+                    f"`{first['memory_used_mib']} MiB`, `{first['utilization_pct']}%`"
+                ),
+                (
+                    f"- latest sample: `{latest['timestamp_utc']}` "
+                    f"`{latest['memory_used_mib']} MiB`, `{latest['utilization_pct']}%`"
+                ),
+                (
+                    f"- minimum memory observed: `{minimum['memory_used_mib']} MiB` "
+                    f"at `{minimum['timestamp_utc']}`"
+                ),
+                f"- memory drop from first to latest: `{wait_history['memory_drop_mib']} MiB`",
+                f"- latest sample passes gate: `{str(wait_history['latest_gate_passed']).lower()}`",
+            ]
+        )
     lines.extend(["", "## Latest Launcher Log", ""])
     if status["launcher_log"]["path"]:
         lines.append(f"`{status['launcher_log']['path']}`")
@@ -402,6 +436,43 @@ def _artifact_status(repo_dir: Path) -> list[dict[str, Any]]:
 def _latest_launcher_log(repo_dir: Path) -> Path | None:
     logs = sorted((repo_dir / "logs" / "h200").glob("wait_and_run_*.log"), reverse=True)
     return logs[0] if logs else None
+
+
+def _wait_history(path: Path) -> dict[str, Any]:
+    samples = []
+    for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+        sample = _parse_wait_sample(line)
+        if sample is not None:
+            samples.append(sample)
+    if not samples:
+        return {"sample_count": 0}
+    first = samples[0]
+    latest = samples[-1]
+    min_memory = min(samples, key=lambda item: item["memory_used_mib"])
+    max_memory = max(samples, key=lambda item: item["memory_used_mib"])
+    return {
+        "sample_count": len(samples),
+        "first": first,
+        "latest": latest,
+        "min_memory": min_memory,
+        "max_memory": max_memory,
+        "min_utilization_pct": min(item["utilization_pct"] for item in samples),
+        "max_utilization_pct": max(item["utilization_pct"] for item in samples),
+        "memory_drop_mib": first["memory_used_mib"] - latest["memory_used_mib"],
+        "latest_gate_passed": latest["memory_used_mib"] <= 20_000
+        and latest["utilization_pct"] <= 20,
+    }
+
+
+def _parse_wait_sample(line: str) -> dict[str, Any] | None:
+    match = WAIT_SAMPLE_RE.match(line.strip())
+    if match is None:
+        return None
+    return {
+        "timestamp_utc": match.group("timestamp"),
+        "memory_used_mib": int(match.group("memory")),
+        "utilization_pct": int(match.group("utilization")),
+    }
 
 
 def _tail(path: Path, line_count: int) -> str:

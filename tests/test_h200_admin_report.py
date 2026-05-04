@@ -37,6 +37,28 @@ def test_admin_report_summarizes_hidden_gpu_context_without_results() -> None:
                     "command": "bash scripts/wait_for_h200_gpu.sh",
                 }
             ],
+            "launcher_log": {
+                "wait_history": {
+                    "sample_count": 2,
+                    "first": {
+                        "timestamp_utc": "2026-05-04T02:04:08Z",
+                        "memory_used_mib": 142461,
+                        "utilization_pct": 100,
+                    },
+                    "latest": {
+                        "timestamp_utc": "2026-05-04T03:59:11Z",
+                        "memory_used_mib": 82139,
+                        "utilization_pct": 95,
+                    },
+                    "min_memory": {
+                        "timestamp_utc": "2026-05-04T03:59:11Z",
+                        "memory_used_mib": 82139,
+                        "utilization_pct": 95,
+                    },
+                    "memory_drop_mib": 60322,
+                    "latest_gate_passed": False,
+                }
+            },
         }
     )
 
@@ -44,6 +66,8 @@ def test_admin_report_summarizes_hidden_gpu_context_without_results() -> None:
     assert "Hidden GPU context likely: `true`" in report
     assert "Visible compute apps: `0`" in report
     assert "Processes                             : None" in report
+    assert "Wait History" in report
+    assert "Memory drop from first to latest: `60322 MiB`" in report
     assert "release or restart the notebook allocation" in report
     assert "nvidia-smi --gpu-reset" in report
     assert "model generations" in report

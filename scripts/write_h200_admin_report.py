@@ -88,6 +88,34 @@ def admin_report(status: dict[str, Any]) -> str:
     if pid_query:
         lines.extend(["### `nvidia-smi -q -d PIDS`", "", "```text", pid_query, "```", ""])
 
+    wait_history = status.get("launcher_log", {}).get("wait_history") or {}
+    if wait_history.get("sample_count"):
+        first = wait_history["first"]
+        latest = wait_history["latest"]
+        minimum = wait_history["min_memory"]
+        lines.extend(
+            [
+                "## Wait History",
+                "",
+                f"- Samples: `{wait_history['sample_count']}`",
+                (
+                    f"- First sample: `{first['timestamp_utc']}` "
+                    f"`{first['memory_used_mib']} MiB`, `{first['utilization_pct']}%`"
+                ),
+                (
+                    f"- Latest sample: `{latest['timestamp_utc']}` "
+                    f"`{latest['memory_used_mib']} MiB`, `{latest['utilization_pct']}%`"
+                ),
+                (
+                    f"- Minimum memory observed: `{minimum['memory_used_mib']} MiB` "
+                    f"at `{minimum['timestamp_utc']}`"
+                ),
+                f"- Memory drop from first to latest: `{wait_history['memory_drop_mib']} MiB`",
+                f"- Latest sample passes gate: `{_bool(wait_history['latest_gate_passed'])}`",
+                "",
+            ]
+        )
+
     lines.extend(
         [
             "## Waiting Processes",
