@@ -95,7 +95,7 @@ def test_wait_history_summarizes_launcher_memory_trend(tmp_path: Path) -> None:
         encoding="utf-8",
     )
 
-    history = _wait_history(log)
+    history = _wait_history(log, current_utc="2026-05-04T04:09:11Z")
 
     assert history["sample_count"] == 3
     assert history["first"]["memory_used_mib"] == 142461
@@ -113,6 +113,8 @@ def test_wait_history_summarizes_launcher_memory_trend(tmp_path: Path) -> None:
     }
     assert history["latest_gate_passed"] is True
     assert history["prolonged_gate_block"] is False
+    assert history["latest_sample_age_minutes"] == 5.0
+    assert history["launcher_log_stale"] is False
 
 
 def test_wait_history_marks_prolonged_gate_block_only_while_blocked(tmp_path: Path) -> None:
@@ -128,11 +130,13 @@ def test_wait_history_marks_prolonged_gate_block_only_while_blocked(tmp_path: Pa
         encoding="utf-8",
     )
 
-    history = _wait_history(log)
+    history = _wait_history(log, current_utc="2026-05-04T04:14:11Z")
 
     assert history["latest_gate_passed"] is False
     assert history["observed_wait_minutes"] == pytest.approx(115.05)
     assert history["prolonged_gate_block"] is True
+    assert history["latest_sample_age_minutes"] == 15.0
+    assert history["launcher_log_stale"] is True
 
 
 def test_wait_history_prolonged_gate_block_starts_at_sixty_minutes(
@@ -150,7 +154,7 @@ def test_wait_history_prolonged_gate_block_starts_at_sixty_minutes(
         encoding="utf-8",
     )
 
-    history = _wait_history(log)
+    history = _wait_history(log, current_utc="2026-05-04T03:04:08Z")
 
     assert history["observed_wait_minutes"] == pytest.approx(59.9833333333)
     assert history["prolonged_gate_block"] is False
@@ -166,7 +170,7 @@ def test_wait_history_prolonged_gate_block_starts_at_sixty_minutes(
         encoding="utf-8",
     )
 
-    history = _wait_history(log)
+    history = _wait_history(log, current_utc="2026-05-04T03:04:08Z")
 
     assert history["observed_wait_minutes"] == 60.0
     assert history["prolonged_gate_block"] is True
@@ -332,6 +336,7 @@ def test_render_markdown_summarizes_blocked_launcher() -> None:
                     },
                     "observed_wait_minutes": 115.0,
                     "memory_drop_mib": 60322,
+                    "latest_sample_age_minutes": 15.0,
                     "gate_threshold": {"memory_used_mib": 20000, "utilization_pct": 20},
                     "latest_memory_plateau": {
                         "memory_used_mib": 82139,
@@ -342,6 +347,7 @@ def test_render_markdown_summarizes_blocked_launcher() -> None:
                     },
                     "latest_gate_passed": False,
                     "prolonged_gate_block": True,
+                    "launcher_log_stale": True,
                 },
             },
         }
@@ -360,5 +366,7 @@ def test_render_markdown_summarizes_blocked_launcher() -> None:
     assert "latest memory plateau: `82139 MiB` for `2` samples" in text
     assert "memory drop from first to latest: `60322 MiB`" in text
     assert "prolonged gate block: `true`" in text
+    assert "latest sample age: `15.0 minutes`" in text
+    assert "launcher log stale: `true`" in text
     assert "release or restart the notebook allocation" in text
     assert "`results/h200_qwen_full_sweep`: missing" in text

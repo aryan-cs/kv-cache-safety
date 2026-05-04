@@ -127,6 +127,8 @@ def admin_report(status: dict[str, Any]) -> str:
                 f"- Memory drop from first to latest: `{wait_history['memory_drop_mib']} MiB`",
                 f"- Latest sample passes gate: `{_bool(wait_history['latest_gate_passed'])}`",
                 f"- Prolonged gate block: `{_bool(wait_history.get('prolonged_gate_block'))}`",
+                f"- Latest sample age: `{float(wait_history.get('latest_sample_age_minutes') or 0.0):.1f} minutes`",
+                f"- Launcher log stale: `{_bool(wait_history.get('launcher_log_stale'))}`",
                 "",
             ]
         )

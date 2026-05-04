@@ -4,7 +4,7 @@ import argparse
 import os
 import re
 import subprocess
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -40,6 +40,7 @@ WAIT_THRESHOLD_RE = re.compile(
 )
 DEFAULT_GATE_MEMORY_USED_MIB = 20_000
 DEFAULT_GATE_UTILIZATION_PCT = 20
+STALE_WAIT_SAMPLE_MINUTES = 10.0
 
 
 def main() -> None:
@@ -214,6 +215,8 @@ def render_markdown(status: dict[str, Any]) -> str:
                 f"- memory drop from first to latest: `{wait_history['memory_drop_mib']} MiB`",
                 f"- latest sample passes gate: `{str(wait_history['latest_gate_passed']).lower()}`",
                 f"- prolonged gate block: `{str(wait_history.get('prolonged_gate_block', False)).lower()}`",
+                f"- latest sample age: `{float(wait_history.get('latest_sample_age_minutes') or 0.0):.1f} minutes`",
+                f"- launcher log stale: `{str(wait_history.get('launcher_log_stale', False)).lower()}`",
             ]
         )
     lines.extend(["", "## Latest Launcher Log", ""])
@@ -472,7 +475,7 @@ def _latest_launcher_log(repo_dir: Path) -> Path | None:
     return logs[0] if logs else None
 
 
-def _wait_history(path: Path) -> dict[str, Any]:
+def _wait_history(path: Path, *, current_utc: str | None = None) -> dict[str, Any]:
     samples = []
     threshold = {
         "memory_used_mib": DEFAULT_GATE_MEMORY_USED_MIB,
@@ -493,6 +496,9 @@ def _wait_history(path: Path) -> dict[str, Any]:
     max_memory = max(samples, key=lambda item: item["memory_used_mib"])
     latest_plateau = _latest_memory_plateau(samples)
     observed_wait_minutes = _minutes_between(first["timestamp_utc"], latest["timestamp_utc"])
+    latest_sample_age_minutes = _latest_sample_age_minutes(
+        latest["timestamp_utc"], current_utc=current_utc
+    )
     latest_gate_passed = latest["memory_used_mib"] <= threshold["memory_used_mib"] and (
         latest["utilization_pct"] <= threshold["utilization_pct"]
     )
@@ -510,6 +516,8 @@ def _wait_history(path: Path) -> dict[str, Any]:
         "gate_threshold": threshold,
         "latest_gate_passed": latest_gate_passed,
         "prolonged_gate_block": not latest_gate_passed and observed_wait_minutes >= 60.0,
+        "latest_sample_age_minutes": latest_sample_age_minutes,
+        "launcher_log_stale": latest_sample_age_minutes >= STALE_WAIT_SAMPLE_MINUTES,
     }
 
 
@@ -539,6 +547,16 @@ def _minutes_between(start_utc: str, end_utc: str) -> float:
     if start is None or end is None:
         return 0.0
     return max(0.0, (end - start).total_seconds() / 60.0)
+
+
+def _latest_sample_age_minutes(latest_utc: str, *, current_utc: str | None) -> float:
+    latest = _parse_utc_timestamp(latest_utc)
+    if latest is None:
+        return 0.0
+    current = _parse_utc_timestamp(current_utc) if current_utc is not None else None
+    if current is None:
+        current = datetime.now(UTC)
+    return max(0.0, (current - latest).total_seconds() / 60.0)
 
 
 def _parse_utc_timestamp(timestamp: str) -> datetime | None:

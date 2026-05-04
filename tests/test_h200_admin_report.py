@@ -57,6 +57,7 @@ def test_admin_report_summarizes_hidden_gpu_context_without_results() -> None:
                         "utilization_pct": 95,
                     },
                     "observed_wait_minutes": 115.0,
+                    "latest_sample_age_minutes": 15.0,
                     "memory_drop_mib": 60322,
                     "gate_threshold": {"memory_used_mib": 20000, "utilization_pct": 20},
                     "latest_memory_plateau": {
@@ -68,6 +69,7 @@ def test_admin_report_summarizes_hidden_gpu_context_without_results() -> None:
                     },
                     "latest_gate_passed": False,
                     "prolonged_gate_block": True,
+                    "launcher_log_stale": True,
                 }
             },
         }
@@ -84,6 +86,8 @@ def test_admin_report_summarizes_hidden_gpu_context_without_results() -> None:
     assert "Latest memory plateau: `82139 MiB` for `2` samples" in report
     assert "Memory drop from first to latest: `60322 MiB`" in report
     assert "Prolonged gate block: `true`" in report
+    assert "Latest sample age: `15.0 minutes`" in report
+    assert "Launcher log stale: `true`" in report
     assert "release or restart the notebook allocation" in report
     assert "nvidia-smi --gpu-reset" in report
     assert "model generations" in report
