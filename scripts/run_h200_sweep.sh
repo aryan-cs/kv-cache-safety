@@ -63,6 +63,9 @@ uv run python scripts/aggregate_results.py --results-dir "$latest_smoke"
 uv run python scripts/make_figures.py --results-dir "$latest_smoke"
 uv run python scripts/export_paper_assets.py --results-dir "$latest_smoke" --paper-dir paper/generated/qwen7b_smoke
 
+echo "Waiting for GPU to clear after Qwen 7B smoke validation..."
+bash scripts/wait_for_h200_gpu.sh
+
 echo "Running primary H200 Qwen 14B sweep..."
 uv run python scripts/run_experiment.py \
   --config configs/experiments/h200_qwen_full_sweep.yaml \
@@ -112,6 +115,9 @@ uv run python scripts/export_human_audit_sample.py \
   --per-suite-policy "$audit_per_suite_policy" \
   --annotator-template-count "$audit_annotator_template_count"
 
+echo "Waiting for GPU to clear after primary H200 Qwen 14B sweep..."
+bash scripts/wait_for_h200_gpu.sh
+
 echo "Running causal patch diagnostic on Qwen 7B..."
 uv run python scripts/run_experiment.py \
   --config configs/experiments/h200_causal_patch_qwen7b.yaml \
@@ -159,6 +165,9 @@ uv run python scripts/export_human_audit_sample.py \
   --results-dir "$latest_causal" \
   --per-suite-policy "$audit_per_suite_policy" \
   --annotator-template-count "$audit_annotator_template_count"
+
+echo "Waiting for GPU to clear after causal patch diagnostic..."
+bash scripts/wait_for_h200_gpu.sh
 
 echo "Running attention-policy diagnostic on Qwen 7B..."
 uv run python scripts/run_experiment.py \

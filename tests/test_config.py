@@ -107,6 +107,21 @@ def test_h200_launcher_revalidates_after_gpu_gate() -> None:
     assert "bash -n" in script
 
 
+def test_h200_sweep_gates_gpu_between_model_stages() -> None:
+    script = Path("scripts/run_h200_sweep.sh").read_text(encoding="utf-8")
+
+    assert script.count("bash scripts/wait_for_h200_gpu.sh") >= 3
+    assert script.index("Waiting for GPU to clear after Qwen 7B smoke validation") < script.index(
+        "Running primary H200 Qwen 14B sweep"
+    )
+    assert script.index("Waiting for GPU to clear after primary H200 Qwen 14B sweep") < script.index(
+        "Running causal patch diagnostic on Qwen 7B"
+    )
+    assert script.index("Waiting for GPU to clear after causal patch diagnostic") < script.index(
+        "Running attention-policy diagnostic on Qwen 7B"
+    )
+
+
 def test_h200_wait_script_logs_visible_gpu_users() -> None:
     script = Path("scripts/wait_for_h200_gpu.sh").read_text(encoding="utf-8")
 
