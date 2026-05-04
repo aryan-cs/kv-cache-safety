@@ -351,8 +351,14 @@ def render_markdown(status: dict[str, Any]) -> str:
             "",
             _artifact_line("primary results", status["primary_results"]),
             _artifact_line("causal results", status["causal_results"]),
-            _artifact_line("primary human audit", status["primary_human_audit"]),
-            _artifact_line("causal human audit", status["causal_human_audit"]),
+            _artifact_line(
+                _audit_artifact_label("primary", status["primary_human_audit"]),
+                status["primary_human_audit"],
+            ),
+            _artifact_line(
+                _audit_artifact_label("causal", status["causal_human_audit"]),
+                status["causal_human_audit"],
+            ),
             _claim_line(status["claim_assessment"]),
             _pdf_line(status["paper_pdf"], evidence_ready=status["evidence_ready"]),
             _arxiv_line(status["arxiv_bundle"]),
@@ -855,6 +861,7 @@ def _audit_status(audit_dir: Path, results_dir: Path) -> dict[str, Any]:
         "expected_audit_count": summary.get("expected_audit_count") if summary else None,
         "completed_audit_count": summary.get("completed_audit_count") if summary else None,
         "completion_rate": summary.get("completion_rate") if summary else None,
+        "annotation_source_type": summary.get("annotation_source_type") if summary else None,
     }
 
 
@@ -1619,6 +1626,15 @@ def _artifact_line(label: str, status: dict[str, Any]) -> str:
         details.append("readiness: " + ", ".join(status["readiness_failures"]))
     suffix = f" ({'; '.join(details)})" if details else ""
     return f"- {label}: `{state}` at `{status['path']}`{suffix}"
+
+
+def _audit_artifact_label(prefix: str, status: dict[str, Any]) -> str:
+    source_type = str(status.get("annotation_source_type") or "human").strip().lower()
+    if source_type == "open_local_judge":
+        return f"{prefix} open local judge audit"
+    if source_type == "mixed":
+        return f"{prefix} mixed-source audit"
+    return f"{prefix} human audit"
 
 
 def _claim_line(status: dict[str, Any]) -> str:

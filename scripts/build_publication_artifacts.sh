@@ -231,6 +231,8 @@ require_human_audit_artifacts "$causal_audit_summary" "$causal_results"
 
 rebuild_primary
 rebuild_causal
+require_human_audit_artifacts "$primary_audit_summary" "$primary_results"
+require_human_audit_artifacts "$causal_audit_summary" "$causal_results"
 assess_claims
 rebuild_qwen32_if_present
 

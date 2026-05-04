@@ -1219,6 +1219,40 @@ def test_publication_status_rejects_stale_audit_input_hashes(tmp_path: Path) -> 
     )
 
 
+def test_publication_status_names_open_judge_audit_without_calling_it_human(
+    tmp_path: Path,
+) -> None:
+    primary = tmp_path / "primary"
+    causal = tmp_path / "causal"
+    primary_audit = tmp_path / "primary_audit"
+    causal_audit = tmp_path / "causal_audit"
+    _write_run(primary)
+    _write_run(causal)
+    _write_audit(primary_audit, primary, source_type="open_local_judge")
+    _write_audit(causal_audit, causal)
+    claim_path = tmp_path / "claim_assessment.json"
+    claim_path.write_text(
+        json.dumps(_passing_claim_assessment(primary, causal, primary_audit, causal_audit)),
+        encoding="utf-8",
+    )
+    pdf_path = tmp_path / "paper.pdf"
+    pdf_path.write_bytes(PDF_BYTES)
+
+    status = publication_status(
+        primary_results_dir=primary,
+        causal_results_dir=causal,
+        primary_audit_dir=primary_audit,
+        causal_audit_dir=causal_audit,
+        claim_assessment_path=claim_path,
+        paper_pdf=pdf_path,
+    )
+    rendered = render_markdown(status)
+
+    assert status["primary_human_audit"]["annotation_source_type"] == "open_local_judge"
+    assert "- primary open local judge audit:" in rendered
+    assert "- primary human audit:" not in rendered
+
+
 def test_publication_status_rejects_stale_claim_source_hashes(tmp_path: Path) -> None:
     primary = tmp_path / "primary"
     causal = tmp_path / "causal"
@@ -2031,12 +2065,26 @@ def _write_audit(
     results_dir: Path,
     *,
     include_inter_annotator: bool = True,
+    source_type: str = "human",
 ) -> None:
     path.mkdir(parents=True)
     audit_csv = path / "audit_labels.csv"
     key_jsonl = path / "audit_key.jsonl"
     export_manifest = path / "audit_export_manifest.json"
     key_rows, annotation_rows = _audit_fixture_rows(include_inter_annotator=include_inter_annotator)
+    if source_type == "open_local_judge":
+        for row in annotation_rows:
+            row["annotation_source_type"] = "open_local_judge"
+            row["annotator_id"] = f"open_judge_qwen_{row['annotator_id']}"
+            row["judge_should_refuse"] = row.pop("human_should_refuse")
+            row["judge_refusal_correct"] = row.pop("human_refusal_correct")
+            row["judge_unsafe_compliance"] = row.pop("human_unsafe_compliance")
+            row["judge_system_leakage"] = row.pop("human_system_leakage")
+            row["judge_capability_correct"] = row.pop("human_capability_correct")
+            row["judge_notes"] = row.pop("human_notes")
+            row["open_judge_model_id"] = "Qwen/Qwen2.5-7B-Instruct"
+            row["open_judge_prompt_sha256"] = f"prompt-{row['annotator_id']}"
+            row["open_judge_raw_output_sha256"] = f"raw-{row['annotator_id']}-{row['audit_id']}"
     key_jsonl.write_text(
         "\n".join(json.dumps(row) for row in key_rows) + "\n",
         encoding="utf-8",

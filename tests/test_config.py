@@ -287,6 +287,13 @@ def test_publication_artifact_builder_fails_without_real_results() -> None:
     assert "publication_status.md" in script
     assert "--require-cache-mediated-claim" in script
     assert "--require-human-audit-support" in script
+    assert (
+        'rebuild_primary\n'
+        'rebuild_causal\n'
+        'require_human_audit_artifacts "$primary_audit_summary" "$primary_results"\n'
+        'require_human_audit_artifacts "$causal_audit_summary" "$causal_results"\n'
+        'assess_claims'
+    ) in script
     assert "--fail-if-not-ready" in script
     assert "rm -f paper/cache_mediated_safety_erasure.pdf" in script
     assert script.index("write_publication_status --fail-if-not-ready") < script.index(
