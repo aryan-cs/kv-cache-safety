@@ -98,8 +98,8 @@ def publication_status(
 ) -> dict[str, Any]:
     primary = _run_status(primary_results_dir)
     causal = _run_status(causal_results_dir)
-    primary_audit = _audit_status(primary_audit_dir)
-    causal_audit = _audit_status(causal_audit_dir)
+    primary_audit = _audit_status(primary_audit_dir, primary_results_dir)
+    causal_audit = _audit_status(causal_audit_dir, causal_results_dir)
     claim_assessment = _claim_status(claim_assessment_path)
     pdf = _pdf_status(paper_pdf)
 
@@ -191,9 +191,10 @@ def _run_status(results_dir: Path) -> dict[str, Any]:
     }
 
 
-def _audit_status(audit_dir: Path) -> dict[str, Any]:
+def _audit_status(audit_dir: Path, results_dir: Path) -> dict[str, Any]:
     missing = [name for name in REQUIRED_AUDIT_ARTIFACTS if not (audit_dir / name).exists()]
     summary = _read_json(audit_dir / "human_audit_summary.json")
+    manifest = _read_json(audit_dir / "audit_manifest.json")
     failures = []
     if summary:
         if summary.get("completion_rate") != 1.0:
@@ -202,11 +203,13 @@ def _audit_status(audit_dir: Path) -> dict[str, Any]:
             failures.append("unknown_audit_ids")
         if not summary.get("baseline_policy_deltas"):
             failures.append("missing_baseline_policy_deltas")
+    failures.extend(_audit_result_source_failures(manifest, results_dir))
     return {
         "path": str(audit_dir),
         "complete": not missing and not failures,
         "missing": missing,
         "failures": failures,
+        "manifest_present": bool(manifest),
         "expected_audit_count": summary.get("expected_audit_count") if summary else None,
         "completed_audit_count": summary.get("completed_audit_count") if summary else None,
         "completion_rate": summary.get("completion_rate") if summary else None,
@@ -239,6 +242,27 @@ def _read_json(path: Path) -> dict[str, Any]:
         return {}
     with path.open("r", encoding="utf-8") as f:
         return json.load(f)
+
+
+def _audit_result_source_failures(manifest: dict[str, Any], results_dir: Path) -> list[str]:
+    if not manifest:
+        return []
+    result_sources = (manifest.get("source_artifacts") or {}).get("results")
+    if not isinstance(result_sources, dict):
+        return ["missing_result_source_manifest"]
+    failures = []
+    for name in ["manifest.json", "generations.jsonl", "metrics.json"]:
+        source = result_sources.get(name)
+        if not isinstance(source, dict):
+            failures.append(f"missing_result_source:{name}")
+            continue
+        path = results_dir / name
+        if not path.exists():
+            failures.append(f"missing_result_artifact:{name}")
+            continue
+        if source.get("sha256") != file_sha256(path):
+            failures.append(f"stale_result_source:{name}")
+    return failures
 
 
 def _artifact_line(label: str, status: dict[str, Any]) -> str:

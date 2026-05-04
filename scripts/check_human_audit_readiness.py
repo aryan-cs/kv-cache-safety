@@ -9,20 +9,26 @@ from _path import add_src_to_path
 
 add_src_to_path()
 
+from cache_safety_erasure.utils.io import file_sha256
+
 DEFAULT_REQUIRED_LABELS = [
     "human_refusal_correct",
     "human_unsafe_compliance",
     "human_system_leakage",
 ]
+REQUIRED_RESULT_SOURCES = ["manifest.json", "generations.jsonl", "metrics.json"]
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Check completed human audit quality gates.")
     parser.add_argument("--summary-json", required=True, type=Path)
+    parser.add_argument("--audit-manifest", type=Path, default=None)
+    parser.add_argument("--results-dir", type=Path, default=None)
     parser.add_argument("--min-completion-rate", type=float, default=1.0)
     parser.add_argument("--min-label-n", type=int, default=1)
     parser.add_argument("--required-label", action="append", default=[])
     parser.add_argument("--require-baseline-deltas", action="store_true")
+    parser.add_argument("--require-result-source-match", action="store_true")
     parser.add_argument("--allow-single-annotator", action="store_true")
     args = parser.parse_args()
 
@@ -36,6 +42,14 @@ def main() -> None:
         require_baseline_deltas=args.require_baseline_deltas,
         allow_single_annotator=args.allow_single_annotator,
     )
+    if args.require_result_source_match:
+        if args.audit_manifest is None:
+            failures.append("--require-result-source-match needs --audit-manifest")
+        elif args.results_dir is None:
+            failures.append("--require-result-source-match needs --results-dir")
+        else:
+            audit_manifest = json.loads(args.audit_manifest.read_text(encoding="utf-8"))
+            failures.extend(check_audit_result_source_match(audit_manifest, args.results_dir))
     if failures:
         print("HUMAN AUDIT NOT READY")
         for failure in failures:
@@ -95,6 +109,36 @@ def check_human_audit_readiness(
             )
             if pair_count < 1:
                 failures.append(f"`{label}` has no inter-annotator pairs")
+    return failures
+
+
+def check_audit_result_source_match(
+    audit_manifest: dict[str, Any],
+    results_dir: Path,
+    *,
+    required_sources: list[str] | None = None,
+) -> list[str]:
+    failures: list[str] = []
+    sources = required_sources or REQUIRED_RESULT_SOURCES
+    result_sources = (audit_manifest.get("source_artifacts") or {}).get("results")
+    if not isinstance(result_sources, dict):
+        return ["audit manifest lacks result source artifacts; re-aggregate with --results-dir"]
+    for name in sources:
+        source = result_sources.get(name)
+        if not isinstance(source, dict):
+            failures.append(f"audit manifest lacks result source `{name}`")
+            continue
+        path = results_dir / name
+        if not path.exists():
+            failures.append(f"result source `{name}` is missing from {results_dir}")
+            continue
+        expected_sha = source.get("sha256")
+        if not expected_sha:
+            failures.append(f"audit manifest result source `{name}` lacks sha256")
+            continue
+        actual_sha = file_sha256(path)
+        if expected_sha != actual_sha:
+            failures.append(f"audit manifest result source `{name}` hash is stale")
     return failures
 
 

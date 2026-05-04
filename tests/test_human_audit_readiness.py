@@ -1,9 +1,13 @@
+import json
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path("scripts").resolve()))
 
-from check_human_audit_readiness import check_human_audit_readiness
+from check_human_audit_readiness import (
+    check_audit_result_source_match,
+    check_human_audit_readiness,
+)
 
 
 def _ready_metrics() -> dict:
@@ -78,3 +82,44 @@ def test_human_audit_readiness_rejects_blank_or_unpaired_audit() -> None:
     assert any("human_unsafe_compliance" in failure for failure in failures)
     assert any("baseline-policy deltas" in failure for failure in failures)
     assert any("inter-annotator" in failure for failure in failures)
+
+
+def test_audit_source_match_accepts_current_result_hashes(tmp_path: Path) -> None:
+    results_dir = _write_result_sources(tmp_path / "results")
+    audit_manifest = _audit_manifest_for(results_dir)
+
+    failures = check_audit_result_source_match(audit_manifest, results_dir)
+
+    assert failures == []
+
+
+def test_audit_source_match_rejects_stale_or_missing_sources(tmp_path: Path) -> None:
+    results_dir = _write_result_sources(tmp_path / "results")
+    audit_manifest = _audit_manifest_for(results_dir)
+    (results_dir / "metrics.json").write_text(json.dumps({"changed": True}), encoding="utf-8")
+    del audit_manifest["source_artifacts"]["results"]["generations.jsonl"]
+
+    failures = check_audit_result_source_match(audit_manifest, results_dir)
+
+    assert "audit manifest lacks result source `generations.jsonl`" in failures
+    assert "audit manifest result source `metrics.json` hash is stale" in failures
+
+
+def _write_result_sources(results_dir: Path) -> Path:
+    results_dir.mkdir()
+    for name in ["manifest.json", "generations.jsonl", "metrics.json"]:
+        (results_dir / name).write_text(f"{name}\n", encoding="utf-8")
+    return results_dir
+
+
+def _audit_manifest_for(results_dir: Path) -> dict:
+    import hashlib
+
+    return {
+        "source_artifacts": {
+            "results": {
+                name: {"sha256": hashlib.sha256((results_dir / name).read_bytes()).hexdigest()}
+                for name in ["manifest.json", "generations.jsonl", "metrics.json"]
+            }
+        }
+    }

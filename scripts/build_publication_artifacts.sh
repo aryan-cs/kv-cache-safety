@@ -27,6 +27,7 @@ require_result_artifacts() {
 
 require_human_audit_artifacts() {
   local audit_dir="$1"
+  local results_dir="$2"
   for required in \
     audit_manifest.json \
     human_audit_summary.json \
@@ -41,6 +42,9 @@ require_human_audit_artifacts() {
   done
   uv run python scripts/check_human_audit_readiness.py \
     --summary-json "$audit_dir/human_audit_summary.json" \
+    --audit-manifest "$audit_dir/audit_manifest.json" \
+    --results-dir "$results_dir" \
+    --require-result-source-match \
     --require-baseline-deltas
 }
 
@@ -183,8 +187,8 @@ uv run pytest -q
 write_publication_status
 
 if [[ "$require_human_audit" == "1" ]]; then
-  require_human_audit_artifacts "$primary_audit_summary"
-  require_human_audit_artifacts "$causal_audit_summary"
+  require_human_audit_artifacts "$primary_audit_summary" "$primary_results"
+  require_human_audit_artifacts "$causal_audit_summary" "$causal_results"
 fi
 
 rebuild_primary
