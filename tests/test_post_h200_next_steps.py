@@ -30,6 +30,47 @@ def test_post_h200_next_steps_starts_with_h200_results_when_missing() -> None:
     assert "wait_and_run_h200_sweep.sh" in render_markdown(report)
 
 
+def test_post_h200_next_steps_surfaces_artifact_specific_blockers() -> None:
+    report = post_h200_next_steps(
+        {
+            "publication_ready": False,
+            "blockers": [
+                "primary_results_complete",
+                "primary_human_audit_complete",
+                "claim_assessment_passed",
+                "arxiv_bundle_ready",
+            ],
+            "gates": {
+                "primary_results_complete": False,
+                "causal_results_complete": True,
+                "primary_human_audit_complete": False,
+                "causal_human_audit_complete": True,
+                "claim_assessment_passed": False,
+                "paper_pdf_exists": True,
+                "arxiv_bundle_ready": False,
+            },
+            "primary_results": {
+                "missing": ["metrics.json"],
+                "readiness_failures": ["public_prompts_lack_dataset_provenance:4"],
+            },
+            "primary_human_audit": {
+                "failures": ["audit export manifest was not leakage-reference capable"]
+            },
+            "claim_assessment": {"failures": ["human_audit_lacks_causal_restoration_delta"]},
+            "arxiv_bundle": {"failures": ["missing_required_bundle_file:figures/a.pdf"]},
+        }
+    )
+    rendered = render_markdown(report)
+
+    assert report["blocker_details"]["primary_results_complete"] == [
+        "metrics.json",
+        "public_prompts_lack_dataset_provenance:4",
+    ]
+    assert "audit export manifest was not leakage-reference capable" in rendered
+    assert "human_audit_lacks_causal_restoration_delta" in rendered
+    assert "missing_required_bundle_file:figures/a.pdf" in rendered
+
+
 def test_post_h200_next_steps_requires_audits_before_claims() -> None:
     report = post_h200_next_steps(
         {

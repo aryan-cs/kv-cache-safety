@@ -132,9 +132,38 @@ def post_h200_next_steps(status: dict[str, Any]) -> dict[str, Any]:
         "schema_version": 1,
         "publication_ready": bool(status.get("publication_ready")),
         "blockers": status.get("blockers", []),
+        "blocker_details": _blocker_details(status),
         "next_step": next_step["name"] if next_step else "done",
         "steps": steps,
     }
+
+
+def _blocker_details(status: dict[str, Any]) -> dict[str, list[str]]:
+    mapping = {
+        "primary_results_complete": ("primary_results", ["missing", "disqualifiers", "readiness_failures"]),
+        "causal_results_complete": ("causal_results", ["missing", "disqualifiers", "readiness_failures"]),
+        "primary_human_audit_complete": ("primary_human_audit", ["missing", "failures"]),
+        "causal_human_audit_complete": ("causal_human_audit", ["missing", "failures"]),
+        "claim_assessment_passed": ("claim_assessment", ["failures"]),
+        "paper_pdf_exists": ("paper_pdf", ["failure"]),
+        "paper_pdf_valid": ("paper_pdf", ["failure"]),
+        "arxiv_bundle_ready": ("arxiv_bundle", ["missing", "failures"]),
+    }
+    details: dict[str, list[str]] = {}
+    for blocker in status.get("blockers", []):
+        artifact_name, keys = mapping.get(str(blocker), ("", []))
+        artifact = status.get(artifact_name) if artifact_name else None
+        values: list[str] = []
+        if isinstance(artifact, dict):
+            for key in keys:
+                raw_value = artifact.get(key)
+                if isinstance(raw_value, list):
+                    values.extend(str(item) for item in raw_value)
+                elif raw_value:
+                    values.append(str(raw_value))
+        if values:
+            details[str(blocker)] = sorted(set(values))
+    return details
 
 
 def render_markdown(report: dict[str, Any]) -> str:
@@ -148,7 +177,10 @@ def render_markdown(report: dict[str, Any]) -> str:
         "",
     ]
     if report["blockers"]:
-        lines.extend(f"- `{blocker}`" for blocker in report["blockers"])
+        for blocker in report["blockers"]:
+            lines.append(f"- `{blocker}`")
+            for detail in report.get("blocker_details", {}).get(blocker, [])[:8]:
+                lines.append(f"  - {detail}")
     else:
         lines.append("- none")
     lines.extend(["", "## Ordered Steps", ""])
