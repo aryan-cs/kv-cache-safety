@@ -8,6 +8,12 @@ sys.path.insert(0, str(Path("scripts").resolve()))
 
 from report_publication_status import publication_status, render_markdown
 
+REQUIRED_AUDIT_LABELS = [
+    "human_refusal_correct",
+    "human_unsafe_compliance",
+    "human_system_leakage",
+]
+
 
 def test_publication_status_reports_missing_artifacts_as_blockers(tmp_path: Path) -> None:
     status = publication_status(
@@ -294,6 +300,42 @@ def test_publication_status_rejects_stale_audit_source_hashes(tmp_path: Path) ->
     assert "stale_result_source:metrics.json" in status["primary_human_audit"]["failures"]
 
 
+def test_publication_status_rejects_audits_without_inter_annotator_pairs(
+    tmp_path: Path,
+) -> None:
+    primary = tmp_path / "primary"
+    causal = tmp_path / "causal"
+    primary_audit = tmp_path / "primary_audit"
+    causal_audit = tmp_path / "causal_audit"
+    _write_run(primary)
+    _write_run(causal)
+    _write_audit(primary_audit, primary, include_inter_annotator=False)
+    _write_audit(causal_audit, causal)
+    claim_path = tmp_path / "claim_assessment.json"
+    claim_path.write_text(
+        json.dumps(_passing_claim_assessment(primary, causal, primary_audit, causal_audit)),
+        encoding="utf-8",
+    )
+    pdf_path = tmp_path / "paper.pdf"
+    pdf_path.write_bytes(b"%PDF-1.7\n")
+
+    status = publication_status(
+        primary_results_dir=primary,
+        causal_results_dir=causal,
+        primary_audit_dir=primary_audit,
+        causal_audit_dir=causal_audit,
+        claim_assessment_path=claim_path,
+        paper_pdf=pdf_path,
+    )
+
+    assert status["publication_ready"] is False
+    assert "primary_human_audit_complete" in status["blockers"]
+    assert (
+        "`human_refusal_correct` has no inter-annotator pairs"
+        in status["primary_human_audit"]["failures"]
+    )
+
+
 def test_publication_status_rejects_stale_claim_source_hashes(tmp_path: Path) -> None:
     primary = tmp_path / "primary"
     causal = tmp_path / "causal"
@@ -415,15 +457,28 @@ def _write_run(path: Path, manifest_overrides: dict | None = None) -> None:
     (path / "metrics.json").write_text(json.dumps({"ok": True}), encoding="utf-8")
 
 
-def _write_audit(path: Path, results_dir: Path) -> None:
+def _write_audit(
+    path: Path,
+    results_dir: Path,
+    *,
+    include_inter_annotator: bool = True,
+) -> None:
     path.mkdir(parents=True)
     summary = {
         "expected_audit_count": 10,
         "completed_audit_count": 10,
         "completion_rate": 1.0,
         "unknown_audit_ids": [],
-        "baseline_policy_deltas": {"public_refusal_safety::kv_int4_sim": {}},
+        "label_rates": {label: {"n": 10, "mean": 0.5} for label in REQUIRED_AUDIT_LABELS},
+        "baseline_policy_deltas": {
+            f"public_refusal_safety::kv_int4_sim::{label}": {"n": 5, "mean_delta": 0.1}
+            for label in REQUIRED_AUDIT_LABELS
+        },
     }
+    if include_inter_annotator:
+        summary["inter_annotator"] = {
+            label: {"pair_count": 2, "agreement": 1.0} for label in REQUIRED_AUDIT_LABELS
+        }
     for name in ["human_audit_summary.md", "human_audit_summary_table.tex", "human_audit_deltas_table.tex"]:
         (path / name).write_text("artifact\n", encoding="utf-8")
     manifest = {

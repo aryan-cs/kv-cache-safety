@@ -10,6 +10,11 @@ from _path import add_src_to_path
 
 add_src_to_path()
 
+from check_human_audit_readiness import (
+    DEFAULT_REQUIRED_LABELS,
+    check_human_audit_readiness,
+)
+
 from cache_safety_erasure.utils.io import file_sha256, write_json
 
 REQUIRED_RUN_ARTIFACTS = [
@@ -250,12 +255,16 @@ def _audit_status(audit_dir: Path, results_dir: Path) -> dict[str, Any]:
     manifest = _read_json(audit_dir / "audit_manifest.json")
     failures = []
     if summary:
-        if summary.get("completion_rate") != 1.0:
-            failures.append("incomplete_annotations")
-        if summary.get("unknown_audit_ids"):
-            failures.append("unknown_audit_ids")
-        if not summary.get("baseline_policy_deltas"):
-            failures.append("missing_baseline_policy_deltas")
+        failures.extend(
+            check_human_audit_readiness(
+                summary,
+                min_completion_rate=1.0,
+                min_label_n=1,
+                required_labels=DEFAULT_REQUIRED_LABELS,
+                require_baseline_deltas=True,
+                allow_single_annotator=False,
+            )
+        )
     failures.extend(_audit_result_source_failures(manifest, results_dir))
     return {
         "path": str(audit_dir),
