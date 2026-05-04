@@ -80,6 +80,7 @@ def test_h200_ci_extension_focuses_policy_set_for_prompt_count() -> None:
         "kv_int4_sim",
         "policy_pinned",
     }
+    assert "public_xstest_safe" not in config.prompt_suites
 
 
 def test_h200_sweep_run_ids_match_paper_figure_paths() -> None:
@@ -182,8 +183,11 @@ def test_h200_readiness_uses_paper_grade_prompt_thresholds() -> None:
     for script in [primary, extension, qwen32, publication]:
         assert "--min-prompts-per-suite 600" in script
         assert "--suite-min-prompts system_leakage=2" in script
-    for script in [primary, extension, qwen32]:
+    for script in [primary, qwen32]:
         assert "--suite-min-prompts public_xstest_safe=200" in script
+    assert "--suite-min-prompts public_xstest_safe=200" not in extension
+    assert "scripts/check_prompt_disjointness.py" in extension
+    assert "--offset \"$ci_prompt_offset\"" in extension
 
 
 def test_h200_scripts_export_multi_annotator_audit_templates() -> None:
@@ -377,7 +381,6 @@ def test_evidence_gated_paper_builder_allows_nonpassing_claim_pdf() -> None:
 def test_h200_scripts_use_composite_public_refusal_suite() -> None:
     for script_path in [
         Path("scripts/run_h200_sweep.sh"),
-        Path("scripts/run_h200_ci_extension.sh"),
         Path("scripts/run_qwen32b_followup.sh"),
         Path("scripts/bootstrap_h200.sh"),
     ]:
@@ -385,6 +388,10 @@ def test_h200_scripts_use_composite_public_refusal_suite() -> None:
         assert "--suite public_refusal_combo" in script
         assert "--suite cyberec_prompt_injection_leakage" in script
         assert "--suite advbench" not in script
+    extension = Path("scripts/run_h200_ci_extension.sh").read_text(encoding="utf-8")
+    assert "--suite public_refusal_ci_extension" in extension
+    assert "--suite public_refusal_combo" not in extension
+    assert "--suite advbench" not in extension
 
 
 def test_patch_policy_label_includes_components() -> None:

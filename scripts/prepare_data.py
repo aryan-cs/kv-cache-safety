@@ -41,6 +41,28 @@ OPEN_DATASET_PRESETS = {
         "should_refuse": True,
         "revision": "886acc352a31533ffbcf4ef22c744658688086fc",
     },
+    "harmbench_direct_request": {
+        "dataset": "swiss-ai/harmbench",
+        "config": "DirectRequest",
+        "split": "test",
+        "text_columns": ["Behavior", "behavior", "prompt", "text"],
+        "suite": "refusal_safety",
+        "category": "public_harmbench_direct_request",
+        "should_refuse": True,
+        "source_id_columns": ["BehaviorID", "behavior_id"],
+        "revision": "f306ca7195c286ffaf20324333e9da804bdd8987",
+    },
+    "harmbench_human_jailbreaks": {
+        "dataset": "swiss-ai/harmbench",
+        "config": "HumanJailbreaks",
+        "split": "test",
+        "text_columns": ["Behavior", "behavior", "prompt", "text"],
+        "suite": "refusal_safety",
+        "category": "public_harmbench_human_jailbreak",
+        "should_refuse": True,
+        "source_id_columns": ["BehaviorID", "behavior_id"],
+        "revision": "f306ca7195c286ffaf20324333e9da804bdd8987",
+    },
     "dolly_benign": {
         "dataset": "databricks/databricks-dolly-15k",
         "config": None,
@@ -112,6 +134,10 @@ HF_COMPOSITE_PRESETS = {
     "public_refusal_combo": {
         "suite": "public_refusal_safety",
         "presets": ["advbench", "jailbreakbench_behaviors"],
+    },
+    "public_refusal_ci_extension": {
+        "suite": "public_refusal_safety",
+        "presets": ["harmbench_direct_request", "harmbench_human_jailbreaks"],
     }
 }
 
@@ -121,6 +147,12 @@ def main() -> None:
     parser.add_argument("--suite", required=True, help="Built-in suite name, `all`, or an open preset.")
     parser.add_argument("--source", choices=["builtin", "hf"], default="builtin")
     parser.add_argument("--limit", type=int, default=None)
+    parser.add_argument(
+        "--offset",
+        type=int,
+        default=0,
+        help="Skip this many usable records before writing. Used for preregistered disjoint shards.",
+    )
     parser.add_argument("--output-suite", default=None)
     parser.add_argument("--output-dir", type=Path, default=Path("data/processed"))
     parser.add_argument(
@@ -129,23 +161,33 @@ def main() -> None:
         help="Override the pinned HF dataset revision for --source hf.",
     )
     args = parser.parse_args()
+    if args.offset < 0:
+        raise SystemExit("--offset must be non-negative.")
+    if args.limit is not None and args.limit < 0:
+        raise SystemExit("--limit must be non-negative.")
 
     if args.source == "hf":
         if args.suite in HF_COMPOSITE_PRESETS:
-            records = load_hf_composite(args.suite, args.limit, args.output_suite, args.revision)
+            records = load_hf_composite(
+                args.suite, args.limit, args.output_suite, args.revision, args.offset
+            )
             suite_name = args.output_suite or str(HF_COMPOSITE_PRESETS[args.suite]["suite"])
             source_args = {
                 "preset": args.suite,
                 "component_presets": HF_COMPOSITE_PRESETS[args.suite]["presets"],
                 "limit": args.limit,
+                "offset": args.offset,
                 "output_suite": args.output_suite,
             }
         else:
-            records = load_hf_preset(args.suite, args.limit, args.output_suite, args.revision)
+            records = load_hf_preset(
+                args.suite, args.limit, args.output_suite, args.revision, args.offset
+            )
             suite_name = args.output_suite or OPEN_DATASET_PRESETS[args.suite]["suite"]
             source_args = {
                 "preset": args.suite,
                 "limit": args.limit,
+                "offset": args.offset,
                 "output_suite": args.output_suite,
                 "revision": args.revision or OPEN_DATASET_PRESETS[args.suite].get("revision"),
             }
@@ -164,6 +206,8 @@ def main() -> None:
     suite_names = list(BUILTIN_SUITES) if args.suite == "all" else [args.suite]
     for suite_name in suite_names:
         records = load_builtin_suite(suite_name)
+        if args.offset:
+            records = records[args.offset :]
         if args.limit is not None:
             records = records[: args.limit]
         path = write_prompt_suite(suite_name, records, args.output_dir)
@@ -172,14 +216,18 @@ def main() -> None:
             path=path,
             records=records,
             source="builtin",
-            source_args={"suite": suite_name, "limit": args.limit},
+            source_args={"suite": suite_name, "limit": args.limit, "offset": args.offset},
         )
         print(f"Wrote {len(records)} built-in records to {path}")
         print(f"Wrote suite manifest to {manifest_path}")
 
 
 def load_hf_preset(
-    name: str, limit: int | None, output_suite: str | None, revision: str | None = None
+    name: str,
+    limit: int | None,
+    output_suite: str | None,
+    revision: str | None = None,
+    offset: int = 0,
 ) -> list[PromptRecord]:
     if name not in OPEN_DATASET_PRESETS:
         raise SystemExit(
@@ -201,8 +249,9 @@ def load_hf_preset(
         dataset = load_dataset(str(preset["dataset"]), **load_kwargs)
     dataset_metadata = _dataset_metadata(dataset, preset, resolved_revision)
     rows: list[PromptRecord] = []
+    usable_seen = 0
     for idx, item in enumerate(dataset):
-        row_metadata = {**dataset_metadata, "source_row_index": idx}
+        row_metadata = _row_metadata(dataset_metadata, preset, idx, item)
         if preset.get("kind") == "multiple_choice":
             record = _multiple_choice_record(name, idx, item, preset, output_suite, row_metadata)
         elif preset.get("kind") == "xstest":
@@ -228,6 +277,10 @@ def load_hf_preset(
                 should_refuse=bool(preset["should_refuse"]),
                 metadata=row_metadata,
             )
+        if usable_seen < offset:
+            usable_seen += 1
+            continue
+        usable_seen += 1
         rows.append(record)
         if limit is not None and len(rows) >= limit:
             break
@@ -237,7 +290,11 @@ def load_hf_preset(
 
 
 def load_hf_composite(
-    name: str, limit: int | None, output_suite: str | None, revision: str | None = None
+    name: str,
+    limit: int | None,
+    output_suite: str | None,
+    revision: str | None = None,
+    offset: int = 0,
 ) -> list[PromptRecord]:
     if revision is not None:
         raise SystemExit("--revision is not supported for composite HF presets.")
@@ -250,8 +307,9 @@ def load_hf_composite(
     suite_name = str(output_suite or composite["suite"])
     records: list[PromptRecord] = []
     seen_users: set[str] = set()
+    target_count = None if limit is None else offset + limit
     for component in composite["presets"]:
-        remaining = None if limit is None else max(0, limit - len(records))
+        remaining = None if target_count is None else max(0, target_count - len(records))
         if remaining == 0:
             break
         component_records = load_hf_preset(
@@ -259,6 +317,7 @@ def load_hf_composite(
             remaining,
             suite_name,
             OPEN_DATASET_PRESETS[str(component)].get("revision"),
+            0,
         )
         for record in component_records:
             normalized_user = " ".join(record.user.lower().split())
@@ -266,8 +325,9 @@ def load_hf_composite(
                 continue
             seen_users.add(normalized_user)
             records.append(record)
-            if limit is not None and len(records) >= limit:
+            if target_count is not None and len(records) >= target_count:
                 break
+    records = records[offset:target_count]
     if not records:
         raise RuntimeError(f"No usable prompt rows found for composite preset `{name}`.")
     return records
@@ -279,6 +339,21 @@ def _first_text(item: dict[str, Any], columns: list[str]) -> str | None:
         if isinstance(value, str) and value.strip():
             return value.strip()
     return None
+
+
+def _row_metadata(
+    dataset_metadata: dict[str, Any],
+    preset: dict[str, Any],
+    idx: int,
+    item: dict[str, Any],
+) -> dict[str, Any]:
+    row_metadata = {**dataset_metadata, "source_row_index": idx}
+    for column in preset.get("source_id_columns", []):
+        value = item.get(column)
+        if value not in {None, ""}:
+            row_metadata["source_id"] = value
+            break
+    return row_metadata
 
 
 def _multiple_choice_record(
