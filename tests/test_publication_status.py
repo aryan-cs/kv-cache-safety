@@ -902,6 +902,47 @@ def test_publication_status_rejects_stale_claim_source_hashes(tmp_path: Path) ->
     assert "stale_claim_source:causal_metrics" in status["claim_assessment"]["failures"]
 
 
+def test_publication_status_rejects_claim_inconsistent_with_source_metrics(
+    tmp_path: Path,
+) -> None:
+    primary = tmp_path / "primary"
+    causal = tmp_path / "causal"
+    primary_audit = tmp_path / "primary_audit"
+    causal_audit = tmp_path / "causal_audit"
+    _write_run(primary)
+    _write_run(causal)
+    _write_audit(primary_audit, primary)
+    _write_audit(causal_audit, causal)
+    (primary / "metrics.json").write_text(
+        json.dumps({"selective_safety_erasure": {}, "policy_level_contrasts": {}}),
+        encoding="utf-8",
+    )
+    claim_path = tmp_path / "claim_assessment.json"
+    claim_path.write_text(
+        json.dumps(_passing_claim_assessment(primary, causal, primary_audit, causal_audit)),
+        encoding="utf-8",
+    )
+    pdf_path = tmp_path / "paper.pdf"
+    pdf_path.write_bytes(b"%PDF-1.7\n")
+
+    status = publication_status(
+        primary_results_dir=primary,
+        causal_results_dir=causal,
+        primary_audit_dir=primary_audit,
+        causal_audit_dir=causal_audit,
+        claim_assessment_path=claim_path,
+        paper_pdf=pdf_path,
+    )
+
+    assert status["publication_ready"] is False
+    assert "claim_assessment_passed" in status["blockers"]
+    assert "claim_recompute_publication_gate_failed" in status["claim_assessment"]["failures"]
+    assert (
+        "claim_recompute_pass_mismatch:H1_behavioral_cache_sensitivity:False!=True"
+        in status["claim_assessment"]["failures"]
+    )
+
+
 def test_publication_status_rejects_preliminary_claim_assessment_without_audit_gate(
     tmp_path: Path,
 ) -> None:
@@ -1172,7 +1213,7 @@ def _write_run(path: Path, manifest_overrides: dict | None = None) -> None:
         encoding="utf-8",
     )
     (path / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
-    (path / "metrics.json").write_text(json.dumps({"ok": True}), encoding="utf-8")
+    (path / "metrics.json").write_text(json.dumps(_passing_metrics()), encoding="utf-8")
     figure_rows = []
     for figure_name in {Path(name).stem for name in REQUIRED_ARXIV_FIGURE_FILES}:
         png_path = path / "figures" / f"{figure_name}.png"
@@ -1237,8 +1278,34 @@ def _write_audit(
             }
         },
         "baseline_policy_deltas": {
-            f"public_refusal_safety::kv_int4_sim::{label}": {"n": 5, "mean_delta": 0.1}
-            for label in REQUIRED_AUDIT_LABELS
+            "public_refusal_safety::kv_int4_sim::human_refusal_correct": {
+                "n": 5,
+                "treatment_minus_baseline": -0.2,
+            },
+            "public_refusal_safety::kv_int4_sim::human_unsafe_compliance": {
+                "n": 5,
+                "treatment_minus_baseline": 0.2,
+            },
+            "public_refusal_safety::kv_int4_sim::human_system_leakage": {
+                "n": 5,
+                "treatment_minus_baseline": 0.0,
+            },
+            "public_refusal_safety::kv_int4_sim__patchkey-value__rolesystem::human_unsafe_compliance": {
+                "n": 5,
+                "treatment_minus_baseline": 0.05,
+            },
+            "public_refusal_safety::kv_int4_sim__patchkey-value__roleuser__matchsystem::human_unsafe_compliance": {
+                "n": 5,
+                "treatment_minus_baseline": 0.25,
+            },
+            "public_refusal_safety::kv_int4_sim__patchkey-value__rolesystem::human_refusal_correct": {
+                "n": 5,
+                "treatment_minus_baseline": -0.05,
+            },
+            "public_refusal_safety::kv_int4_sim__patchkey-value__roleuser__matchsystem::human_refusal_correct": {
+                "n": 5,
+                "treatment_minus_baseline": -0.25,
+            },
         },
     }
     if include_inter_annotator:
@@ -1294,6 +1361,73 @@ def _write_audit(
 
 def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _passing_metrics() -> dict:
+    return {
+        "selective_safety_erasure": {
+            "public_refusal_safety::kv_int4_sim": {
+                "safety_degradation": 0.12,
+                "capability_degradation": 0.02,
+                "selective_safety_erasure_index": 0.10,
+                "paired_safety_degradation_ci": {
+                    "mean": 0.12,
+                    "ci_low": 0.05,
+                    "ci_high": 0.18,
+                    "paired_n": 100,
+                    "cluster_n": 100,
+                },
+            }
+        },
+        "policy_level_contrasts": {
+            "kv_int4_sim": {
+                "selective_safety_erasure_index": 0.10,
+                "selective_safety_erasure_index_ci": {
+                    "mean": 0.10,
+                    "ci_low": 0.04,
+                    "ci_high": 0.16,
+                    "n_safety": 100,
+                    "n_capability": 100,
+                },
+            }
+        },
+        "causal_restoration": {
+            "public_refusal_safety::kv_int4_sim__patchkey-value__rolesystem": {
+                "compressed_policy": "kv_int4_sim",
+                "safety_restoration_fraction": 0.62,
+                "safety_restoration_fraction_ci": {
+                    "mean": 0.62,
+                    "ci_low": 0.50,
+                    "ci_high": 0.72,
+                    "cluster_n": 100,
+                },
+                "refusal_restoration_fraction": 0.55,
+                "refusal_restoration_fraction_ci": {
+                    "mean": 0.55,
+                    "ci_low": 0.44,
+                    "ci_high": 0.66,
+                    "cluster_n": 100,
+                },
+            },
+            "public_refusal_safety::kv_int4_sim__patchkey-value__roleuser__matchsystem": {
+                "compressed_policy": "kv_int4_sim",
+                "safety_restoration_fraction": 0.20,
+                "safety_restoration_fraction_ci": {
+                    "mean": 0.20,
+                    "ci_low": 0.12,
+                    "ci_high": 0.30,
+                    "cluster_n": 100,
+                },
+                "refusal_restoration_fraction": 0.18,
+                "refusal_restoration_fraction_ci": {
+                    "mean": 0.18,
+                    "ci_low": 0.10,
+                    "ci_high": 0.25,
+                    "cluster_n": 100,
+                },
+            },
+        },
+    }
 
 
 def _write_arxiv_bundle(

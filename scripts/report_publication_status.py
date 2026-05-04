@@ -10,6 +10,7 @@ from _path import add_src_to_path
 
 add_src_to_path()
 
+from assess_claims import assess_claims
 from check_human_audit_readiness import (
     DEFAULT_REQUIRED_LABELS,
     check_audit_input_source_match,
@@ -849,6 +850,7 @@ def _claim_failures(assessment: dict[str, Any], source_paths: dict[str, Path]) -
         if not isinstance(causal_delta, dict):
             failures.append("human_audit_lacks_causal_restoration_delta")
     failures.extend(_claim_source_failures(assessment, source_paths))
+    failures.extend(_claim_recompute_failures(assessment, source_paths))
     return failures
 
 
@@ -876,6 +878,60 @@ def _claim_best_evidence_failures(claim_id: str, claim: dict[str, Any]) -> list[
     if not isinstance(claim.get("best_evidence"), dict):
         return [f"claim_lacks_best_evidence:{claim_id}"]
     return []
+
+
+def _claim_recompute_failures(
+    assessment: dict[str, Any], source_paths: dict[str, Path]
+) -> list[str]:
+    required_sources = [
+        "primary_metrics",
+        "causal_metrics",
+        "primary_audit_summary",
+        "causal_audit_summary",
+    ]
+    missing = [name for name in required_sources if not source_paths[name].exists()]
+    if missing:
+        return [f"claim_recompute_missing_source:{name}" for name in missing]
+    thresholds = assessment.get("thresholds") if isinstance(assessment, dict) else {}
+    if not isinstance(thresholds, dict):
+        thresholds = {}
+    recomputed = assess_claims(
+        _read_json(source_paths["primary_metrics"]),
+        _read_json(source_paths["causal_metrics"]),
+        primary_audit_metrics=_read_json(source_paths["primary_audit_summary"]),
+        causal_audit_metrics=_read_json(source_paths["causal_audit_summary"]),
+        min_safety_effect=float(thresholds.get("min_safety_effect_ci_low", 0.02)),
+        min_ssei_effect=float(thresholds.get("min_ssei_effect_ci_low", 0.02)),
+        min_restoration_fraction=float(thresholds.get("min_restoration_fraction", 0.20)),
+        min_restoration_margin=float(
+            thresholds.get("min_restoration_margin_over_user_control", 0.10)
+        ),
+        min_human_audit_delta=float(thresholds.get("min_human_audit_delta", 0.0)),
+        require_human_audit_support=True,
+    )
+    failures = []
+    if recomputed.get("publication_gate", {}).get("passed") is not True:
+        failures.append("claim_recompute_publication_gate_failed")
+    if recomputed.get("passed_claim_count") != assessment.get("passed_claim_count"):
+        failures.append(
+            "claim_recompute_passed_count_mismatch:"
+            f"{recomputed.get('passed_claim_count')}!={assessment.get('passed_claim_count')}"
+        )
+    recomputed_claims = recomputed.get("claims") or {}
+    assessment_claims = assessment.get("claims") or {}
+    for claim_id in EXPECTED_CLAIM_IDS:
+        recomputed_passed = (recomputed_claims.get(claim_id) or {}).get("passed")
+        assessment_passed = (assessment_claims.get(claim_id) or {}).get("passed")
+        if recomputed_passed is not assessment_passed:
+            failures.append(
+                f"claim_recompute_pass_mismatch:{claim_id}:"
+                f"{recomputed_passed}!={assessment_passed}"
+            )
+    if recomputed.get("human_audit_support", {}).get("passed") is not (
+        assessment.get("human_audit_support") or {}
+    ).get("passed"):
+        failures.append("claim_recompute_human_audit_mismatch")
+    return failures
 
 
 def _claim_source_failures(assessment: dict[str, Any], source_paths: dict[str, Path]) -> list[str]:
