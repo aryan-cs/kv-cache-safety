@@ -111,6 +111,13 @@ def test_wait_history_summarizes_launcher_memory_trend(tmp_path: Path) -> None:
         "latest_seen_utc": "2026-05-04T04:04:11Z",
         "duration_minutes": 0.0,
     }
+    assert history["latest_gate_block_window"] == {
+        "reason": "none",
+        "sample_count": 0,
+        "first_seen_utc": None,
+        "latest_seen_utc": "2026-05-04T04:04:11Z",
+        "duration_minutes": 0.0,
+    }
     assert history["latest_gate_passed"] is True
     assert history["prolonged_gate_block"] is False
     assert history["latest_sample_age_minutes"] == 5.0
@@ -137,6 +144,33 @@ def test_wait_history_marks_prolonged_gate_block_only_while_blocked(tmp_path: Pa
     assert history["prolonged_gate_block"] is True
     assert history["latest_sample_age_minutes"] == 15.0
     assert history["launcher_log_stale"] is True
+
+
+def test_wait_history_reports_utilization_only_block_window(tmp_path: Path) -> None:
+    log = tmp_path / "wait.log"
+    log.write_text(
+        "\n".join(
+            [
+                "Waiting for H200 GPU: memory.used <= 20000 MiB and utilization <= 20%",
+                "2026-05-04T04:19:11Z memory.used=82139MiB utilization=100%",
+                "2026-05-04T04:24:11Z memory.used=5947MiB utilization=67%",
+                "2026-05-04T04:29:11Z memory.used=5947MiB utilization=68%",
+                "2026-05-04T04:34:11Z memory.used=5947MiB utilization=53%",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    history = _wait_history(log, current_utc="2026-05-04T04:35:11Z")
+
+    assert history["latest_gate_passed"] is False
+    assert history["latest_gate_block_window"] == {
+        "reason": "utilization",
+        "sample_count": 3,
+        "first_seen_utc": "2026-05-04T04:24:11Z",
+        "latest_seen_utc": "2026-05-04T04:34:11Z",
+        "duration_minutes": 10.0,
+    }
 
 
 def test_wait_history_prolonged_gate_block_starts_at_sixty_minutes(
@@ -345,6 +379,13 @@ def test_render_markdown_summarizes_blocked_launcher() -> None:
                         "latest_seen_utc": "2026-05-04T04:04:11Z",
                         "duration_minutes": 5.0,
                     },
+                    "latest_gate_block_window": {
+                        "reason": "memory_used_and_utilization",
+                        "sample_count": 2,
+                        "first_seen_utc": "2026-05-04T02:04:08Z",
+                        "latest_seen_utc": "2026-05-04T03:59:11Z",
+                        "duration_minutes": 115.05,
+                    },
                     "latest_gate_passed": False,
                     "prolonged_gate_block": True,
                     "launcher_log_stale": True,
@@ -366,6 +407,7 @@ def test_render_markdown_summarizes_blocked_launcher() -> None:
     assert "latest memory plateau: `82139 MiB` for `2` samples" in text
     assert "memory drop from first to latest: `60322 MiB`" in text
     assert "prolonged gate block: `true`" in text
+    assert "latest gate block window: `memory_used_and_utilization`" in text
     assert "latest sample age: `15.0 minutes`" in text
     assert "launcher log stale: `true`" in text
     assert "release or restart the notebook allocation" in text

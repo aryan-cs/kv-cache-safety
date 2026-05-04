@@ -183,6 +183,7 @@ def render_markdown(status: dict[str, Any]) -> str:
         minimum = wait_history["min_memory"]
         threshold = wait_history.get("gate_threshold") or {}
         plateau = wait_history.get("latest_memory_plateau") or {}
+        block_window = wait_history.get("latest_gate_block_window") or {}
         lines.extend(
             [
                 "",
@@ -215,6 +216,12 @@ def render_markdown(status: dict[str, Any]) -> str:
                 f"- memory drop from first to latest: `{wait_history['memory_drop_mib']} MiB`",
                 f"- latest sample passes gate: `{str(wait_history['latest_gate_passed']).lower()}`",
                 f"- prolonged gate block: `{str(wait_history.get('prolonged_gate_block', False)).lower()}`",
+                (
+                    f"- latest gate block window: `{block_window.get('reason', 'unknown')}` "
+                    f"for `{block_window.get('sample_count', 0)}` samples "
+                    f"since `{block_window.get('first_seen_utc', 'n/a')}` "
+                    f"({float(block_window.get('duration_minutes') or 0.0):.1f} minutes)"
+                ),
                 f"- latest sample age: `{float(wait_history.get('latest_sample_age_minutes') or 0.0):.1f} minutes`",
                 f"- launcher log stale: `{str(wait_history.get('launcher_log_stale', False)).lower()}`",
             ]
@@ -495,6 +502,7 @@ def _wait_history(path: Path, *, current_utc: str | None = None) -> dict[str, An
     min_memory = min(samples, key=lambda item: item["memory_used_mib"])
     max_memory = max(samples, key=lambda item: item["memory_used_mib"])
     latest_plateau = _latest_memory_plateau(samples)
+    latest_gate_block_window = _latest_gate_block_window(samples, threshold)
     observed_wait_minutes = _minutes_between(first["timestamp_utc"], latest["timestamp_utc"])
     latest_sample_age_minutes = _latest_sample_age_minutes(
         latest["timestamp_utc"], current_utc=current_utc
@@ -509,6 +517,7 @@ def _wait_history(path: Path, *, current_utc: str | None = None) -> dict[str, An
         "min_memory": min_memory,
         "max_memory": max_memory,
         "latest_memory_plateau": latest_plateau,
+        "latest_gate_block_window": latest_gate_block_window,
         "observed_wait_minutes": observed_wait_minutes,
         "min_utilization_pct": min(item["utilization_pct"] for item in samples),
         "max_utilization_pct": max(item["utilization_pct"] for item in samples),
@@ -539,6 +548,48 @@ def _latest_memory_plateau(samples: list[dict[str, Any]]) -> dict[str, Any]:
             first_plateau_sample["timestamp_utc"], latest["timestamp_utc"]
         ),
     }
+
+
+def _latest_gate_block_window(
+    samples: list[dict[str, Any]], threshold: dict[str, int]
+) -> dict[str, Any]:
+    latest = samples[-1]
+    latest_reason = _gate_block_reason(latest, threshold)
+    if latest_reason == "none":
+        return {
+            "reason": "none",
+            "sample_count": 0,
+            "first_seen_utc": None,
+            "latest_seen_utc": latest["timestamp_utc"],
+            "duration_minutes": 0.0,
+        }
+    window = []
+    for sample in reversed(samples):
+        if _gate_block_reason(sample, threshold) != latest_reason:
+            break
+        window.append(sample)
+    first_window_sample = window[-1]
+    return {
+        "reason": latest_reason,
+        "sample_count": len(window),
+        "first_seen_utc": first_window_sample["timestamp_utc"],
+        "latest_seen_utc": latest["timestamp_utc"],
+        "duration_minutes": _minutes_between(
+            first_window_sample["timestamp_utc"], latest["timestamp_utc"]
+        ),
+    }
+
+
+def _gate_block_reason(sample: dict[str, Any], threshold: dict[str, int]) -> str:
+    memory_blocked = sample["memory_used_mib"] > threshold["memory_used_mib"]
+    utilization_blocked = sample["utilization_pct"] > threshold["utilization_pct"]
+    if memory_blocked and utilization_blocked:
+        return "memory_used_and_utilization"
+    if memory_blocked:
+        return "memory_used"
+    if utilization_blocked:
+        return "utilization"
+    return "none"
 
 
 def _minutes_between(start_utc: str, end_utc: str) -> float:

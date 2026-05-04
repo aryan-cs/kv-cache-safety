@@ -67,6 +67,13 @@ def test_admin_report_summarizes_hidden_gpu_context_without_results() -> None:
                         "latest_seen_utc": "2026-05-04T04:04:11Z",
                         "duration_minutes": 5.0,
                     },
+                    "latest_gate_block_window": {
+                        "reason": "memory_used_and_utilization",
+                        "sample_count": 2,
+                        "first_seen_utc": "2026-05-04T02:04:08Z",
+                        "latest_seen_utc": "2026-05-04T03:59:11Z",
+                        "duration_minutes": 115.0,
+                    },
                     "latest_gate_passed": False,
                     "prolonged_gate_block": True,
                     "launcher_log_stale": True,
@@ -86,6 +93,7 @@ def test_admin_report_summarizes_hidden_gpu_context_without_results() -> None:
     assert "Latest memory plateau: `82139 MiB` for `2` samples" in report
     assert "Memory drop from first to latest: `60322 MiB`" in report
     assert "Prolonged gate block: `true`" in report
+    assert "Latest gate block window: `memory_used_and_utilization`" in report
     assert "Latest sample age: `15.0 minutes`" in report
     assert "Launcher log stale: `true`" in report
     assert "release or restart the notebook allocation" in report

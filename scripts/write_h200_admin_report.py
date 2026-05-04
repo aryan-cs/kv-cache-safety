@@ -96,6 +96,7 @@ def admin_report(status: dict[str, Any]) -> str:
         minimum = wait_history["min_memory"]
         threshold = wait_history.get("gate_threshold") or {}
         plateau = wait_history.get("latest_memory_plateau") or {}
+        block_window = wait_history.get("latest_gate_block_window") or {}
         lines.extend(
             [
                 "## Wait History",
@@ -127,6 +128,12 @@ def admin_report(status: dict[str, Any]) -> str:
                 f"- Memory drop from first to latest: `{wait_history['memory_drop_mib']} MiB`",
                 f"- Latest sample passes gate: `{_bool(wait_history['latest_gate_passed'])}`",
                 f"- Prolonged gate block: `{_bool(wait_history.get('prolonged_gate_block'))}`",
+                (
+                    f"- Latest gate block window: `{block_window.get('reason', 'unknown')}` "
+                    f"for `{block_window.get('sample_count', 0)}` samples "
+                    f"since `{block_window.get('first_seen_utc', 'n/a')}` "
+                    f"({float(block_window.get('duration_minutes') or 0.0):.1f} minutes)"
+                ),
                 f"- Latest sample age: `{float(wait_history.get('latest_sample_age_minutes') or 0.0):.1f} minutes`",
                 f"- Launcher log stale: `{_bool(wait_history.get('launcher_log_stale'))}`",
                 "",
