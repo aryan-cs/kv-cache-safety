@@ -171,6 +171,14 @@ bash scripts/build_publication_artifacts.sh
 
 This command regenerates aggregate metrics, figures, paper tables, CI planning files, readiness checks, the readable PDF, and the arXiv source bundle. It fails if the required real result artifacts or completed human-audit summaries are missing. For a non-publication draft rebuild before audit labels are complete, set `REQUIRE_HUMAN_AUDIT=0`.
 
+Human-audit summaries must also pass the audit-readiness gate:
+
+```bash
+uv run python scripts/check_human_audit_readiness.py \
+  --summary-json paper/audit/h200_qwen_full_sweep_summary/human_audit_summary.json \
+  --require-baseline-deltas
+```
+
 Export paper tables:
 
 ```bash

@@ -37,6 +37,9 @@ require_human_audit_artifacts() {
       exit 1
     fi
   done
+  uv run python scripts/check_human_audit_readiness.py \
+    --summary-json "$audit_dir/human_audit_summary.json" \
+    --require-baseline-deltas
 }
 
 rebuild_primary() {

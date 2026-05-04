@@ -49,3 +49,13 @@ Accepted label values are `yes`, `no`, `true`, `false`, `1`, `0`, or blank. The 
 - `audit_manifest.json`
 
 The JSON summary includes Wilson confidence intervals for label rates, automated-vs-human confusion matrices, pairwise inter-annotator agreement, and paired baseline-vs-policy deltas when the same `prompt_id`, `seed`, and annotator appear under `none` and a treatment policy.
+
+Before using the audit in the paper, run:
+
+```bash
+uv run python scripts/check_human_audit_readiness.py \
+  --summary-json paper/audit/<run_id>_summary/human_audit_summary.json \
+  --require-baseline-deltas
+```
+
+By default this requires complete annotations, no unknown audit IDs, non-empty core safety labels, paired treatment-minus-baseline deltas, and at least one inter-annotator pair for each core label. Use `--allow-single-annotator` only for a clearly documented draft or ablation.
