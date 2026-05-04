@@ -12,6 +12,7 @@ add_src_to_path()
 
 from check_human_audit_readiness import (
     DEFAULT_REQUIRED_LABELS,
+    check_audit_input_source_match,
     check_human_audit_readiness,
 )
 
@@ -265,6 +266,7 @@ def _audit_status(audit_dir: Path, results_dir: Path) -> dict[str, Any]:
                 allow_single_annotator=False,
             )
         )
+    failures.extend(check_audit_input_source_match(manifest))
     failures.extend(_audit_result_source_failures(manifest, results_dir))
     return {
         "path": str(audit_dir),

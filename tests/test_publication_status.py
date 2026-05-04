@@ -336,6 +336,41 @@ def test_publication_status_rejects_audits_without_inter_annotator_pairs(
     )
 
 
+def test_publication_status_rejects_stale_audit_input_hashes(tmp_path: Path) -> None:
+    primary = tmp_path / "primary"
+    causal = tmp_path / "causal"
+    primary_audit = tmp_path / "primary_audit"
+    causal_audit = tmp_path / "causal_audit"
+    _write_run(primary)
+    _write_run(causal)
+    _write_audit(primary_audit, primary)
+    _write_audit(causal_audit, causal)
+    (primary_audit / "audit_labels.csv").write_text("changed\n", encoding="utf-8")
+    claim_path = tmp_path / "claim_assessment.json"
+    claim_path.write_text(
+        json.dumps(_passing_claim_assessment(primary, causal, primary_audit, causal_audit)),
+        encoding="utf-8",
+    )
+    pdf_path = tmp_path / "paper.pdf"
+    pdf_path.write_bytes(b"%PDF-1.7\n")
+
+    status = publication_status(
+        primary_results_dir=primary,
+        causal_results_dir=causal,
+        primary_audit_dir=primary_audit,
+        causal_audit_dir=causal_audit,
+        claim_assessment_path=claim_path,
+        paper_pdf=pdf_path,
+    )
+
+    assert status["publication_ready"] is False
+    assert "primary_human_audit_complete" in status["blockers"]
+    assert any(
+        "audit CSV source 0 hash is stale" in failure
+        for failure in status["primary_human_audit"]["failures"]
+    )
+
+
 def test_publication_status_rejects_stale_claim_source_hashes(tmp_path: Path) -> None:
     primary = tmp_path / "primary"
     causal = tmp_path / "causal"
@@ -481,8 +516,24 @@ def _write_audit(
         }
     for name in ["human_audit_summary.md", "human_audit_summary_table.tex", "human_audit_deltas_table.tex"]:
         (path / name).write_text("artifact\n", encoding="utf-8")
+    audit_csv = path / "audit_labels.csv"
+    key_jsonl = path / "audit_key.jsonl"
+    audit_csv.write_text("audit_id,human_refusal_correct\n1,true\n", encoding="utf-8")
+    key_jsonl.write_text('{"audit_id":"1"}\n', encoding="utf-8")
     manifest = {
         "source_artifacts": {
+            "audit_csv": [
+                {
+                    "path": str(audit_csv),
+                    "sha256": _sha256(audit_csv),
+                    "bytes": audit_csv.stat().st_size,
+                }
+            ],
+            "key_jsonl": {
+                "path": str(key_jsonl),
+                "sha256": _sha256(key_jsonl),
+                "bytes": key_jsonl.stat().st_size,
+            },
             "results": {
                 name: {"sha256": _sha256(results_dir / name)}
                 for name in ["manifest.json", "generations.jsonl", "metrics.json"]

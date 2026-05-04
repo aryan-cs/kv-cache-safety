@@ -49,6 +49,7 @@ def main() -> None:
             failures.append("--require-result-source-match needs --results-dir")
         else:
             audit_manifest = json.loads(args.audit_manifest.read_text(encoding="utf-8"))
+            failures.extend(check_audit_input_source_match(audit_manifest))
             failures.extend(check_audit_result_source_match(audit_manifest, args.results_dir))
     if failures:
         print("HUMAN AUDIT NOT READY")
@@ -140,6 +141,40 @@ def check_audit_result_source_match(
         if expected_sha != actual_sha:
             failures.append(f"audit manifest result source `{name}` hash is stale")
     return failures
+
+
+def check_audit_input_source_match(audit_manifest: dict[str, Any]) -> list[str]:
+    failures: list[str] = []
+    source_artifacts = audit_manifest.get("source_artifacts") or {}
+    audit_csv_sources = source_artifacts.get("audit_csv")
+    if not isinstance(audit_csv_sources, list) or not audit_csv_sources:
+        failures.append("audit manifest lacks audit CSV source artifacts")
+    else:
+        for idx, source in enumerate(audit_csv_sources):
+            failures.extend(_source_file_failures(source, f"audit CSV source {idx}"))
+    key_source = source_artifacts.get("key_jsonl")
+    if not isinstance(key_source, dict):
+        failures.append("audit manifest lacks key JSONL source artifact")
+    else:
+        failures.extend(_source_file_failures(key_source, "key JSONL source"))
+    return failures
+
+
+def _source_file_failures(source: Any, label: str) -> list[str]:
+    if not isinstance(source, dict):
+        return [f"{label} is malformed"]
+    raw_path = source.get("path")
+    if not raw_path:
+        return [f"{label} lacks path"]
+    path = Path(str(raw_path))
+    if not path.exists():
+        return [f"{label} is missing: {path}"]
+    expected_sha = source.get("sha256")
+    if not expected_sha:
+        return [f"{label} lacks sha256"]
+    if expected_sha != file_sha256(path):
+        return [f"{label} hash is stale: {path}"]
+    return []
 
 
 if __name__ == "__main__":

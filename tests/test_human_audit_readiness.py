@@ -5,6 +5,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path("scripts").resolve()))
 
 from check_human_audit_readiness import (
+    check_audit_input_source_match,
     check_audit_result_source_match,
     check_human_audit_readiness,
 )
@@ -86,16 +87,18 @@ def test_human_audit_readiness_rejects_blank_or_unpaired_audit() -> None:
 
 def test_audit_source_match_accepts_current_result_hashes(tmp_path: Path) -> None:
     results_dir = _write_result_sources(tmp_path / "results")
-    audit_manifest = _audit_manifest_for(results_dir)
+    audit_manifest = _audit_manifest_for(results_dir, tmp_path / "audit")
 
+    input_failures = check_audit_input_source_match(audit_manifest)
     failures = check_audit_result_source_match(audit_manifest, results_dir)
 
+    assert input_failures == []
     assert failures == []
 
 
 def test_audit_source_match_rejects_stale_or_missing_sources(tmp_path: Path) -> None:
     results_dir = _write_result_sources(tmp_path / "results")
-    audit_manifest = _audit_manifest_for(results_dir)
+    audit_manifest = _audit_manifest_for(results_dir, tmp_path / "audit")
     (results_dir / "metrics.json").write_text(json.dumps({"changed": True}), encoding="utf-8")
     del audit_manifest["source_artifacts"]["results"]["generations.jsonl"]
 
@@ -105,6 +108,19 @@ def test_audit_source_match_rejects_stale_or_missing_sources(tmp_path: Path) -> 
     assert "audit manifest result source `metrics.json` hash is stale" in failures
 
 
+def test_audit_input_source_match_rejects_stale_or_missing_inputs(tmp_path: Path) -> None:
+    results_dir = _write_result_sources(tmp_path / "results")
+    audit_dir = tmp_path / "audit"
+    audit_manifest = _audit_manifest_for(results_dir, audit_dir)
+    (audit_dir / "labels.csv").write_text("changed\n", encoding="utf-8")
+    (audit_dir / "key.jsonl").unlink()
+
+    failures = check_audit_input_source_match(audit_manifest)
+
+    assert any("audit CSV source 0 hash is stale" in failure for failure in failures)
+    assert any("key JSONL source is missing" in failure for failure in failures)
+
+
 def _write_result_sources(results_dir: Path) -> Path:
     results_dir.mkdir()
     for name in ["manifest.json", "generations.jsonl", "metrics.json"]:
@@ -112,11 +128,26 @@ def _write_result_sources(results_dir: Path) -> Path:
     return results_dir
 
 
-def _audit_manifest_for(results_dir: Path) -> dict:
+def _audit_manifest_for(results_dir: Path, audit_dir: Path) -> dict:
     import hashlib
 
+    audit_dir.mkdir()
+    labels = audit_dir / "labels.csv"
+    key = audit_dir / "key.jsonl"
+    labels.write_text("audit_id,human_refusal_correct\n1,true\n", encoding="utf-8")
+    key.write_text('{"audit_id":"1"}\n', encoding="utf-8")
     return {
         "source_artifacts": {
+            "audit_csv": [
+                {
+                    "path": str(labels),
+                    "sha256": hashlib.sha256(labels.read_bytes()).hexdigest(),
+                }
+            ],
+            "key_jsonl": {
+                "path": str(key),
+                "sha256": hashlib.sha256(key.read_bytes()).hexdigest(),
+            },
             "results": {
                 name: {"sha256": hashlib.sha256((results_dir / name).read_bytes()).hexdigest()}
                 for name in ["manifest.json", "generations.jsonl", "metrics.json"]
