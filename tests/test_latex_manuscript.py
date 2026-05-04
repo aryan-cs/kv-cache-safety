@@ -245,6 +245,7 @@ def test_arxiv_packager_records_file_provenance(tmp_path: Path) -> None:
             str(output_dir),
             "--archive",
             str(archive),
+            *_isolated_arxiv_missing_args(tmp_path),
             "--allow-missing",
         ],
         check=True,
@@ -279,6 +280,7 @@ def test_arxiv_packager_copies_optional_qwen32_only_when_requested(tmp_path: Pat
             str(output_dir),
             "--archive",
             str(archive),
+            *_isolated_arxiv_missing_args(tmp_path),
             "--allow-missing",
         ],
         check=True,
@@ -297,6 +299,7 @@ def test_arxiv_packager_copies_optional_qwen32_only_when_requested(tmp_path: Pat
             str(output_dir),
             "--archive",
             str(archive),
+            *_isolated_arxiv_missing_args(tmp_path),
             "--qwen32-generated-dir",
             str(qwen32_dir),
             "--allow-missing",
@@ -307,6 +310,22 @@ def test_arxiv_packager_copies_optional_qwen32_only_when_requested(tmp_path: Pat
 
     assert "generated/h200_qwen32b_public_followup" in manifest_with_optional["copied_generated"]
     assert (output_dir / "generated" / "h200_qwen32b_public_followup" / "qwen32_note.tex").exists()
+
+
+def _isolated_arxiv_missing_args(tmp_path: Path) -> list[str]:
+    isolated = tmp_path / "missing_inputs"
+    return [
+        "--primary-generated-dir",
+        str(isolated / "generated_primary"),
+        "--causal-generated-dir",
+        str(isolated / "generated_causal"),
+        "--claim-generated-dir",
+        str(isolated / "generated_claim"),
+        "--primary-audit-dir",
+        str(isolated / "audit_primary"),
+        "--causal-audit-dir",
+        str(isolated / "audit_causal"),
+    ]
 
 
 def test_arxiv_packager_excludes_raw_evidence_from_support_trees(tmp_path: Path) -> None:
