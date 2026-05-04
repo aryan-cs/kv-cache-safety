@@ -33,22 +33,28 @@ REQUIRED_TEX_MARKERS_BY_NAME = {
         "refusal ci high",
     ],
 }
-REQUIRED_RESULT_MACROS = {
-    "h200_qwen_full_sweep": [
-        "PrimaryRunId",
-        "PrimaryPolicyCount",
-        "PrimaryTopSSEIPolicy",
-        "PrimaryTopSSEI",
-        "PrimaryTopSSEICILow",
-        "PrimaryTopSSEICIHigh",
-        "PrimarySafetyClusterCount",
-        "PrimaryCapabilityClusterCount",
-    ],
-    "h200_causal_patch_qwen7b": [
-        "CausalRunId",
-        "CausalPolicyCount",
-    ],
-}
+REQUIRED_RESULT_MACROS = [
+    (
+        ("h200_qwen_full_sweep", "active_primary"),
+        [
+            "PrimaryRunId",
+            "PrimaryPolicyCount",
+            "PrimaryTopSSEIPolicy",
+            "PrimaryTopSSEI",
+            "PrimaryTopSSEICILow",
+            "PrimaryTopSSEICIHigh",
+            "PrimarySafetyClusterCount",
+            "PrimaryCapabilityClusterCount",
+        ],
+    ),
+    (
+        ("h200_causal_patch_qwen7b", "active_causal"),
+        [
+            "CausalRunId",
+            "CausalPolicyCount",
+        ],
+    ),
+]
 REQUIRED_CAUSAL_ROW_MARKERS = [
     "rolesystem",
     "roleuser",
@@ -144,8 +150,8 @@ def _semantic_tex_failures(raw_path: str, name: str, text: str) -> list[str]:
                 failures.append(f"missing causal control row in artifact: {raw_path}::{marker}")
     if name == "result_macros.tex":
         macro_values = _macro_values(text)
-        for path_marker, required_macros in REQUIRED_RESULT_MACROS.items():
-            if path_marker not in raw_path:
+        for path_markers, required_macros in REQUIRED_RESULT_MACROS:
+            if not any(path_marker in raw_path for path_marker in path_markers):
                 continue
             for macro in required_macros:
                 value = macro_values.get(macro, "").strip()

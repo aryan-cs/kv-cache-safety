@@ -16,6 +16,7 @@ from aggregate_human_audit import (
 )
 from report_publication_status import (
     REQUIRED_ARXIV_FIGURE_FILES,
+    _required_arxiv_bundle_files,
     publication_status,
     render_markdown,
 )
@@ -25,6 +26,22 @@ REQUIRED_AUDIT_LABELS = [
     "human_unsafe_compliance",
     "human_system_leakage",
 ]
+
+
+def test_required_arxiv_bundle_files_follow_selected_generated_dirs() -> None:
+    files = _required_arxiv_bundle_files(
+        primary_generated_dir=Path("paper/generated/h200_qwen_full_sweep_plus_ci_extension"),
+        causal_generated_dir=Path("paper/generated/h200_causal_patch_qwen7b"),
+    )
+
+    assert (
+        "generated/h200_qwen_full_sweep_plus_ci_extension/main_results_table.tex"
+        in files
+    )
+    assert "generated/active_primary/main_results_table.tex" in files
+    assert "generated/h200_qwen_full_sweep/main_results_table.tex" not in files
+
+
 def _test_pdf_bytes(text: str = "Publication evidence") -> bytes:
     stream = f"BT /F1 12 Tf 72 72 Td ({text}) Tj ET".encode("ascii")
     objects = [
@@ -2339,6 +2356,8 @@ def _write_paper_generated_assets(
 ) -> None:
     primary_generated.mkdir(parents=True)
     causal_generated.mkdir(parents=True)
+    active_primary = primary_generated.parent / "active_primary"
+    active_causal = causal_generated.parent / "active_causal"
     for path in [
         primary_generated / "artifact_manifest.json",
         primary_generated / "main_results_table.tex",
@@ -2347,12 +2366,30 @@ def _write_paper_generated_assets(
         causal_generated / "artifact_manifest.json",
         causal_generated / "causal_restoration_table.tex",
         causal_generated / "result_macros.tex",
+        active_primary / "active_asset_manifest.json",
+        active_primary / "main_results_table.tex",
+        active_primary / "suite_level_effects_table.tex",
+        active_primary / "result_macros.tex",
+        active_causal / "active_asset_manifest.json",
+        active_causal / "causal_restoration_table.tex",
+        active_causal / "result_macros.tex",
         claim_path.parent / "abstract_status_sentence.tex",
         claim_path.parent / "claim_assessment_table.tex",
         claim_path.parent / "claim_interpretation.tex",
     ]:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(f"{path.name}\n", encoding="utf-8")
+    for path in [
+        active_primary / "figures" / "safety_capability_phase_portrait.pdf",
+        active_primary / "figures" / "selective_safety_erasure_heatmap.pdf",
+        active_primary / "figures" / "prompt_effect_constellation.pdf",
+        active_primary / "figures" / "cache_state_fingerprint.pdf",
+        active_primary / "figures" / "safety_state_atlas.pdf",
+        active_causal / "figures" / "causal_restoration_fraction.pdf",
+        active_causal / "figures" / "causal_restoration_flow.pdf",
+    ]:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(PDF_BYTES)
 
 
 def _final_pdf_sources(
@@ -2365,6 +2402,8 @@ def _final_pdf_sources(
     causal_generated: Path,
     claim_path: Path,
 ) -> list[tuple[str, Path]]:
+    active_primary = primary_generated.parent / "active_primary"
+    active_causal = causal_generated.parent / "active_causal"
     return [
         ("latex_main", Path("paper/latex/main.tex")),
         ("bibliography", Path("paper/references.bib")),
@@ -2381,9 +2420,19 @@ def _final_pdf_sources(
             primary_generated / "suite_level_effects_table.tex",
         ),
         ("primary_generated_macros", primary_generated / "result_macros.tex"),
+        ("active_primary_manifest", active_primary / "active_asset_manifest.json"),
+        ("active_primary_main_table", active_primary / "main_results_table.tex"),
+        (
+            "active_primary_suite_table",
+            active_primary / "suite_level_effects_table.tex",
+        ),
+        ("active_primary_macros", active_primary / "result_macros.tex"),
         ("causal_generated_manifest", causal_generated / "artifact_manifest.json"),
         ("causal_generated_table", causal_generated / "causal_restoration_table.tex"),
         ("causal_generated_macros", causal_generated / "result_macros.tex"),
+        ("active_causal_manifest", active_causal / "active_asset_manifest.json"),
+        ("active_causal_table", active_causal / "causal_restoration_table.tex"),
+        ("active_causal_macros", active_causal / "result_macros.tex"),
         ("claim_assessment_json", claim_path),
         ("claim_generated_status", claim_path.parent / "abstract_status_sentence.tex"),
         ("claim_generated_table", claim_path.parent / "claim_assessment_table.tex"),
@@ -2409,10 +2458,35 @@ def _final_pdf_sources(
         ("primary_figure", primary / "figures" / "cache_state_fingerprint.pdf"),
         ("primary_figure", primary / "figures" / "safety_state_atlas.pdf"),
         (
+            "active_primary_figure",
+            active_primary / "figures" / "safety_capability_phase_portrait.pdf",
+        ),
+        (
+            "active_primary_figure",
+            active_primary / "figures" / "selective_safety_erasure_heatmap.pdf",
+        ),
+        (
+            "active_primary_figure",
+            active_primary / "figures" / "prompt_effect_constellation.pdf",
+        ),
+        (
+            "active_primary_figure",
+            active_primary / "figures" / "cache_state_fingerprint.pdf",
+        ),
+        ("active_primary_figure", active_primary / "figures" / "safety_state_atlas.pdf"),
+        (
             "causal_figure",
             causal / "figures" / "causal_restoration_fraction.pdf",
         ),
         ("causal_figure", causal / "figures" / "causal_restoration_flow.pdf"),
+        (
+            "active_causal_figure",
+            active_causal / "figures" / "causal_restoration_fraction.pdf",
+        ),
+        (
+            "active_causal_figure",
+            active_causal / "figures" / "causal_restoration_flow.pdf",
+        ),
     ]
 
 
@@ -2520,6 +2594,8 @@ def _write_arxiv_bundle(
     source_dir.mkdir(parents=True)
     (source_dir / "generated" / "h200_qwen_full_sweep").mkdir(parents=True)
     (source_dir / "generated" / "h200_causal_patch_qwen7b").mkdir(parents=True)
+    (source_dir / "generated" / "active_primary").mkdir(parents=True)
+    (source_dir / "generated" / "active_causal").mkdir(parents=True)
     (source_dir / "generated" / "claim_assessment").mkdir(parents=True)
     (source_dir / "audit" / "h200_qwen_full_sweep_summary").mkdir(parents=True)
     (source_dir / "audit" / "h200_causal_patch_qwen7b_summary").mkdir(parents=True)
@@ -2539,6 +2615,11 @@ def _write_arxiv_bundle(
         source_dir / "generated" / "h200_qwen_full_sweep" / "result_macros.tex",
         source_dir / "generated" / "h200_causal_patch_qwen7b" / "causal_restoration_table.tex",
         source_dir / "generated" / "h200_causal_patch_qwen7b" / "result_macros.tex",
+        source_dir / "generated" / "active_primary" / "main_results_table.tex",
+        source_dir / "generated" / "active_primary" / "suite_level_effects_table.tex",
+        source_dir / "generated" / "active_primary" / "result_macros.tex",
+        source_dir / "generated" / "active_causal" / "causal_restoration_table.tex",
+        source_dir / "generated" / "active_causal" / "result_macros.tex",
         source_dir / "generated" / "claim_assessment" / "abstract_status_sentence.tex",
         source_dir / "generated" / "claim_assessment" / "claim_assessment_table.tex",
         source_dir / "generated" / "claim_assessment" / "claim_interpretation.tex",
@@ -2560,6 +2641,8 @@ def _write_arxiv_bundle(
         "copied_generated": [
             str(source_dir / "generated" / "h200_qwen_full_sweep"),
             str(source_dir / "generated" / "h200_causal_patch_qwen7b"),
+            str(source_dir / "generated" / "active_primary"),
+            str(source_dir / "generated" / "active_causal"),
             str(source_dir / "generated" / "claim_assessment"),
         ],
         "copied_audit": [

@@ -95,8 +95,10 @@ def test_h200_sweep_run_ids_match_paper_figure_paths() -> None:
     assert "scripts/assess_claims.py" in script
     assert "scripts/plan_registered_followups.py" in script
     assert "scripts/post_h200_next_steps.py" in script
-    assert "../../results/h200_qwen_full_sweep/figures/" in tex
-    assert "../../results/h200_causal_patch_qwen7b/figures/" in tex
+    assert "../generated/active_primary/figures/" in tex
+    assert "../generated/active_causal/figures/" in tex
+    assert "../../results/h200_qwen_full_sweep/figures/" not in tex
+    assert "../../results/h200_causal_patch_qwen7b/figures/" not in tex
 
 
 def test_build_paper_pdf_status_checks_use_explicit_artifact_paths() -> None:
@@ -107,6 +109,7 @@ def test_build_paper_pdf_status_checks_use_explicit_artifact_paths() -> None:
     assert 'claim_assessment="${CLAIM_ASSESSMENT_PATH:-paper/generated/claim_assessment/claim_assessment.json}"' in script
     assert "--primary-results-dir \"$primary_results\"" in script
     assert "--causal-results-dir \"$causal_results\"" in script
+    assert "scripts/sync_active_paper_assets.py" in script
     assert "--primary-audit-dir \"$primary_audit_dir\"" in script
     assert "--causal-audit-dir \"$causal_audit_dir\"" in script
     assert "--claim-assessment \"$claim_assessment\"" in script
@@ -340,6 +343,7 @@ def test_complete_paper_build_checks_publication_status_before_latex() -> None:
     script = Path("scripts/build_paper_pdf.sh").read_text(encoding="utf-8")
 
     assert "scripts/check_latex_placeholders.py" in script
+    assert "scripts/sync_active_paper_assets.py" in script
     assert "scripts/check_paper_asset_freshness.py" in script
     assert "ALLOW_NONPASSING_CLAIM_PAPER" in script
     assert "publication_status_fail_args" in script
@@ -350,6 +354,9 @@ def test_complete_paper_build_checks_publication_status_before_latex() -> None:
     copy_cmd = 'cp "$build_dir/cache_mediated_safety_erasure.pdf" paper/cache_mediated_safety_erasure.pdf'
     assert copy_cmd in script
     assert 'rm -f "$build_dir/main.pdf" "$build_dir/cache_mediated_safety_erasure.pdf"' in script
+    assert script.index("scripts/sync_active_paper_assets.py") < script.index(
+        "scripts/check_latex_placeholders.py"
+    )
     assert script.index("scripts/check_latex_placeholders.py") < script.index(
         'rm -f "$build_dir/main.pdf" "$build_dir/cache_mediated_safety_erasure.pdf"'
     )

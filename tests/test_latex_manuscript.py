@@ -20,6 +20,7 @@ from package_arxiv_submission import (
     _rewrite_main_tex_for_arxiv,
     build_figure_sources,
 )
+from sync_active_paper_assets import sync_active_paper_assets
 
 
 def test_latex_manuscript_is_formal_registered_protocol() -> None:
@@ -31,14 +32,14 @@ def test_latex_manuscript_is_formal_registered_protocol() -> None:
     assert "registered analysis protocol" in tex
     assert "reports no empirical claims" in tex
     assert r"\EmpiricalStatusSentence" in tex
-    assert r"\requiredartifact{../generated/h200_qwen_full_sweep/result_macros.tex}" in tex
-    assert r"\requiredartifact{../generated/h200_causal_patch_qwen7b/result_macros.tex}" in tex
+    assert r"\requiredartifact{../generated/active_primary/result_macros.tex}" in tex
+    assert r"\requiredartifact{../generated/active_causal/result_macros.tex}" in tex
     assert r"\requiredartifact{../generated/claim_assessment/abstract_status_sentence.tex}" in tex
-    assert "../generated/h200_qwen_full_sweep/result_macros.tex" in tex
-    assert "../generated/h200_causal_patch_qwen7b/result_macros.tex" in tex
+    assert "../generated/active_primary/result_macros.tex" in tex
+    assert "../generated/active_causal/result_macros.tex" in tex
     assert "../generated/claim_assessment/abstract_status_sentence.tex" in tex
     assert "Empirical result not yet reported" in tex
-    assert r"\maybeinputtable{../generated/h200_qwen_full_sweep/main_results_table.tex}" in tex
+    assert r"\maybeinputtable{../generated/active_primary/main_results_table.tex}" in tex
     assert r"\maybeinputtable{../generated/claim_assessment/claim_assessment_table.tex}" in tex
     assert r"\maybeinputtable{../generated/claim_assessment/claim_interpretation.tex}" in tex
     assert r"\maybeinputtable{../audit/h200_qwen_full_sweep_summary/human_audit_summary_table.tex}" in tex
@@ -122,7 +123,7 @@ def test_latex_references_cover_primary_model_and_cache_work() -> None:
 
 def test_arxiv_rewrite_uses_local_bibliography_and_figures() -> None:
     source = (
-        r"\maybeincludegraphic{../../results/h200_qwen_full_sweep/figures/"
+        r"\maybeincludegraphic{../generated/active_primary/figures/"
         r"safety_capability_phase_portrait.pdf}{0.9\linewidth}{pending}"
         "\n"
         r"\bibliography{../references}"
@@ -132,6 +133,9 @@ def test_arxiv_rewrite_uses_local_bibliography_and_figures() -> None:
 
     assert r"\bibliography{references}" in rewritten
     assert "figures/safety_capability_phase_portrait.pdf" in rewritten
+    assert "figures/safety_capability_phase_portrait.pdf" in _rewrite_main_tex_for_arxiv(
+        "../generated/active_primary/figures/safety_capability_phase_portrait.pdf"
+    )
     assert "figures/prompt_effect_constellation.pdf" in _rewrite_main_tex_for_arxiv(
         "../../results/h200_qwen_full_sweep/figures/prompt_effect_constellation.pdf"
     )
@@ -147,8 +151,8 @@ def test_arxiv_rewrite_uses_local_bibliography_and_figures() -> None:
     )
     assert _final_source_failures(strict) == []
     assert r"\PackageError{cache-paper}{Missing required publication artifact}" in strict
-    assert "generated/h200_qwen_full_sweep" in _rewrite_main_tex_for_arxiv(
-        "../generated/h200_qwen_full_sweep/main_results_table.tex"
+    assert "generated/active_primary" in _rewrite_main_tex_for_arxiv(
+        "../generated/active_primary/main_results_table.tex"
     )
     assert "generated/claim_assessment" in _rewrite_main_tex_for_arxiv(
         "../generated/claim_assessment/claim_assessment_table.tex"
@@ -156,12 +160,14 @@ def test_arxiv_rewrite_uses_local_bibliography_and_figures() -> None:
     assert "generated/claim_assessment" in _rewrite_main_tex_for_arxiv(
         "../generated/claim_assessment/abstract_status_sentence.tex"
     )
-    assert "generated/h200_qwen_full_sweep" in _rewrite_main_tex_for_arxiv(
-        "../generated/h200_qwen_full_sweep/result_macros.tex"
+    assert "generated/active_primary" in _rewrite_main_tex_for_arxiv(
+        "../generated/active_primary/result_macros.tex"
     )
-    assert "generated/h200_causal_patch_qwen7b" in _rewrite_main_tex_for_arxiv(
-        "../generated/h200_causal_patch_qwen7b/result_macros.tex"
+    assert "generated/active_causal" in _rewrite_main_tex_for_arxiv(
+        "../generated/active_causal/result_macros.tex"
     )
+    assert Path("paper/generated/active_primary") in REQUIRED_GENERATED_DIRS
+    assert Path("paper/generated/active_causal") in REQUIRED_GENERATED_DIRS
     assert Path("paper/generated/claim_assessment") in GENERATED_DIRS
     assert Path("paper/generated/claim_assessment") in REQUIRED_GENERATED_DIRS
     assert Path("paper/generated/h200_qwen32b_public_followup") in OPTIONAL_GENERATED_DIRS
@@ -221,6 +227,54 @@ def test_arxiv_packager_treats_missing_inputs_as_publication_blockers() -> None:
         "paper/generated/missing",
         "paper/audit/missing",
     ]
+
+
+def test_active_paper_asset_sync_copies_selected_sources(tmp_path: Path) -> None:
+    primary_results = tmp_path / "results" / "merged_primary"
+    causal_results = tmp_path / "results" / "causal"
+    primary_generated = tmp_path / "generated" / "merged_primary"
+    causal_generated = tmp_path / "generated" / "causal"
+    active_primary = tmp_path / "generated" / "active_primary"
+    active_causal = tmp_path / "generated" / "active_causal"
+    for path in [
+        primary_generated / "result_macros.tex",
+        primary_generated / "main_results_table.tex",
+        primary_generated / "suite_level_effects_table.tex",
+        causal_generated / "result_macros.tex",
+        causal_generated / "causal_restoration_table.tex",
+    ]:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(f"{path.name}\n", encoding="utf-8")
+    for path in [
+        primary_results / "figures" / "safety_capability_phase_portrait.pdf",
+        primary_results / "figures" / "selective_safety_erasure_heatmap.pdf",
+        primary_results / "figures" / "prompt_effect_constellation.pdf",
+        primary_results / "figures" / "cache_state_fingerprint.pdf",
+        primary_results / "figures" / "safety_state_atlas.pdf",
+        causal_results / "figures" / "causal_restoration_fraction.pdf",
+        causal_results / "figures" / "causal_restoration_flow.pdf",
+    ]:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b"%PDF-1.7\n1 0 obj\n<<>>\nendobj\ntrailer\n<<>>\n%%EOF\n")
+
+    missing = sync_active_paper_assets(
+        primary_results_dir=primary_results,
+        causal_results_dir=causal_results,
+        primary_generated_dir=primary_generated,
+        causal_generated_dir=causal_generated,
+        active_primary_dir=active_primary,
+        active_causal_dir=active_causal,
+    )
+
+    assert missing == []
+    assert (active_primary / "main_results_table.tex").read_text(encoding="utf-8") == (
+        "main_results_table.tex\n"
+    )
+    assert (active_primary / "figures" / "safety_state_atlas.pdf").exists()
+    manifest = json.loads(
+        (active_primary / "active_asset_manifest.json").read_text(encoding="utf-8")
+    )
+    assert manifest["results_dir"] == str(primary_results)
 
 
 def test_arxiv_packager_rejects_malformed_figure_pdfs(tmp_path: Path) -> None:

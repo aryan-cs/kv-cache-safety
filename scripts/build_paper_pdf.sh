@@ -9,6 +9,8 @@ primary_results="${PRIMARY_RESULTS_DIR:-results/h200_qwen_full_sweep}"
 causal_results="${CAUSAL_RESULTS_DIR:-results/h200_causal_patch_qwen7b}"
 primary_paper_dir="${PRIMARY_PAPER_DIR:-paper/generated/h200_qwen_full_sweep}"
 causal_paper_dir="${CAUSAL_PAPER_DIR:-paper/generated/h200_causal_patch_qwen7b}"
+active_primary_dir="paper/generated/active_primary"
+active_causal_dir="paper/generated/active_causal"
 primary_audit_dir="${PRIMARY_AUDIT_SUMMARY_DIR:-paper/audit/h200_qwen_full_sweep_summary}"
 causal_audit_dir="${CAUSAL_AUDIT_SUMMARY_DIR:-paper/audit/h200_causal_patch_qwen7b_summary}"
 claim_assessment="${CLAIM_ASSESSMENT_PATH:-paper/generated/claim_assessment/claim_assessment.json}"
@@ -29,9 +31,16 @@ final_pdf_sources=(
   "primary_generated_main_table=$primary_paper_dir/main_results_table.tex"
   "primary_generated_suite_table=$primary_paper_dir/suite_level_effects_table.tex"
   "primary_generated_macros=$primary_paper_dir/result_macros.tex"
+  "active_primary_manifest=$active_primary_dir/active_asset_manifest.json"
+  "active_primary_main_table=$active_primary_dir/main_results_table.tex"
+  "active_primary_suite_table=$active_primary_dir/suite_level_effects_table.tex"
+  "active_primary_macros=$active_primary_dir/result_macros.tex"
   "causal_generated_manifest=$causal_paper_dir/artifact_manifest.json"
   "causal_generated_table=$causal_paper_dir/causal_restoration_table.tex"
   "causal_generated_macros=$causal_paper_dir/result_macros.tex"
+  "active_causal_manifest=$active_causal_dir/active_asset_manifest.json"
+  "active_causal_table=$active_causal_dir/causal_restoration_table.tex"
+  "active_causal_macros=$active_causal_dir/result_macros.tex"
   "claim_assessment_json=$claim_assessment"
   "claim_generated_status=$(dirname "$claim_assessment")/abstract_status_sentence.tex"
   "claim_generated_table=$(dirname "$claim_assessment")/claim_assessment_table.tex"
@@ -47,8 +56,15 @@ final_pdf_sources=(
   "primary_figure=$primary_results/figures/prompt_effect_constellation.pdf"
   "primary_figure=$primary_results/figures/cache_state_fingerprint.pdf"
   "primary_figure=$primary_results/figures/safety_state_atlas.pdf"
+  "active_primary_figure=$active_primary_dir/figures/safety_capability_phase_portrait.pdf"
+  "active_primary_figure=$active_primary_dir/figures/selective_safety_erasure_heatmap.pdf"
+  "active_primary_figure=$active_primary_dir/figures/prompt_effect_constellation.pdf"
+  "active_primary_figure=$active_primary_dir/figures/cache_state_fingerprint.pdf"
+  "active_primary_figure=$active_primary_dir/figures/safety_state_atlas.pdf"
   "causal_figure=$causal_results/figures/causal_restoration_fraction.pdf"
   "causal_figure=$causal_results/figures/causal_restoration_flow.pdf"
+  "active_causal_figure=$active_causal_dir/figures/causal_restoration_fraction.pdf"
+  "active_causal_figure=$active_causal_dir/figures/causal_restoration_flow.pdf"
 )
 
 publication_status_args=(
@@ -96,6 +112,14 @@ write_final_pdf_manifest() {
   done
   "${cmd[@]}"
 }
+
+uv run python scripts/sync_active_paper_assets.py \
+  --primary-results-dir "$primary_results" \
+  --causal-results-dir "$causal_results" \
+  --primary-generated-dir "$primary_paper_dir" \
+  --causal-generated-dir "$causal_paper_dir" \
+  --active-primary-dir "$active_primary_dir" \
+  --active-causal-dir "$active_causal_dir"
 
 if [[ "${REQUIRE_COMPLETE_PAPER:-0}" == "1" ]]; then
   uv run python scripts/check_latex_placeholders.py --tex "$src_dir/main.tex"

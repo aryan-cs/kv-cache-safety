@@ -79,17 +79,17 @@ The present manuscript is a registered analysis protocol and reports no empirica
 \newcommand{\CausalTopSSEICIHigh}{}
 \newcommand{\CausalSafetyClusterCount}{}
 \newcommand{\CausalCapabilityClusterCount}{}
-\IfFileExists{../generated/h200_qwen_full_sweep/result_macros.tex}{%
-  \input{../generated/h200_qwen_full_sweep/result_macros.tex}%
+\IfFileExists{../generated/active_primary/result_macros.tex}{%
+  \input{../generated/active_primary/result_macros.tex}%
 }{}
-\IfFileExists{../generated/h200_causal_patch_qwen7b/result_macros.tex}{%
-  \input{../generated/h200_causal_patch_qwen7b/result_macros.tex}%
+\IfFileExists{../generated/active_causal/result_macros.tex}{%
+  \input{../generated/active_causal/result_macros.tex}%
 }{}
 \IfFileExists{../generated/claim_assessment/abstract_status_sentence.tex}{%
   \input{../generated/claim_assessment/abstract_status_sentence.tex}%
 }{}
-\requiredartifact{../generated/h200_qwen_full_sweep/result_macros.tex}
-\requiredartifact{../generated/h200_causal_patch_qwen7b/result_macros.tex}
+\requiredartifact{../generated/active_primary/result_macros.tex}
+\requiredartifact{../generated/active_causal/result_macros.tex}
 \requiredartifact{../generated/claim_assessment/abstract_status_sentence.tex}
 
 \begin{document}
@@ -250,49 +250,49 @@ For audited prompts, the analysis embeds each prompt-condition pair using open e
 
 \begin{figure}[t]
   \centering
-  \maybeincludegraphic{../../results/h200_qwen_full_sweep/figures/safety_capability_phase_portrait.pdf}{0.92\linewidth}{Safety degradation versus capability degradation by policy and budget.}
+  \maybeincludegraphic{../generated/active_primary/figures/safety_capability_phase_portrait.pdf}{0.92\linewidth}{Safety degradation versus capability degradation by policy and budget.}
   \caption{Safety-capability phase portrait. Policies trace trajectories as cache budgets tighten. A safety-erasure pattern appears as upward movement before rightward capability collapse.}
   \label{fig:safety-capability}
 \end{figure}
 
 \begin{figure}[t]
   \centering
-  \maybeincludegraphic{../../results/h200_qwen_full_sweep/figures/selective_safety_erasure_heatmap.pdf}{0.92\linewidth}{Selective Safety Erasure Index heatmap by model, suite, policy, and cache budget.}
+  \maybeincludegraphic{../generated/active_primary/figures/selective_safety_erasure_heatmap.pdf}{0.92\linewidth}{Selective Safety Erasure Index heatmap by model, suite, policy, and cache budget.}
   \caption{Selective Safety Erasure Index across cache policies. Erasure is claimed only for conditions where safety loss remains after subtracting matched capability loss.}
   \label{fig:ssei}
 \end{figure}
 
 \begin{figure}[t]
   \centering
-  \maybeincludegraphic{../../results/h200_qwen_full_sweep/figures/prompt_effect_constellation.pdf}{0.92\linewidth}{Prompt-level baseline-to-treatment effect vectors by suite and policy.}
+  \maybeincludegraphic{../generated/active_primary/figures/prompt_effect_constellation.pdf}{0.92\linewidth}{Prompt-level baseline-to-treatment effect vectors by suite and policy.}
   \caption{Prompt-level effect map. Each arrow starts at baseline and points toward the compressed condition in a metric-derived effect space. Coherent clusters indicate prompt families where cache interventions create similar behavioral shifts.}
   \label{fig:constellation}
 \end{figure}
 
 \begin{figure}[t]
   \centering
-  \maybeincludegraphic{../../results/h200_qwen_full_sweep/figures/cache_state_fingerprint.pdf}{0.92\linewidth}{Token-role retention heatmap for system, user, template, and generated spans.}
+  \maybeincludegraphic{../generated/active_primary/figures/cache_state_fingerprint.pdf}{0.92\linewidth}{Token-role retention heatmap for system, user, template, and generated spans.}
   \caption{Cache-state fingerprint by token role and policy. This visualization tests whether policy-relevant spans form a visibly fragile band under cache pressure.}
   \label{fig:role-retention}
 \end{figure}
 
 \begin{figure}[t]
   \centering
-  \maybeincludegraphic{../../results/h200_qwen_full_sweep/figures/safety_state_atlas.pdf}{0.92\linewidth}{Suite-policy atlas combining selective safety degradation with role-level cache loss.}
+  \maybeincludegraphic{../generated/active_primary/figures/safety_state_atlas.pdf}{0.92\linewidth}{Suite-policy atlas combining selective safety degradation with role-level cache loss.}
   \caption{Safety-state atlas. Color shows selective safety degradation while overlaid circles show token-role cache loss, making it possible to compare behavioral safety loss against system-token and user-token retention patterns.}
   \label{fig:safety-state-atlas}
 \end{figure}
 
 \begin{figure}[t]
   \centering
-  \maybeincludegraphic{../../results/h200_causal_patch_qwen7b/figures/causal_restoration_fraction.pdf}{0.92\linewidth}{Restoration fraction by causal patch and policy-pinned condition.}
+  \maybeincludegraphic{../generated/active_causal/figures/causal_restoration_fraction.pdf}{0.92\linewidth}{Restoration fraction by causal patch and policy-pinned condition.}
   \caption{Causal restoration fractions. The key comparison is system-role restoration versus matched user-role restoration under the same compressed condition.}
   \label{fig:causal}
 \end{figure}
 
 \begin{figure}[t]
   \centering
-  \maybeincludegraphic{../../results/h200_causal_patch_qwen7b/figures/causal_restoration_flow.pdf}{0.92\linewidth}{Compressed, system-patched, matched-user-patched, and policy-pinned conditions.}
+  \maybeincludegraphic{../generated/active_causal/figures/causal_restoration_flow.pdf}{0.92\linewidth}{Compressed, system-patched, matched-user-patched, and policy-pinned conditions.}
   \caption{Causal restoration flow. The diagnostic pattern is movement toward baseline for policy-relevant restoration more than matched controls.}
   \label{fig:causal-flow}
 \end{figure}
@@ -301,18 +301,18 @@ For audited prompts, the analysis embeds each prompt-condition pair using open e
 
 \subsection{Behavioral Cache Sensitivity}
 Table~\ref{tab:suite-effects} reports paired baseline-versus-intervention effects across the registered safety, leakage, benign, and capability suites.
-\maybeinputtable{../generated/h200_qwen_full_sweep/suite_level_effects_table.tex}{Report baseline versus each cache policy for refusal, leakage, benign over-refusal, and capability. Include prompt-clustered confidence intervals and a table of per-suite effects.}
+\maybeinputtable{../generated/active_primary/suite_level_effects_table.tex}{Report baseline versus each cache policy for refusal, leakage, benign over-refusal, and capability. Include prompt-clustered confidence intervals and a table of per-suite effects.}
 
 \subsection{Selective Safety Degradation}
 Top policy-level $\ssei$: \PrimaryTopSSEIPolicy{} with estimate \PrimaryTopSSEI{} and 95\% interval [\PrimaryTopSSEICILow{}, \PrimaryTopSSEICIHigh{}]. A positive result requires safety degradation to exceed capability degradation under matched cache pressure, not merely lower overall quality.
-\maybeinputtable{../generated/h200_qwen_full_sweep/main_results_table.tex}{Report $\ssei$ by model, suite, policy, and budget after a completed registered analysis run.}
+\maybeinputtable{../generated/active_primary/main_results_table.tex}{Report $\ssei$ by model, suite, policy, and budget after a completed registered analysis run.}
 
 \subsection{Token-Role Cache Accounting}
 The cache-state fingerprint in Figure~\ref{fig:role-retention} reports token-role retention under each cache policy. The mechanistic claim requires role-specific cache disruption to align with behavioral degradation: policy-relevant spans should be disproportionately evicted or perturbed in conditions with positive $\ssei$, and protected or restored spans should move the model back toward baseline behavior.
 
 \subsection{Causal Restoration and Mitigation}
 The central causal claim requires system-role restoration or pinning to outperform matched non-policy controls.
-\maybeinputtable{../generated/h200_causal_patch_qwen7b/causal_restoration_table.tex}{Report system-role patching, matched user-role patching, and policy-pinned mitigation after the causal patch analysis is complete.}
+\maybeinputtable{../generated/active_causal/causal_restoration_table.tex}{Report system-role patching, matched user-role patching, and policy-pinned mitigation after the causal patch analysis is complete.}
 
 \subsection{Evidence-Gated Claim Assessment}
 \maybeinputtable{../generated/claim_assessment/claim_assessment_table.tex}{Report the claims ladder assessment after primary and causal runs are complete. The cache-mediated safety erasure claim requires all registered criteria to pass.}

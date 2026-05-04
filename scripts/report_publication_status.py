@@ -51,12 +51,14 @@ REQUIRED_AUDIT_ARTIFACTS = [
     "human_audit_summary_table.tex",
     "human_audit_deltas_table.tex",
 ]
-REQUIRED_ARXIV_BUNDLE_FILES = [
-    "generated/h200_qwen_full_sweep/main_results_table.tex",
-    "generated/h200_qwen_full_sweep/suite_level_effects_table.tex",
-    "generated/h200_qwen_full_sweep/result_macros.tex",
-    "generated/h200_causal_patch_qwen7b/causal_restoration_table.tex",
-    "generated/h200_causal_patch_qwen7b/result_macros.tex",
+ACTIVE_ARXIV_BUNDLE_FILES = [
+    "generated/active_primary/main_results_table.tex",
+    "generated/active_primary/suite_level_effects_table.tex",
+    "generated/active_primary/result_macros.tex",
+    "generated/active_causal/causal_restoration_table.tex",
+    "generated/active_causal/result_macros.tex",
+]
+STATIC_ARXIV_BUNDLE_FILES = [
     "generated/claim_assessment/abstract_status_sentence.tex",
     "generated/claim_assessment/claim_assessment_table.tex",
     "generated/claim_assessment/claim_interpretation.tex",
@@ -64,6 +66,15 @@ REQUIRED_ARXIV_BUNDLE_FILES = [
     "audit/h200_qwen_full_sweep_summary/human_audit_deltas_table.tex",
     "audit/h200_causal_patch_qwen7b_summary/human_audit_summary_table.tex",
     "audit/h200_causal_patch_qwen7b_summary/human_audit_deltas_table.tex",
+]
+REQUIRED_ARXIV_BUNDLE_FILES = [
+    "generated/h200_qwen_full_sweep/main_results_table.tex",
+    "generated/h200_qwen_full_sweep/suite_level_effects_table.tex",
+    "generated/h200_qwen_full_sweep/result_macros.tex",
+    "generated/h200_causal_patch_qwen7b/causal_restoration_table.tex",
+    "generated/h200_causal_patch_qwen7b/result_macros.tex",
+    *ACTIVE_ARXIV_BUNDLE_FILES,
+    *STATIC_ARXIV_BUNDLE_FILES,
 ]
 REQUIRED_ARXIV_FIGURE_FILES = [f"figures/{name}" for name in FIGURE_SOURCES]
 PRIMARY_REQUIRED_FIGURES = [
@@ -85,6 +96,25 @@ PRIMARY_REQUIRED_SUITES = [
     "public_xstest_safe",
     "public_capability_arc",
 ]
+
+
+def _required_arxiv_bundle_files(
+    primary_generated_dir: Path = Path("paper/generated/h200_qwen_full_sweep"),
+    causal_generated_dir: Path = Path("paper/generated/h200_causal_patch_qwen7b"),
+) -> list[str]:
+    primary_name = primary_generated_dir.name
+    causal_name = causal_generated_dir.name
+    return [
+        f"generated/{primary_name}/main_results_table.tex",
+        f"generated/{primary_name}/suite_level_effects_table.tex",
+        f"generated/{primary_name}/result_macros.tex",
+        f"generated/{causal_name}/causal_restoration_table.tex",
+        f"generated/{causal_name}/result_macros.tex",
+        *ACTIVE_ARXIV_BUNDLE_FILES,
+        *STATIC_ARXIV_BUNDLE_FILES,
+    ]
+
+
 CAUSAL_REQUIRED_SUITES = [
     "system_leakage",
     "public_system_leakage",
@@ -282,7 +312,12 @@ def publication_status(
             claim_assessment_path=claim_assessment_path,
         ),
     )
-    arxiv = _arxiv_status(arxiv_source_dir, arxiv_archive)
+    arxiv = _arxiv_status(
+        arxiv_source_dir,
+        arxiv_archive,
+        primary_generated_dir=primary_generated_dir,
+        causal_generated_dir=causal_generated_dir,
+    )
 
     gates = {
         "primary_results_complete": primary["complete"],
@@ -1061,6 +1096,8 @@ def _final_pdf_expected_sources(
     claim_assessment_path: Path,
 ) -> list[tuple[str, Path]]:
     claim_generated_dir = claim_assessment_path.parent
+    active_primary_dir = primary_generated_dir.parent / "active_primary"
+    active_causal_dir = causal_generated_dir.parent / "active_causal"
     return [
         ("latex_main", Path("paper/latex/main.tex")),
         ("bibliography", Path("paper/references.bib")),
@@ -1074,9 +1111,16 @@ def _final_pdf_expected_sources(
         ("primary_generated_main_table", primary_generated_dir / "main_results_table.tex"),
         ("primary_generated_suite_table", primary_generated_dir / "suite_level_effects_table.tex"),
         ("primary_generated_macros", primary_generated_dir / "result_macros.tex"),
+        ("active_primary_manifest", active_primary_dir / "active_asset_manifest.json"),
+        ("active_primary_main_table", active_primary_dir / "main_results_table.tex"),
+        ("active_primary_suite_table", active_primary_dir / "suite_level_effects_table.tex"),
+        ("active_primary_macros", active_primary_dir / "result_macros.tex"),
         ("causal_generated_manifest", causal_generated_dir / "artifact_manifest.json"),
         ("causal_generated_table", causal_generated_dir / "causal_restoration_table.tex"),
         ("causal_generated_macros", causal_generated_dir / "result_macros.tex"),
+        ("active_causal_manifest", active_causal_dir / "active_asset_manifest.json"),
+        ("active_causal_table", active_causal_dir / "causal_restoration_table.tex"),
+        ("active_causal_macros", active_causal_dir / "result_macros.tex"),
         ("claim_assessment_json", claim_assessment_path),
         ("claim_generated_status", claim_generated_dir / "abstract_status_sentence.tex"),
         ("claim_generated_table", claim_generated_dir / "claim_assessment_table.tex"),
@@ -1092,12 +1136,25 @@ def _final_pdf_expected_sources(
         ("primary_figure", primary_results_dir / "figures" / "prompt_effect_constellation.pdf"),
         ("primary_figure", primary_results_dir / "figures" / "cache_state_fingerprint.pdf"),
         ("primary_figure", primary_results_dir / "figures" / "safety_state_atlas.pdf"),
+        ("active_primary_figure", active_primary_dir / "figures" / "safety_capability_phase_portrait.pdf"),
+        ("active_primary_figure", active_primary_dir / "figures" / "selective_safety_erasure_heatmap.pdf"),
+        ("active_primary_figure", active_primary_dir / "figures" / "prompt_effect_constellation.pdf"),
+        ("active_primary_figure", active_primary_dir / "figures" / "cache_state_fingerprint.pdf"),
+        ("active_primary_figure", active_primary_dir / "figures" / "safety_state_atlas.pdf"),
         ("causal_figure", causal_results_dir / "figures" / "causal_restoration_fraction.pdf"),
         ("causal_figure", causal_results_dir / "figures" / "causal_restoration_flow.pdf"),
+        ("active_causal_figure", active_causal_dir / "figures" / "causal_restoration_fraction.pdf"),
+        ("active_causal_figure", active_causal_dir / "figures" / "causal_restoration_flow.pdf"),
     ]
 
 
-def _arxiv_status(source_dir: Path, archive: Path) -> dict[str, Any]:
+def _arxiv_status(
+    source_dir: Path,
+    archive: Path,
+    *,
+    primary_generated_dir: Path = Path("paper/generated/h200_qwen_full_sweep"),
+    causal_generated_dir: Path = Path("paper/generated/h200_causal_patch_qwen7b"),
+) -> dict[str, Any]:
     manifest_path = source_dir / "manifest.json"
     manifest = _read_json(manifest_path)
     failures = []
@@ -1142,8 +1199,10 @@ def _arxiv_status(source_dir: Path, archive: Path) -> dict[str, Any]:
             Path(str(path)).name for path in manifest.get("copied_generated", [])
         }
         for required_name in [
-            "h200_qwen_full_sweep",
-            "h200_causal_patch_qwen7b",
+            primary_generated_dir.name,
+            causal_generated_dir.name,
+            "active_primary",
+            "active_causal",
             "claim_assessment",
         ]:
             if required_name not in copied_generated_names:
@@ -1168,14 +1227,18 @@ def _arxiv_status(source_dir: Path, archive: Path) -> dict[str, Any]:
             for copied_path in manifest.get(key, []):
                 if not _resolve_bundle_path(source_dir, copied_path).exists():
                     failures.append(f"missing_copied_path:{copied_path}")
-        for required_file in [*REQUIRED_ARXIV_BUNDLE_FILES, *REQUIRED_ARXIV_FIGURE_FILES]:
+        required_bundle_files = _required_arxiv_bundle_files(
+            primary_generated_dir=primary_generated_dir,
+            causal_generated_dir=causal_generated_dir,
+        )
+        for required_file in [*required_bundle_files, *REQUIRED_ARXIV_FIGURE_FILES]:
             if not (source_dir / required_file).exists():
                 failures.append(f"missing_required_bundle_file:{required_file}")
         provenance_members = _manifest_provenance_members(source_dir, manifest, failures)
         for required_file in [
             "main.tex",
             "references.bib",
-            *REQUIRED_ARXIV_BUNDLE_FILES,
+            *required_bundle_files,
             *REQUIRED_ARXIV_FIGURE_FILES,
         ]:
             if required_file not in provenance_members:

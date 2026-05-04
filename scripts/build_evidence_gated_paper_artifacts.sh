@@ -54,6 +54,12 @@ done
 
 clear_stale_publication_pdfs
 
+uv run python scripts/sync_active_paper_assets.py \
+  --primary-results-dir "$primary_results" \
+  --causal-results-dir "$causal_results" \
+  --primary-generated-dir "$primary_generated_dir" \
+  --causal-generated-dir "$causal_generated_dir"
+
 uv run python scripts/check_latex_placeholders.py --tex paper/latex/main.tex
 uv run python scripts/check_paper_asset_freshness.py \
   --pair "$primary_generated_dir=$primary_results" \

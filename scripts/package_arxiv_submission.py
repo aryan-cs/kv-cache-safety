@@ -17,6 +17,8 @@ DEFAULT_PRIMARY_RESULTS_DIR = Path("results/h200_qwen_full_sweep")
 DEFAULT_CAUSAL_RESULTS_DIR = Path("results/h200_causal_patch_qwen7b")
 DEFAULT_PRIMARY_GENERATED_DIR = Path("paper/generated/h200_qwen_full_sweep")
 DEFAULT_CAUSAL_GENERATED_DIR = Path("paper/generated/h200_causal_patch_qwen7b")
+DEFAULT_ACTIVE_PRIMARY_GENERATED_DIR = Path("paper/generated/active_primary")
+DEFAULT_ACTIVE_CAUSAL_GENERATED_DIR = Path("paper/generated/active_causal")
 DEFAULT_CLAIM_GENERATED_DIR = Path("paper/generated/claim_assessment")
 DEFAULT_QWEN32_GENERATED_DIR = Path("paper/generated/h200_qwen32b_public_followup")
 DEFAULT_PRIMARY_AUDIT_DIR = Path("paper/audit/h200_qwen_full_sweep_summary")
@@ -56,6 +58,8 @@ FIGURE_SOURCES = {
 REQUIRED_GENERATED_DIRS = [
     DEFAULT_PRIMARY_GENERATED_DIR,
     DEFAULT_CAUSAL_GENERATED_DIR,
+    DEFAULT_ACTIVE_PRIMARY_GENERATED_DIR,
+    DEFAULT_ACTIVE_CAUSAL_GENERATED_DIR,
     DEFAULT_CLAIM_GENERATED_DIR,
 ]
 OPTIONAL_GENERATED_DIRS = [DEFAULT_QWEN32_GENERATED_DIR]
@@ -142,6 +146,8 @@ def main() -> None:
     required_generated_dirs = [
         args.primary_generated_dir,
         args.causal_generated_dir,
+        DEFAULT_ACTIVE_PRIMARY_GENERATED_DIR,
+        DEFAULT_ACTIVE_CAUSAL_GENERATED_DIR,
         args.claim_generated_dir,
     ]
     optional_generated_dirs = [args.qwen32_generated_dir] if args.qwen32_generated_dir else []
@@ -306,6 +312,16 @@ def _rewrite_main_tex_for_arxiv(
         source_items.extend(figure_sources.items())
     for output_name, source_path in source_items:
         text = text.replace(str(Path("../..") / source_path), f"figures/{output_name}")
+    for output_name in build_figure_sources().keys():
+        for prefix in ("../generated", "generated"):
+            text = text.replace(
+                f"{prefix}/active_primary/figures/{output_name}",
+                f"figures/{output_name}",
+            )
+            text = text.replace(
+                f"{prefix}/active_causal/figures/{output_name}",
+                f"figures/{output_name}",
+            )
     if strict_final:
         text = _rewrite_final_publication_fallbacks(text)
     return text
@@ -313,7 +329,7 @@ def _rewrite_main_tex_for_arxiv(
 
 def _rewrite_final_publication_fallbacks(text: str) -> str:
     start_marker = r"\newcommand{\todoresult}"
-    end_marker = r"\IfFileExists{generated/h200_qwen_full_sweep/result_macros.tex}"
+    end_marker = r"\IfFileExists{generated/active_primary/result_macros.tex}"
     start = text.find(start_marker)
     end = text.find(end_marker)
     if start == -1 or end == -1 or end <= start:
