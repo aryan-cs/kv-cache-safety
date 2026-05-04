@@ -49,6 +49,7 @@ def check_paper_asset_freshness(paper_dir: Path, results_dir: Path) -> list[str]
         return [f"invalid paper artifact manifest `{manifest_path}`: {exc}"]
     failures.extend(_table_failures(manifest, paper_dir))
     failures.extend(_source_failures(manifest, results_dir))
+    failures.extend(_provenance_failures(manifest, results_dir))
     return failures
 
 
@@ -86,6 +87,24 @@ def _source_failures(manifest: dict[str, Any], results_dir: Path) -> list[str]:
             continue
         if source.get("sha256") != file_sha256(path):
             failures.append(f"paper artifact source `{name}` hash is stale")
+    return failures
+
+
+def _provenance_failures(manifest: dict[str, Any], results_dir: Path) -> list[str]:
+    failures = []
+    if not manifest.get("analysis_git_commit"):
+        failures.append(f"paper artifact manifest lacks analysis git commit: {results_dir}")
+    run_manifest_path = results_dir / "manifest.json"
+    try:
+        run_manifest = json.loads(run_manifest_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        run_manifest = {}
+    expected_run_commit = run_manifest.get("git_commit") if isinstance(run_manifest, dict) else None
+    observed_run_commit = manifest.get("source_run_git_commit")
+    if expected_run_commit and observed_run_commit != expected_run_commit:
+        failures.append("paper artifact manifest source run git commit is stale")
+    elif not observed_run_commit:
+        failures.append(f"paper artifact manifest lacks source run git commit: {results_dir}")
     return failures
 
 

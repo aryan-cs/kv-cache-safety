@@ -546,6 +546,18 @@ def _check_paper_assets(paper_dir: Path, results_dir: Path, failures: list[str])
             continue
         if source.get("sha256") != file_sha256(source_path):
             failures.append(f"paper artifact source `{name}` hash is stale")
+    if not manifest.get("analysis_git_commit"):
+        failures.append("paper artifact manifest lacks analysis git commit")
+    try:
+        run_manifest = json.loads((results_dir / "manifest.json").read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        run_manifest = {}
+    expected_run_commit = run_manifest.get("git_commit") if isinstance(run_manifest, dict) else None
+    observed_run_commit = manifest.get("source_run_git_commit")
+    if expected_run_commit and observed_run_commit != expected_run_commit:
+        failures.append("paper artifact manifest source run git commit is stale")
+    elif not observed_run_commit:
+        failures.append("paper artifact manifest lacks source run git commit")
 
 
 def _check_causal_patch_config(policy_configs: list[dict], failures: list[str]) -> None:

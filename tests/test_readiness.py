@@ -313,7 +313,10 @@ def test_paper_artifact_manifest_checks_tables_and_sources(tmp_path: Path) -> No
     (results_dir / "figures").mkdir(parents=True)
     paper_dir.mkdir()
     for name in ["manifest.json", "metrics.json", "figures/manifest.json"]:
-        (results_dir / name).write_text(name, encoding="utf-8")
+        if name == "manifest.json":
+            write_json(results_dir / name, {"git_commit": "run-commit", "git_dirty": False})
+        else:
+            (results_dir / name).write_text(name, encoding="utf-8")
     table_path = paper_dir / "main_results_table.tex"
     table_path.write_text("table", encoding="utf-8")
     write_json(
@@ -329,6 +332,8 @@ def test_paper_artifact_manifest_checks_tables_and_sources(tmp_path: Path) -> No
                 name: {"sha256": file_sha256(results_dir / name)}
                 for name in ["manifest.json", "metrics.json", "figures/manifest.json"]
             },
+            "source_run_git_commit": "run-commit",
+            "analysis_git_commit": "analysis-commit",
         },
     )
     failures: list[str] = []

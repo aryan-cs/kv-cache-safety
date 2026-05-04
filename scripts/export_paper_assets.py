@@ -8,7 +8,13 @@ from _path import add_src_to_path
 
 add_src_to_path()
 
-from cache_safety_erasure.utils.io import file_sha256, write_json
+from cache_safety_erasure.utils.io import (
+    file_sha256,
+    git_commit,
+    git_dirty,
+    git_status_short,
+    write_json,
+)
 
 TABLE_FILES = [
     "main_results_table.md",
@@ -208,6 +214,7 @@ def main() -> None:
 
 
 def _write_artifact_manifest(results_dir: Path, paper_dir: Path) -> None:
+    run_manifest = _read_json(results_dir / "manifest.json")
     tables = {
         name: {
             "path": str(paper_dir / name),
@@ -229,10 +236,28 @@ def _write_artifact_manifest(results_dir: Path, paper_dir: Path) -> None:
         {
             "schema_version": 1,
             "results_dir": str(results_dir),
+            "source_run_git_commit": run_manifest.get("git_commit"),
+            "source_run_git_dirty": run_manifest.get("git_dirty"),
+            "source_run_name": run_manifest.get("run_name"),
+            "source_run_model_id": run_manifest.get("model_id"),
+            "analysis_git_commit": git_commit(),
+            "analysis_git_dirty": git_dirty(),
+            "analysis_git_status_short": git_status_short(),
             "tables": tables,
             "source_artifacts": source_artifacts,
         },
     )
+
+
+def _read_json(path: Path) -> dict:
+    if not path.exists():
+        return {}
+    try:
+        with path.open("r", encoding="utf-8") as f:
+            data = json.load(f)
+    except json.JSONDecodeError:
+        return {}
+    return data if isinstance(data, dict) else {}
 
 
 def write_markdown_table(path: Path, columns: list[str], rows: list[dict]) -> None:

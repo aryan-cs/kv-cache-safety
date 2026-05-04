@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 from cache_safety_erasure.utils.io import append_jsonl, file_sha256, read_jsonl, write_json
@@ -239,7 +240,10 @@ def test_export_paper_assets_writes_ci_bearing_tables(tmp_path: Path) -> None:
     results_dir = tmp_path / "results" / "run_001"
     paper_dir = tmp_path / "paper" / "generated" / "run_001"
     (results_dir / "figures").mkdir(parents=True)
-    write_json(results_dir / "manifest.json", {"run_name": "run_001"})
+    write_json(
+        results_dir / "manifest.json",
+        {"run_name": "run_001", "git_commit": "run-commit", "git_dirty": False},
+    )
     write_json(results_dir / "figures" / "manifest.json", {"figures": {}})
     write_json(
         results_dir / "metrics.json",
@@ -326,6 +330,11 @@ def test_export_paper_assets_writes_ci_bearing_tables(tmp_path: Path) -> None:
     assert "rolesystem" in causal_tex
     assert "roleuser" in causal_tex
     assert "policy\\_pinned" in causal_tex
+    artifact_manifest = json.loads(
+        (paper_dir / "artifact_manifest.json").read_text(encoding="utf-8")
+    )
+    assert artifact_manifest["source_run_git_commit"] == "run-commit"
+    assert artifact_manifest["analysis_git_commit"]
 
 
 def test_paper_asset_freshness_detects_stale_tables_and_sources(tmp_path: Path) -> None:
@@ -342,7 +351,10 @@ def test_paper_asset_freshness_detects_stale_tables_and_sources(tmp_path: Path) 
     table.write_text("fresh\n", encoding="utf-8")
     for name in ["manifest.json", "metrics.json", "figures/manifest.json"]:
         path = results_dir / name
-        path.write_text(f"{name}\n", encoding="utf-8")
+        if name == "manifest.json":
+            write_json(path, {"git_commit": "run-commit", "git_dirty": False})
+        else:
+            path.write_text(f"{name}\n", encoding="utf-8")
     write_json(
         paper_dir / "artifact_manifest.json",
         {
@@ -356,6 +368,8 @@ def test_paper_asset_freshness_detects_stale_tables_and_sources(tmp_path: Path) 
                 name: {"sha256": file_sha256(results_dir / name)}
                 for name in ["manifest.json", "metrics.json", "figures/manifest.json"]
             },
+            "source_run_git_commit": "run-commit",
+            "analysis_git_commit": "analysis-commit",
         },
     )
 
