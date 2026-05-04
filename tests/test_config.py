@@ -218,14 +218,17 @@ def test_publication_human_audit_aggregation_has_fail_closed_wrapper() -> None:
 
     assert "PRIMARY_RUN_ID:-h200_qwen_full_sweep" in script
     assert "CAUSAL_RUN_ID:-h200_causal_patch_qwen7b" in script
+    assert "AUDIT_SOURCE:-auto" in script
     assert "audit_blinded_annotator_open_judge_" in script
-    assert "audit_csvs=(\"${open_judge_csvs[@]}\")" in script
-    assert "Missing completed annotator CSVs" in script
+    assert "Set AUDIT_SOURCE=human or AUDIT_SOURCE=open_judge" in script
+    assert "Invalid AUDIT_SOURCE" in script
+    assert "Missing completed ${audit_source} annotator CSVs" in script
     assert "scripts/aggregate_human_audit.py" in script
     assert "--require-result-source-match" in script
     assert "--require-baseline-deltas" in script
     assert "OPEN_JUDGE_PARSE_ERROR_POLICY:-record_unlabeled" in judge_script
     assert '--on-parse-error "$judge_parse_error_policy"' in judge_script
+    assert "AUDIT_SOURCE=open_judge bash scripts/aggregate_publication_human_audits.sh" in judge_script
     assert "scripts/check_human_audit_readiness.py" in script
     assert "scripts/post_h200_next_steps.py" in script
     assert "bash scripts/aggregate_publication_human_audits.sh" in readme
@@ -360,6 +363,7 @@ def test_evidence_gated_paper_builder_allows_nonpassing_claim_pdf() -> None:
     assert "scripts/package_arxiv_submission.py" in script
     assert "--require-arxiv-bundle" in script
     assert "build_evidence_gated_paper_artifacts.sh" in finalizer
+    assert "AUDIT_SOURCE=open_judge bash scripts/aggregate_publication_human_audits.sh" in finalizer
 
 
 def test_h200_scripts_use_composite_public_refusal_suite() -> None:

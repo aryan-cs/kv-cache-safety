@@ -10,6 +10,7 @@ causal_results="${CAUSAL_RESULTS_DIR:-results/$causal_run_id}"
 audit_input_dir="${AUDIT_INPUT_DIR:-paper/audit}"
 primary_output_dir="${PRIMARY_AUDIT_SUMMARY_DIR:-paper/audit/${primary_run_id}_summary}"
 causal_output_dir="${CAUSAL_AUDIT_SUMMARY_DIR:-paper/audit/${causal_run_id}_summary}"
+audit_source="${AUDIT_SOURCE:-auto}"
 
 require_file() {
   local path="$1"
@@ -42,15 +43,38 @@ aggregate_run_audit() {
 
   shopt -s nullglob
   local open_judge_csvs=("$audit_input_dir/${run_id}_audit_blinded_annotator_open_judge_"*.csv)
+  local candidate_human_csvs=("$audit_input_dir/${run_id}_audit_blinded_annotator_"*.csv)
+  local human_csvs=()
+  local candidate_csv
+  for candidate_csv in "${candidate_human_csvs[@]}"; do
+    if [[ "$candidate_csv" == *"_audit_blinded_annotator_open_judge_"*".csv" ]]; then
+      continue
+    fi
+    human_csvs+=("$candidate_csv")
+  done
   local audit_csvs=()
-  if [[ "${#open_judge_csvs[@]}" -gt 0 ]]; then
+  if [[ "$audit_source" == "open_judge" ]]; then
     audit_csvs=("${open_judge_csvs[@]}")
+  elif [[ "$audit_source" == "human" ]]; then
+    audit_csvs=("${human_csvs[@]}")
+  elif [[ "$audit_source" == "auto" ]]; then
+    if [[ "${#open_judge_csvs[@]}" -gt 0 && "${#human_csvs[@]}" -gt 0 ]]; then
+      echo "Both human and open local judge annotation CSVs are present for ${run_id}." >&2
+      echo "Set AUDIT_SOURCE=human or AUDIT_SOURCE=open_judge before aggregating." >&2
+      exit 1
+    fi
+    if [[ "${#open_judge_csvs[@]}" -gt 0 ]]; then
+      audit_csvs=("${open_judge_csvs[@]}")
+    else
+      audit_csvs=("${human_csvs[@]}")
+    fi
   else
-    audit_csvs=("$audit_input_dir/${run_id}_audit_blinded_annotator_"*.csv)
+    echo "Invalid AUDIT_SOURCE=${audit_source}; expected auto, human, or open_judge." >&2
+    exit 1
   fi
   shopt -u nullglob
   if [[ "${#audit_csvs[@]}" -eq 0 ]]; then
-    echo "Missing completed annotator CSVs: $audit_input_dir/${run_id}_audit_blinded_annotator_*.csv" >&2
+    echo "Missing completed ${audit_source} annotator CSVs for ${run_id} in ${audit_input_dir}" >&2
     exit 1
   fi
 
@@ -75,6 +99,6 @@ uv run python scripts/post_h200_next_steps.py \
   --output-json paper/generated/post_h200_next_steps.json \
   --output-md paper/generated/post_h200_next_steps.md
 
-echo "Publication human audits aggregated:"
+echo "Publication audit support aggregated:"
 echo "- $primary_output_dir"
 echo "- $causal_output_dir"

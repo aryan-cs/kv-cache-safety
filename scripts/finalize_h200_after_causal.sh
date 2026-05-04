@@ -193,7 +193,7 @@ write_preliminary_claims
 
 if [[ "$run_open_judge_audit" == "1" ]]; then
   bash scripts/run_publication_open_judge_audits.sh
-  bash scripts/aggregate_publication_human_audits.sh
+  AUDIT_SOURCE=open_judge bash scripts/aggregate_publication_human_audits.sh
 fi
 
 write_audit_supported_claims

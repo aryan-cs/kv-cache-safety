@@ -43,6 +43,10 @@ validate both completed annotator file sets:
 bash scripts/aggregate_publication_human_audits.sh
 ```
 
+If both human annotation CSVs and open-local-judge CSVs are present, the wrapper
+fails closed. Set `AUDIT_SOURCE=human` or `AUDIT_SOURCE=open_judge` to choose the
+intended source explicitly.
+
 For one-off debugging, the equivalent per-run commands are:
 
 ```bash
@@ -99,7 +103,7 @@ prompt hash:
 
 ```bash
 bash scripts/run_publication_open_judge_audits.sh
-bash scripts/aggregate_publication_human_audits.sh
+AUDIT_SOURCE=open_judge bash scripts/aggregate_publication_human_audits.sh
 ```
 
 These labels are audit-support labels, not human labels. The paper and claim

@@ -317,6 +317,9 @@ This aggregates the completed primary and causal annotator CSVs, validates
 inter-annotator coverage, checks leakage-reference context, and verifies that
 the audit summaries still match the fetched result artifacts and audit-export
 manifests.
+If both human annotation files and open-local-judge files are present, set
+`AUDIT_SOURCE=human` or `AUDIT_SOURCE=open_judge`; the wrapper refuses to choose
+between mixed sources implicitly.
 
 Run the optional Qwen 32B public-suite follow-up after the primary 14B/7B workflow passes:
 

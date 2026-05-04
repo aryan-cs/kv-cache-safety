@@ -52,4 +52,4 @@ run_open_judge_variant "$causal_run_id" v2
 run_open_judge_variant "$causal_run_id" v3
 
 echo "Open local judge audit CSVs written to $audit_input_dir"
-echo "Aggregate them with scripts/aggregate_publication_human_audits.sh."
+echo "Aggregate them with AUDIT_SOURCE=open_judge bash scripts/aggregate_publication_human_audits.sh."
