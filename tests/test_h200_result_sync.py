@@ -58,6 +58,12 @@ def test_fetch_h200_results_script_is_guarded_and_checksum_verified() -> None:
     assert "paper/generated/preliminary_claim_assessment" in script
     assert "paper/generated/claim_assessment" not in script
     assert "h200_qwen_full_sweep_audit_key.jsonl" in script
+    assert "h200_qwen_full_sweep_audit_export_manifest.json" in script
+    assert "h200_qwen_full_sweep_audit_blinded_annotator_01.csv" in script
+    assert "h200_qwen_full_sweep_audit_blinded_annotator_02.csv" in script
+    assert "h200_causal_patch_qwen7b_audit_export_manifest.json" in script
+    assert "h200_causal_patch_qwen7b_audit_blinded_annotator_01.csv" in script
+    assert "h200_causal_patch_qwen7b_audit_blinded_annotator_02.csv" in script
     assert "rsync -az --checksum" in script
     assert "scripts/write_artifact_manifest.py" in script
     assert "scripts/compare_artifact_manifests.py" in script

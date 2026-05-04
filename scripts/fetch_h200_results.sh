@@ -22,8 +22,14 @@ default_paths=(
   "paper/generated/post_h200_next_steps.json"
   "paper/generated/post_h200_next_steps.md"
   "paper/audit/h200_qwen_full_sweep_audit_blinded.csv"
+  "paper/audit/h200_qwen_full_sweep_audit_blinded_annotator_01.csv"
+  "paper/audit/h200_qwen_full_sweep_audit_blinded_annotator_02.csv"
+  "paper/audit/h200_qwen_full_sweep_audit_export_manifest.json"
   "paper/audit/h200_qwen_full_sweep_audit_key.jsonl"
   "paper/audit/h200_causal_patch_qwen7b_audit_blinded.csv"
+  "paper/audit/h200_causal_patch_qwen7b_audit_blinded_annotator_01.csv"
+  "paper/audit/h200_causal_patch_qwen7b_audit_blinded_annotator_02.csv"
+  "paper/audit/h200_causal_patch_qwen7b_audit_export_manifest.json"
   "paper/audit/h200_causal_patch_qwen7b_audit_key.jsonl"
 )
 
