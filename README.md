@@ -190,8 +190,8 @@ Package arXiv-style source files:
 uv run python scripts/package_arxiv_submission.py
 ```
 
-After the primary and causal H200 runs complete, fetch the result and paper-artifact
-directories into the local checkout with checksum verification:
+After the guarded H200 launcher completes, fetch the result, generated paper assets,
+and blinded audit files into the local checkout with checksum verification:
 
 ```bash
 bash scripts/fetch_h200_results.sh
@@ -200,6 +200,12 @@ bash scripts/fetch_h200_results.sh
 This writes remote and local artifact manifests in `logs/h200/`, compares hashes
 and byte counts, and refuses paths outside `results/`, `paper/generated/`, and
 `paper/audit/`. It does not pull code or start jobs on the H200.
+
+If you need only an intermediate run, pass explicit artifact paths, for example:
+
+```bash
+bash scripts/fetch_h200_results.sh results/h200_qwen_full_sweep paper/generated/h200_qwen_full_sweep
+```
 
 Then rebuild all paper artifacts from recorded results:
 

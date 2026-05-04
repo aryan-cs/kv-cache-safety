@@ -13,11 +13,18 @@ compare_report="${H200_ARTIFACT_COMPARE_REPORT:-logs/h200/h200_artifact_manifest
 default_paths=(
   "results/h200_qwen_full_sweep"
   "results/h200_causal_patch_qwen7b"
+  "results/h200_attention_diagnostic_qwen7b_primary"
   "paper/generated/h200_qwen_full_sweep"
   "paper/generated/h200_causal_patch_qwen7b"
-  "paper/generated/claim_assessment"
-  "paper/audit/h200_qwen_full_sweep_summary"
-  "paper/audit/h200_causal_patch_qwen7b_summary"
+  "paper/generated/h200_attention_diagnostic_qwen7b"
+  "paper/generated/preliminary_claim_assessment"
+  "paper/generated/preliminary_followup_plan"
+  "paper/generated/post_h200_next_steps.json"
+  "paper/generated/post_h200_next_steps.md"
+  "paper/audit/h200_qwen_full_sweep_audit_blinded.csv"
+  "paper/audit/h200_qwen_full_sweep_audit_key.jsonl"
+  "paper/audit/h200_causal_patch_qwen7b_audit_blinded.csv"
+  "paper/audit/h200_causal_patch_qwen7b_audit_key.jsonl"
 )
 
 if [[ "$#" -gt 0 ]]; then
