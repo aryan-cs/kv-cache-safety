@@ -1179,8 +1179,211 @@ def test_publication_status_rejects_public_prompt_without_provenance(
     )
 
 
+def test_publication_status_requires_registered_primary_suites(tmp_path: Path) -> None:
+    primary = tmp_path / "primary"
+    causal = tmp_path / "causal"
+    primary_audit = tmp_path / "primary_audit"
+    causal_audit = tmp_path / "causal_audit"
+    _write_run(primary)
+    _write_run(causal)
+    manifest_path = primary / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["prompt_counts"].pop("public_capability_arc")
+    manifest["prompt_suites"].remove("public_capability_arc")
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    _refresh_figure_manifest_source_hashes(primary)
+    _write_audit(primary_audit, primary)
+    _write_audit(causal_audit, causal)
+    claim_path = tmp_path / "claim_assessment.json"
+    claim_path.write_text(
+        json.dumps(_passing_claim_assessment(primary, causal, primary_audit, causal_audit)),
+        encoding="utf-8",
+    )
+    pdf_path = tmp_path / "paper.pdf"
+    pdf_path.write_bytes(b"%PDF-1.7\n")
+
+    status = publication_status(
+        primary_results_dir=primary,
+        causal_results_dir=causal,
+        primary_audit_dir=primary_audit,
+        causal_audit_dir=causal_audit,
+        claim_assessment_path=claim_path,
+        paper_pdf=pdf_path,
+    )
+
+    assert status["publication_ready"] is False
+    assert "primary_results_complete" in status["blockers"]
+    assert (
+        "missing_required_suite:public_capability_arc"
+        in status["primary_results"]["readiness_failures"]
+    )
+
+
+def test_publication_status_requires_registered_primary_policies(tmp_path: Path) -> None:
+    primary = tmp_path / "primary"
+    causal = tmp_path / "causal"
+    primary_audit = tmp_path / "primary_audit"
+    causal_audit = tmp_path / "causal_audit"
+    _write_run(primary)
+    _write_run(causal)
+    manifest_path = primary / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["cache_policy_configs"] = [
+        policy
+        for policy in manifest["cache_policy_configs"]
+        if policy.get("name") != "random_matched"
+    ]
+    manifest["cache_policy_labels"] = [
+        label for label in manifest["cache_policy_labels"] if not label.startswith("random_matched")
+    ]
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    _refresh_figure_manifest_source_hashes(primary)
+    _write_audit(primary_audit, primary)
+    _write_audit(causal_audit, causal)
+    claim_path = tmp_path / "claim_assessment.json"
+    claim_path.write_text(
+        json.dumps(_passing_claim_assessment(primary, causal, primary_audit, causal_audit)),
+        encoding="utf-8",
+    )
+    pdf_path = tmp_path / "paper.pdf"
+    pdf_path.write_bytes(b"%PDF-1.7\n")
+
+    status = publication_status(
+        primary_results_dir=primary,
+        causal_results_dir=causal,
+        primary_audit_dir=primary_audit,
+        causal_audit_dir=causal_audit,
+        claim_assessment_path=claim_path,
+        paper_pdf=pdf_path,
+    )
+
+    assert status["publication_ready"] is False
+    assert "primary_results_complete" in status["blockers"]
+    assert (
+        "missing_required_policy:random_matched"
+        in status["primary_results"]["readiness_failures"]
+    )
+
+
+def test_publication_status_requires_causal_patch_controls(tmp_path: Path) -> None:
+    primary = tmp_path / "primary"
+    causal = tmp_path / "causal"
+    primary_audit = tmp_path / "primary_audit"
+    causal_audit = tmp_path / "causal_audit"
+    _write_run(primary)
+    _write_run(causal)
+    manifest_path = causal / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    for policy in manifest["cache_policy_configs"]:
+        policy.pop("patch_from_baseline", None)
+    manifest["cache_policy_labels"] = [
+        label for label in manifest["cache_policy_labels"] if "__patch" not in label
+    ]
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    _refresh_figure_manifest_source_hashes(causal)
+    _write_audit(primary_audit, primary)
+    _write_audit(causal_audit, causal)
+    claim_path = tmp_path / "claim_assessment.json"
+    claim_path.write_text(
+        json.dumps(_passing_claim_assessment(primary, causal, primary_audit, causal_audit)),
+        encoding="utf-8",
+    )
+    pdf_path = tmp_path / "paper.pdf"
+    pdf_path.write_bytes(b"%PDF-1.7\n")
+
+    status = publication_status(
+        primary_results_dir=primary,
+        causal_results_dir=causal,
+        primary_audit_dir=primary_audit,
+        causal_audit_dir=causal_audit,
+        claim_assessment_path=claim_path,
+        paper_pdf=pdf_path,
+    )
+
+    assert status["publication_ready"] is False
+    assert "causal_results_complete" in status["blockers"]
+    assert "missing_causal_patch_policy" in status["causal_results"]["readiness_failures"]
+
+
+def test_publication_status_rejects_wide_primary_safety_intervals(tmp_path: Path) -> None:
+    primary = tmp_path / "primary"
+    causal = tmp_path / "causal"
+    primary_audit = tmp_path / "primary_audit"
+    causal_audit = tmp_path / "causal_audit"
+    _write_run(primary)
+    _write_run(causal)
+    metrics_path = primary / "metrics.json"
+    metrics = json.loads(metrics_path.read_text(encoding="utf-8"))
+    metrics["selective_safety_erasure"]["public_refusal_safety::kv_int4_sim"][
+        "paired_safety_degradation_ci"
+    ] = {"mean": 0.12, "ci_low": 0.01, "ci_high": 0.20, "paired_n": 100, "cluster_n": 100}
+    metrics_path.write_text(json.dumps(metrics), encoding="utf-8")
+    _refresh_figure_manifest_source_hashes(primary)
+    _write_audit(primary_audit, primary)
+    _write_audit(causal_audit, causal)
+    claim_path = tmp_path / "claim_assessment.json"
+    claim_path.write_text(
+        json.dumps(_passing_claim_assessment(primary, causal, primary_audit, causal_audit)),
+        encoding="utf-8",
+    )
+    pdf_path = tmp_path / "paper.pdf"
+    pdf_path.write_bytes(b"%PDF-1.7\n")
+
+    status = publication_status(
+        primary_results_dir=primary,
+        causal_results_dir=causal,
+        primary_audit_dir=primary_audit,
+        causal_audit_dir=causal_audit,
+        claim_assessment_path=claim_path,
+        paper_pdf=pdf_path,
+    )
+
+    assert status["publication_ready"] is False
+    assert "primary_results_complete" in status["blockers"]
+    assert any(
+        failure.startswith("public_refusal_safety::kv_int4_sim:paired_safety_ci_width=")
+        for failure in status["primary_results"]["readiness_failures"]
+    )
+
+
 def _write_run(path: Path, manifest_overrides: dict | None = None) -> None:
     (path / "figures").mkdir(parents=True)
+    prompt_counts = {
+        "system_leakage": 2,
+        "public_system_leakage": 650,
+        "public_refusal_safety": 650,
+        "public_benign_overrefusal": 650,
+        "public_xstest_safe": 200,
+        "public_capability_arc": 650,
+    }
+    cache_policy_configs = [
+        {"name": "none"},
+        {"name": "sliding_window", "budget": 64},
+        {"name": "sink_recent", "budget": 128, "sink_tokens": 8},
+        {"name": "random_matched", "budget": 128, "seed": 991},
+        {"name": "kv_int8_sim"},
+        {"name": "kv_int4_sim"},
+        {"name": "policy_pinned", "budget": 128, "sink_tokens": 8},
+        {
+            "name": "kv_int4_sim",
+            "patch_from_baseline": {
+                "token_roles": ["system"],
+                "max_tokens": 16,
+                "selection": "first",
+                "components": ["key", "value"],
+            },
+        },
+        {
+            "name": "kv_int4_sim",
+            "patch_from_baseline": {
+                "token_roles": ["user"],
+                "match_token_count_to_roles": ["system"],
+                "max_tokens": 16,
+                "selection": "first",
+                "components": ["key", "value"],
+            },
+        },
+    ]
     manifest = {
         "model_provider": "hf",
         "model_id": "Qwen/Qwen2.5-14B-Instruct",
@@ -1188,15 +1391,27 @@ def _write_run(path: Path, manifest_overrides: dict | None = None) -> None:
         "git_dirty": False,
         "git_commit": "abc123",
         "expected_generation_count": 2,
-        "cache_policy_labels": ["none", "kv_int4_sim"],
-        "cache_policy_configs": [{"name": "none"}, {"name": "kv_int4_sim"}],
-        "prompt_counts": {"public_refusal_safety": 650},
-        "prompt_suites": ["public_refusal_safety"],
+        "cache_policy_labels": [
+            "none",
+            "sliding_window__budget64",
+            "sink_recent__budget128__sink8",
+            "random_matched__budget128__seed991",
+            "kv_int8_sim",
+            "kv_int4_sim",
+            "policy_pinned__budget128__sink8",
+            "kv_int4_sim__patchkey-value__rolesystem__max16__selfirst",
+            "kv_int4_sim__patchkey-value__roleuser__matchsystem__max16__selfirst",
+        ],
+        "cache_policy_configs": cache_policy_configs,
+        "prompt_counts": prompt_counts,
+        "prompt_suites": list(prompt_counts),
         "prompt_suite_manifests": {
-            "public_refusal_safety": {
-                "sha256": "suite-sha",
-                "record_count": 650,
+            suite: {
+                "sha256": f"{suite}-sha",
+                "record_count": count,
             }
+            for suite, count in prompt_counts.items()
+            if suite.startswith("public_")
         },
     }
     manifest.update(manifest_overrides or {})
@@ -1359,6 +1574,16 @@ def _write_audit(
     (path / "human_audit_summary.json").write_text(json.dumps(summary), encoding="utf-8")
 
 
+def _refresh_figure_manifest_source_hashes(path: Path) -> None:
+    figure_manifest_path = path / "figures" / "manifest.json"
+    figure_manifest = json.loads(figure_manifest_path.read_text(encoding="utf-8"))
+    figure_manifest["source_artifacts"] = {
+        name: {"sha256": _sha256(path / name)}
+        for name in ["manifest.json", "generations.jsonl", "metrics.json", "cache_stats.parquet"]
+    }
+    figure_manifest_path.write_text(json.dumps(figure_manifest), encoding="utf-8")
+
+
 def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
@@ -1372,8 +1597,8 @@ def _passing_metrics() -> dict:
                 "selective_safety_erasure_index": 0.10,
                 "paired_safety_degradation_ci": {
                     "mean": 0.12,
-                    "ci_low": 0.05,
-                    "ci_high": 0.18,
+                    "ci_low": 0.08,
+                    "ci_high": 0.15,
                     "paired_n": 100,
                     "cluster_n": 100,
                 },

@@ -64,6 +64,38 @@ CAUSAL_REQUIRED_FIGURES = [
     "causal_restoration_fraction",
     "causal_restoration_flow",
 ]
+PRIMARY_REQUIRED_SUITES = [
+    "system_leakage",
+    "public_system_leakage",
+    "public_refusal_safety",
+    "public_benign_overrefusal",
+    "public_xstest_safe",
+    "public_capability_arc",
+]
+CAUSAL_REQUIRED_SUITES = [
+    "system_leakage",
+    "public_system_leakage",
+    "public_refusal_safety",
+]
+PRIMARY_SUITE_MIN_PROMPTS = {
+    "system_leakage": 2,
+    "public_xstest_safe": 200,
+}
+CAUSAL_SUITE_MIN_PROMPTS = {
+    "system_leakage": 2,
+}
+PRIMARY_REQUIRED_POLICIES = [
+    "none",
+    "sliding_window",
+    "sink_recent",
+    "random_matched",
+    "kv_int8_sim",
+    "kv_int4_sim",
+    "policy_pinned",
+]
+CAUSAL_REQUIRED_POLICIES = ["none", "kv_int4_sim", "policy_pinned"]
+PRIMARY_MAX_CI_WIDTH = 0.08
+CAUSAL_MAX_CI_WIDTH = 0.12
 EXPECTED_CLAIM_IDS = [
     "H1_behavioral_cache_sensitivity",
     "H2_selective_safety_degradation",
@@ -318,6 +350,7 @@ def _run_readiness_failures(
             )
     if not manifest.get("prompt_counts"):
         failures.append("manifest_lacks_prompt_counts")
+    failures.extend(_profile_contract_failures(results_dir, manifest, profile=profile))
     failures.extend(_prompt_suite_provenance_failures(results_dir, manifest))
     failures.extend(_figure_source_failures(results_dir))
     failures.extend(_figure_manifest_failures(results_dir, profile=profile))
@@ -329,6 +362,110 @@ def _jsonl_row_count(path: Path) -> int | None:
         return None
     with path.open("r", encoding="utf-8") as f:
         return sum(1 for line in f if line.strip())
+
+
+def _profile_contract_failures(
+    results_dir: Path, manifest: dict[str, Any], *, profile: str
+) -> list[str]:
+    failures = []
+    required_suites = PRIMARY_REQUIRED_SUITES if profile == "primary" else CAUSAL_REQUIRED_SUITES
+    suite_min_prompts = (
+        PRIMARY_SUITE_MIN_PROMPTS if profile == "primary" else CAUSAL_SUITE_MIN_PROMPTS
+    )
+    default_min_prompts = 600
+    prompt_counts = manifest.get("prompt_counts") or {}
+    for suite in required_suites:
+        if suite not in prompt_counts:
+            failures.append(f"missing_required_suite:{suite}")
+            continue
+        required_count = suite_min_prompts.get(suite, default_min_prompts)
+        observed_count = _coerce_nonnegative_int(prompt_counts.get(suite), default=0)
+        if observed_count < required_count:
+            failures.append(f"suite_prompt_count:{suite}={observed_count}; required={required_count}")
+
+    policy_configs = manifest.get("cache_policy_configs") or []
+    policy_names = {
+        str(policy.get("name"))
+        for policy in policy_configs
+        if isinstance(policy, dict) and policy.get("name")
+    }
+    required_policies = (
+        PRIMARY_REQUIRED_POLICIES if profile == "primary" else CAUSAL_REQUIRED_POLICIES
+    )
+    for policy in required_policies:
+        if not _policy_present(policy, policy_configs, policy_names):
+            failures.append(f"missing_required_policy:{policy}")
+    metrics = _read_json(results_dir / "metrics.json")
+    if profile == "causal":
+        failures.extend(_causal_patch_contract_failures(policy_configs))
+        if metrics and not metrics.get("causal_restoration"):
+            failures.append("missing_causal_restoration_metrics")
+    failures.extend(_ci_width_failures(metrics, profile=profile))
+    return failures
+
+
+def _policy_present(
+    required_policy: str, policy_configs: list[Any], policy_names: set[str]
+) -> bool:
+    return required_policy in policy_names or any(
+        str(policy.get("name", "")).startswith(required_policy)
+        for policy in policy_configs
+        if isinstance(policy, dict)
+    )
+
+
+def _causal_patch_contract_failures(policy_configs: list[Any]) -> list[str]:
+    patched = [
+        policy.get("patch_from_baseline")
+        for policy in policy_configs
+        if isinstance(policy, dict) and isinstance(policy.get("patch_from_baseline"), dict)
+    ]
+    if not patched:
+        return ["missing_causal_patch_policy"]
+    has_system = any("system" in (patch.get("token_roles") or []) for patch in patched)
+    has_user_control = any(
+        "user" in (patch.get("token_roles") or [])
+        and "system" in (patch.get("match_token_count_to_roles") or [])
+        for patch in patched
+    )
+    failures = []
+    if not has_system:
+        failures.append("missing_system_patch_policy")
+    if not has_user_control:
+        failures.append("missing_matched_user_control_patch_policy")
+    return failures
+
+
+def _ci_width_failures(metrics: dict[str, Any], *, profile: str) -> list[str]:
+    if not metrics:
+        return []
+    max_width = PRIMARY_MAX_CI_WIDTH if profile == "primary" else CAUSAL_MAX_CI_WIDTH
+    failures = []
+    for key, value in metrics.get("selective_safety_erasure", {}).items():
+        if not isinstance(value, dict):
+            failures.append(f"{key}:malformed_selective_safety_erasure_entry")
+            continue
+        ci = value.get("paired_safety_degradation_ci") or {}
+        ci_low = ci.get("ci_low")
+        ci_high = ci.get("ci_high")
+        if ci_low is None or ci_high is None:
+            failures.append(f"{key}:missing_paired_safety_ci")
+            continue
+        try:
+            width = float(ci_high) - float(ci_low)
+        except (TypeError, ValueError):
+            failures.append(f"{key}:invalid_paired_safety_ci")
+            continue
+        if width > max_width:
+            failures.append(f"{key}:paired_safety_ci_width={width:.3f}; target<={max_width:.3f}")
+    return failures
+
+
+def _coerce_nonnegative_int(value: object, *, default: int) -> int:
+    try:
+        return max(0, int(value))
+    except (TypeError, ValueError):
+        return default
 
 
 def _prompt_suite_provenance_failures(results_dir: Path, manifest: dict[str, Any]) -> list[str]:
