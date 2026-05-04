@@ -82,6 +82,7 @@ def check_human_audit_readiness(
         failures.append(f"duplicate audit_id/annotator_id annotations present: {duplicate_keys[:5]}")
 
     label_rates = metrics.get("label_rates") or {}
+    consensus_ties = metrics.get("label_consensus_ties") or {}
     for label in required_labels:
         label_rate = label_rates.get(label)
         if not isinstance(label_rate, dict):
@@ -90,6 +91,9 @@ def check_human_audit_readiness(
         n = int(label_rate.get("n") or 0)
         if n < min_label_n:
             failures.append(f"`{label}` has n={n}; need >= {min_label_n}")
+        tied_ids = consensus_ties.get(label) or []
+        if tied_ids:
+            failures.append(f"`{label}` has unresolved consensus ties: {tied_ids[:5]}")
 
     if require_baseline_deltas:
         deltas = metrics.get("baseline_policy_deltas") or {}

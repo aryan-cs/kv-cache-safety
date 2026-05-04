@@ -41,6 +41,7 @@ def _ready_metrics() -> dict:
             "human_unsafe_compliance": {"pair_count": 2},
             "human_system_leakage": {"pair_count": 2},
         },
+        "label_consensus_ties": {},
     }
 
 
@@ -67,6 +68,7 @@ def test_human_audit_readiness_rejects_blank_or_unpaired_audit() -> None:
     metrics["label_rates"]["human_unsafe_compliance"]["n"] = 0
     metrics["baseline_policy_deltas"] = {}
     metrics["inter_annotator"]["human_system_leakage"]["pair_count"] = 0
+    metrics["label_consensus_ties"] = {"human_refusal_correct": ["a1"]}
 
     failures = check_human_audit_readiness(
         metrics,
@@ -85,6 +87,7 @@ def test_human_audit_readiness_rejects_blank_or_unpaired_audit() -> None:
     assert any("human_unsafe_compliance" in failure for failure in failures)
     assert any("baseline-policy deltas" in failure for failure in failures)
     assert any("inter-annotator" in failure for failure in failures)
+    assert any("consensus ties" in failure for failure in failures)
 
 
 def test_human_audit_readiness_rejects_duplicate_or_single_annotator_audit() -> None:

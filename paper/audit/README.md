@@ -58,7 +58,7 @@ Accepted label values are `yes`, `no`, `true`, `false`, `1`, `0`, or blank. The 
 - `human_audit_deltas_table.tex`
 - `audit_manifest.json`
 
-The JSON summary includes Wilson confidence intervals for label rates, automated-vs-human confusion matrices, pairwise inter-annotator agreement across distinct annotators, duplicate-annotation diagnostics, and paired baseline-vs-policy deltas when the same `prompt_id`, `seed`, and annotator appear under `none` and a treatment policy.
+The JSON summary reports publication-facing label rates at the item level after majority consensus across annotators; unresolved ties are listed and block readiness. It also keeps annotation-level label rates as diagnostics, includes Wilson confidence intervals, automated-vs-human confusion matrices, pairwise inter-annotator agreement across distinct annotators, duplicate-annotation diagnostics, and paired baseline-vs-policy deltas when the same `prompt_id` and `seed` appear under `none` and a treatment policy.
 
 Before using the audit in the paper, run:
 

@@ -161,19 +161,21 @@ def _audit_metrics(
     unknown_ids: list[str],
     duplicate_annotation_keys: list[str],
 ) -> dict[str, Any]:
+    consensus_rows, consensus_ties = _consensus_rows(joined_rows)
     completed_ids = {
         str(row["audit_id"])
         for row in joined_rows
         if any(row.get(field) is not None for field in BOOLEAN_LABELS)
     }
     by_suite_policy: dict[tuple[str, str], list[dict[str, Any]]] = defaultdict(list)
-    for row in joined_rows:
+    for row in consensus_rows:
         by_suite_policy[(str(row.get("suite")), str(row.get("policy")))].append(row)
     return {
         "schema_version": 1,
         "expected_audit_count": len(expected_audit_ids),
         "annotation_row_count": len(joined_rows),
         "completed_audit_count": len(completed_ids),
+        "consensus_audit_count": len(consensus_rows),
         "completion_rate": len(completed_ids) / len(expected_audit_ids) if expected_audit_ids else None,
         "unknown_audit_ids": sorted(set(unknown_ids)),
         "duplicate_annotation_keys": duplicate_annotation_keys,
@@ -181,10 +183,13 @@ def _audit_metrics(
             {str(row.get("annotator_id")) for row in joined_rows if row.get("annotator_id")}
         ),
         "multi_annotator_audit_count": _multi_annotator_audit_count(joined_rows),
-        "label_rates": {field: _rate(joined_rows, field) for field in BOOLEAN_LABELS},
-        "automated_label_disagreement": _automated_disagreement(joined_rows),
-        "automated_label_confusion": _automated_confusion(joined_rows),
-        "baseline_policy_deltas": _baseline_policy_deltas(joined_rows),
+        "label_rates": {field: _rate(consensus_rows, field) for field in BOOLEAN_LABELS},
+        "annotation_label_rates": {field: _rate(joined_rows, field) for field in BOOLEAN_LABELS},
+        "label_consensus_ties": consensus_ties,
+        "automated_label_disagreement": _automated_disagreement(consensus_rows),
+        "automated_label_confusion": _automated_confusion(consensus_rows),
+        "baseline_policy_deltas": _baseline_policy_deltas(consensus_rows),
+        "annotation_baseline_policy_deltas": _baseline_policy_deltas(joined_rows),
         "inter_annotator": {
             field: _inter_annotator_agreement(joined_rows, field) for field in BOOLEAN_LABELS
         },
@@ -198,6 +203,37 @@ def _audit_metrics(
             for (suite, policy), rows in sorted(by_suite_policy.items())
         },
     }
+
+
+def _consensus_rows(rows: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], dict[str, list[str]]]:
+    by_audit_id: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for row in rows:
+        by_audit_id[str(row["audit_id"])].append(row)
+    consensus_rows = []
+    ties: dict[str, list[str]] = {field: [] for field in BOOLEAN_LABELS}
+    for audit_id, audit_rows in sorted(by_audit_id.items()):
+        base = dict(audit_rows[0])
+        base["annotator_id"] = "consensus"
+        base["annotator_count"] = len(
+            {str(row.get("annotator_id") or "annotator_0") for row in audit_rows}
+        )
+        vote_counts: dict[str, dict[str, int]] = {}
+        for field in BOOLEAN_LABELS:
+            values = [row.get(field) for row in audit_rows if row.get(field) is not None]
+            true_count = sum(1 for value in values if value is True)
+            false_count = sum(1 for value in values if value is False)
+            vote_counts[field] = {"true": true_count, "false": false_count}
+            if true_count > false_count:
+                base[field] = True
+            elif false_count > true_count:
+                base[field] = False
+            else:
+                base[field] = None
+                if values:
+                    ties[field].append(audit_id)
+        base["label_vote_counts"] = vote_counts
+        consensus_rows.append(base)
+    return consensus_rows, {field: ids for field, ids in ties.items() if ids}
 
 
 def _rate(rows: list[dict[str, Any]], field: str) -> dict[str, float | int | None]:
@@ -435,6 +471,7 @@ def render_summary_markdown(metrics: dict[str, Any]) -> str:
         "",
         f"Expected audit items: `{metrics['expected_audit_count']}`",
         f"Completed audit items: `{metrics['completed_audit_count']}`",
+        f"Consensus audit items: `{metrics['consensus_audit_count']}`",
         f"Completion rate: `{_format_float(metrics['completion_rate'])}`",
         "",
         "## Label Rates",
@@ -499,7 +536,7 @@ def render_summary_latex(metrics: dict[str, Any]) -> str:
         [
             r"\bottomrule",
             r"\end{tabular}",
-            r"\caption{Human-audit label rates with Wilson confidence intervals.}",
+            r"\caption{Item-level consensus human-audit label rates with Wilson confidence intervals.}",
             r"\label{tab:human-audit-summary}",
             r"\end{table}",
             "",
