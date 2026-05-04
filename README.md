@@ -190,6 +190,14 @@ bash scripts/build_publication_artifacts.sh
 
 This command regenerates aggregate metrics, figures, paper tables, CI planning files, the evidence-gated claim assessment, readiness checks, the readable PDF, and the arXiv source bundle. It fails if the required real result artifacts, completed human-audit summaries, or cache-mediated-safety-erasure claim gates are missing.
 
+To see the next fail-closed step without running the full rebuild:
+
+```bash
+uv run python scripts/post_h200_next_steps.py
+```
+
+This checklist reports whether the next legitimate action is completing H200 results, completing human audits, assessing claims, or building the final publication bundle.
+
 If early results are weak or mixed, do not silently search for a better framing. Generate an evidence-gated follow-up plan from the completed claim assessment:
 
 ```bash

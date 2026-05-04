@@ -1,0 +1,75 @@
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path("scripts").resolve()))
+
+from post_h200_next_steps import post_h200_next_steps, render_markdown
+
+
+def test_post_h200_next_steps_starts_with_h200_results_when_missing() -> None:
+    report = post_h200_next_steps(
+        {
+            "publication_ready": False,
+            "blockers": ["primary_results_complete", "causal_results_complete"],
+            "gates": {
+                "primary_results_complete": False,
+                "causal_results_complete": False,
+                "primary_human_audit_complete": False,
+                "causal_human_audit_complete": False,
+                "claim_assessment_passed": False,
+                "paper_pdf_exists": True,
+                "arxiv_bundle_ready": False,
+            },
+        }
+    )
+
+    assert report["publication_ready"] is False
+    assert report["next_step"] == "complete_h200_results"
+    assert report["steps"][0]["state"] == "ready"
+    assert report["steps"][1]["state"] == "blocked"
+    assert "wait_and_run_h200_sweep.sh" in render_markdown(report)
+
+
+def test_post_h200_next_steps_requires_audits_before_claims() -> None:
+    report = post_h200_next_steps(
+        {
+            "publication_ready": False,
+            "blockers": ["primary_human_audit_complete", "causal_human_audit_complete"],
+            "gates": {
+                "primary_results_complete": True,
+                "causal_results_complete": True,
+                "primary_human_audit_complete": False,
+                "causal_human_audit_complete": False,
+                "claim_assessment_passed": False,
+                "paper_pdf_exists": True,
+                "arxiv_bundle_ready": False,
+            },
+        }
+    )
+
+    assert report["next_step"] == "complete_human_audits"
+    assert report["steps"][0]["state"] == "complete"
+    assert report["steps"][1]["state"] == "ready"
+    assert report["steps"][2]["state"] == "blocked"
+
+
+def test_post_h200_next_steps_marks_publication_bundle_ready_after_claims() -> None:
+    report = post_h200_next_steps(
+        {
+            "publication_ready": False,
+            "blockers": ["arxiv_bundle_ready"],
+            "gates": {
+                "primary_results_complete": True,
+                "causal_results_complete": True,
+                "primary_human_audit_complete": True,
+                "causal_human_audit_complete": True,
+                "claim_assessment_passed": True,
+                "paper_pdf_exists": True,
+                "arxiv_bundle_ready": False,
+            },
+        }
+    )
+
+    assert report["next_step"] == "build_publication_bundle"
+    assert report["steps"][-1]["state"] == "ready"
+    assert "build_publication_artifacts.sh" in render_markdown(report)
