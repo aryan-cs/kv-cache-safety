@@ -21,6 +21,52 @@ def test_claim_assessment_passes_only_with_causal_system_control_gap() -> None:
     assert "cache-mediated safety erasure" in assessment["recommended_framing"]
 
 
+def test_claim_assessment_requires_human_audit_when_configured() -> None:
+    assessment = assess_claims(
+        _primary_positive_metrics(),
+        _causal_positive_metrics(),
+        require_human_audit_support=True,
+    )
+
+    assert assessment["publication_gate"]["passed"] is False
+    assert assessment["human_audit_support"]["passed"] is False
+    assert "human-audit gate has not cleared" in assessment["recommended_framing"]
+
+
+def test_claim_assessment_passes_with_aligned_human_audit_support() -> None:
+    assessment = assess_claims(
+        _primary_positive_metrics(),
+        _causal_positive_metrics(),
+        primary_audit_metrics=_audit_positive_metrics(),
+        causal_audit_metrics=_audit_positive_metrics(),
+        require_human_audit_support=True,
+    )
+
+    assert assessment["publication_gate"]["passed"] is True
+    assert assessment["human_audit_support"]["passed"] is True
+    assert assessment["human_audit_support"]["best_primary_delta"]["support"] > 0
+
+
+def test_claim_assessment_rejects_human_audit_that_contradicts_direction() -> None:
+    audit = _audit_positive_metrics()
+    audit["baseline_policy_deltas"] = {
+        "public_refusal_safety::kv_int4_sim::human_refusal_correct": {
+            "treatment_minus_baseline": 0.20,
+            "n": 4,
+        }
+    }
+    assessment = assess_claims(
+        _primary_positive_metrics(),
+        _causal_positive_metrics(),
+        primary_audit_metrics=audit,
+        causal_audit_metrics=_audit_positive_metrics(),
+        require_human_audit_support=True,
+    )
+
+    assert assessment["publication_gate"]["passed"] is False
+    assert assessment["human_audit_support"]["passed"] is False
+
+
 def test_claim_assessment_rejects_selective_effect_without_causal_control_gap() -> None:
     causal = _causal_positive_metrics()
     user_control = causal["causal_restoration"][
@@ -199,4 +245,26 @@ def _causal_positive_metrics() -> dict:
                 },
             },
         }
+    }
+
+
+def _audit_positive_metrics() -> dict:
+    return {
+        "completion_rate": 1.0,
+        "unknown_audit_ids": [],
+        "label_rates": {
+            "human_refusal_correct": {"n": 8},
+            "human_unsafe_compliance": {"n": 8},
+            "human_system_leakage": {"n": 8},
+        },
+        "baseline_policy_deltas": {
+            "public_refusal_safety::kv_int4_sim::human_refusal_correct": {
+                "treatment_minus_baseline": -0.25,
+                "n": 4,
+            },
+            "public_refusal_safety::kv_int4_sim::human_unsafe_compliance": {
+                "treatment_minus_baseline": 0.25,
+                "n": 4,
+            },
+        },
     }

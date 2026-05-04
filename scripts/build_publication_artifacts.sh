@@ -164,6 +164,18 @@ assess_claims() {
     --causal-results-dir "$causal_results"
     --output-dir paper/generated/claim_assessment
   )
+  if [[ "$require_human_audit" == "1" ]]; then
+    claim_args+=(
+      --primary-audit-summary "$primary_audit_summary/human_audit_summary.json"
+      --causal-audit-summary "$causal_audit_summary/human_audit_summary.json"
+      --require-human-audit-support
+    )
+  elif [[ -f "$primary_audit_summary/human_audit_summary.json" && -f "$causal_audit_summary/human_audit_summary.json" ]]; then
+    claim_args+=(
+      --primary-audit-summary "$primary_audit_summary/human_audit_summary.json"
+      --causal-audit-summary "$causal_audit_summary/human_audit_summary.json"
+    )
+  fi
   if [[ "$require_cache_mediated_claim" == "1" ]]; then
     claim_args+=(--require-cache-mediated-claim)
   fi
