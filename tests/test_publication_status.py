@@ -1098,6 +1098,46 @@ def test_publication_status_rejects_empty_figure_manifest(tmp_path: Path) -> Non
     )
 
 
+def test_publication_status_rejects_public_prompt_without_provenance(
+    tmp_path: Path,
+) -> None:
+    primary = tmp_path / "primary"
+    causal = tmp_path / "causal"
+    primary_audit = tmp_path / "primary_audit"
+    causal_audit = tmp_path / "causal_audit"
+    _write_run(primary)
+    _write_run(causal)
+    _write_audit(primary_audit, primary)
+    _write_audit(causal_audit, causal)
+    (primary / "prompts.jsonl").write_text(
+        '{"suite":"public_refusal_safety","prompt_id":"p1","metadata":{}}\n',
+        encoding="utf-8",
+    )
+    claim_path = tmp_path / "claim_assessment.json"
+    claim_path.write_text(
+        json.dumps(_passing_claim_assessment(primary, causal, primary_audit, causal_audit)),
+        encoding="utf-8",
+    )
+    pdf_path = tmp_path / "paper.pdf"
+    pdf_path.write_bytes(b"%PDF-1.7\n")
+
+    status = publication_status(
+        primary_results_dir=primary,
+        causal_results_dir=causal,
+        primary_audit_dir=primary_audit,
+        causal_audit_dir=causal_audit,
+        claim_assessment_path=claim_path,
+        paper_pdf=pdf_path,
+    )
+
+    assert status["publication_ready"] is False
+    assert "primary_results_complete" in status["blockers"]
+    assert (
+        "public_prompts_lack_dataset_provenance:1"
+        in status["primary_results"]["readiness_failures"]
+    )
+
+
 def _write_run(path: Path, manifest_overrides: dict | None = None) -> None:
     (path / "figures").mkdir(parents=True)
     manifest = {
@@ -1110,10 +1150,22 @@ def _write_run(path: Path, manifest_overrides: dict | None = None) -> None:
         "cache_policy_labels": ["none", "kv_int4_sim"],
         "cache_policy_configs": [{"name": "none"}, {"name": "kv_int4_sim"}],
         "prompt_counts": {"public_refusal_safety": 650},
+        "prompt_suites": ["public_refusal_safety"],
+        "prompt_suite_manifests": {
+            "public_refusal_safety": {
+                "sha256": "suite-sha",
+                "record_count": 650,
+            }
+        },
     }
     manifest.update(manifest_overrides or {})
-    for name in ["config.resolved.yaml", "environment.json", "prompts.jsonl", "cache_stats.parquet"]:
+    for name in ["config.resolved.yaml", "environment.json", "cache_stats.parquet"]:
         (path / name).write_text("artifact\n", encoding="utf-8")
+    (path / "prompts.jsonl").write_text(
+        '{"suite":"public_refusal_safety","prompt_id":"p1",'
+        '"metadata":{"source_dataset":"unit","source_split":"test"}}\n',
+        encoding="utf-8",
+    )
     (path / "generations.jsonl").write_text(
         '{"suite":"public_refusal_safety","prompt_id":"p1","policy":"none","seed":0}\n'
         '{"suite":"public_refusal_safety","prompt_id":"p1","policy":"kv_int4_sim","seed":0}\n',

@@ -317,6 +317,7 @@ def _run_readiness_failures(
             )
     if not manifest.get("prompt_counts"):
         failures.append("manifest_lacks_prompt_counts")
+    failures.extend(_prompt_suite_provenance_failures(results_dir, manifest))
     failures.extend(_figure_source_failures(results_dir))
     failures.extend(_figure_manifest_failures(results_dir, profile=profile))
     return failures
@@ -327,6 +328,44 @@ def _jsonl_row_count(path: Path) -> int | None:
         return None
     with path.open("r", encoding="utf-8") as f:
         return sum(1 for line in f if line.strip())
+
+
+def _prompt_suite_provenance_failures(results_dir: Path, manifest: dict[str, Any]) -> list[str]:
+    prompt_counts = manifest.get("prompt_counts") or {}
+    prompt_suites = manifest.get("prompt_suites") or list(prompt_counts)
+    public_suites = sorted(str(suite) for suite in prompt_suites if str(suite).startswith("public_"))
+    if not public_suites:
+        return []
+    failures = []
+    prompt_suite_manifests = manifest.get("prompt_suite_manifests") or {}
+    for suite in public_suites:
+        suite_manifest = prompt_suite_manifests.get(suite)
+        if not isinstance(suite_manifest, dict):
+            failures.append(f"missing_processed_suite_manifest:{suite}")
+            continue
+        if not suite_manifest.get("sha256") or not suite_manifest.get("record_count"):
+            failures.append(f"processed_suite_manifest_lacks_hash_count:{suite}")
+
+    prompts_path = results_dir / "prompts.jsonl"
+    if not prompts_path.exists():
+        return failures
+    public_without_provenance = 0
+    with prompts_path.open("r", encoding="utf-8") as f:
+        for line_number, line in enumerate(f, start=1):
+            if not line.strip():
+                continue
+            try:
+                row = json.loads(line)
+            except json.JSONDecodeError as exc:
+                failures.append(f"invalid_prompts_jsonl:{line_number}:{exc.msg}")
+                continue
+            if str(row.get("suite", "")).startswith("public_"):
+                metadata = row.get("metadata") or {}
+                if not metadata.get("source_dataset") or not metadata.get("source_split"):
+                    public_without_provenance += 1
+    if public_without_provenance:
+        failures.append(f"public_prompts_lack_dataset_provenance:{public_without_provenance}")
+    return failures
 
 
 def _figure_source_failures(results_dir: Path) -> list[str]:
