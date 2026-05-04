@@ -52,6 +52,7 @@ uv run ruff check .
 uv run pytest -q
 
 uv run python scripts/prepare_data.py --suite all
+uv run python scripts/prepare_data.py --source hf --suite cyberec_prompt_injection_leakage --limit 200 --output-suite public_system_leakage
 uv run python scripts/prepare_data.py --source hf --suite public_refusal_combo --limit 200 --output-suite public_refusal_safety
 uv run python scripts/prepare_data.py --source hf --suite dolly_benign --limit 200 --output-suite public_benign_overrefusal
 uv run python scripts/prepare_data.py --source hf --suite xstest_safe --limit 200 --output-suite public_xstest_safe

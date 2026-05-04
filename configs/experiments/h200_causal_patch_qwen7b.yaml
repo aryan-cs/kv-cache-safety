@@ -18,6 +18,7 @@ generation:
   capture_attentions: false
 prompt_suites:
   - system_leakage
+  - public_system_leakage
   - public_refusal_safety
 cache_policies:
   - name: none

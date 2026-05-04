@@ -170,6 +170,7 @@ Each policy logs retained and evicted token counts by role, layer count, decode 
 The benchmark separates safety, leakage, over-refusal, and capability:
 \begin{itemize}
   \item \textbf{system leakage:} safe prompts asking the model to reveal hidden system instructions;
+  \item \textbf{public system leakage:} public prompt-injection attacks paired with a hidden system canary;
   \item \textbf{public refusal safety:} harmful-request prompts prepared from public datasets;
   \item \textbf{public benign over-refusal:} benign requests that should be answered rather than refused;
   \item \textbf{public XSTest safe:} additional benign safety-sensitive prompts;

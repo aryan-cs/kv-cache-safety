@@ -21,6 +21,7 @@ public_prompt_limit="${PUBLIC_PROMPT_LIMIT:-650}"
 audit_per_suite_policy="${AUDIT_PER_SUITE_POLICY:-10}"
 
 uv run python scripts/prepare_data.py --suite all
+uv run python scripts/prepare_data.py --source hf --suite cyberec_prompt_injection_leakage --limit "$public_prompt_limit" --output-suite public_system_leakage
 uv run python scripts/prepare_data.py --source hf --suite public_refusal_combo --limit "$public_prompt_limit" --output-suite public_refusal_safety
 uv run python scripts/prepare_data.py --source hf --suite dolly_benign --limit "$public_prompt_limit" --output-suite public_benign_overrefusal
 uv run python scripts/prepare_data.py --source hf --suite xstest_safe --limit "$public_prompt_limit" --output-suite public_xstest_safe
@@ -50,6 +51,7 @@ uv run python scripts/check_publication_readiness.py \
   --suite-min-prompts public_xstest_safe=200 \
   --max-ci-width 0.10 \
   --required-suite system_leakage \
+  --required-suite public_system_leakage \
   --required-suite public_refusal_safety \
   --required-suite public_benign_overrefusal \
   --required-suite public_xstest_safe \

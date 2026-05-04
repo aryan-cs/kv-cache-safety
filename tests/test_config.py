@@ -36,6 +36,7 @@ def test_h200_public_sweep_uses_prompt_clusters_not_repeated_deterministic_seeds
     assert config.generation.do_sample is False
     assert config.seeds == (0,)
     assert config.limit_per_suite is None
+    assert "public_system_leakage" in config.prompt_suites
 
 
 @pytest.mark.skipif(
@@ -98,6 +99,7 @@ def test_h200_scripts_use_composite_public_refusal_suite() -> None:
     ]:
         script = script_path.read_text(encoding="utf-8")
         assert "--suite public_refusal_combo" in script
+        assert "--suite cyberec_prompt_injection_leakage" in script
         assert "--suite advbench" not in script
 
 
