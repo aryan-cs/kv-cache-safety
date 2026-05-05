@@ -19,6 +19,9 @@ def test_claim_assessment_passes_only_with_causal_system_control_gap() -> None:
     assert assessment["claims"]["H1_behavioral_cache_sensitivity"]["passed"] is True
     assert assessment["claims"]["H2_selective_safety_degradation"]["passed"] is True
     assert assessment["claims"]["H3_causal_safety_state_erasure"]["passed"] is True
+    best = assessment["claims"]["H3_causal_safety_state_erasure"]["best_comparison"]
+    assert round(best["margin_ci_high"], 3) == 0.440
+    assert round(best["margin_ci_width"], 3) == 0.180
     assert "cache-mediated safety erasure" in assessment["recommended_framing"]
 
 
@@ -245,6 +248,21 @@ def test_claim_assessment_rejects_wide_causal_intervals() -> None:
 
     assert assessment["claims"]["H3_causal_safety_state_erasure"]["passed"] is False
     assert "system/control CI widths 0.250/0.080" in assessment["claims"]["H3_causal_safety_state_erasure"]["summary"]
+    assert assessment["publication_gate"]["passed"] is False
+
+
+def test_claim_assessment_rejects_wide_causal_margin_interval() -> None:
+    assessment = assess_claims(
+        _primary_positive_metrics(),
+        _causal_positive_metrics(),
+        max_causal_margin_ci_width=0.12,
+    )
+
+    h3 = assessment["claims"]["H3_causal_safety_state_erasure"]
+
+    assert h3["passed"] is False
+    assert round(h3["best_comparison"]["margin_ci_width"], 3) == 0.180
+    assert "width 0.180" in h3["summary"]
     assert assessment["publication_gate"]["passed"] is False
 
 

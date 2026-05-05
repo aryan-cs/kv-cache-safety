@@ -1973,7 +1973,15 @@ def _claim_best_evidence_failures(claim_id: str, claim: dict[str, Any]) -> list[
         if not isinstance(comparison, dict):
             return [f"claim_lacks_best_comparison:{claim_id}"]
         failures = []
-        for key in ["margin", "margin_ci_low", "system_ci_width", "control_ci_width", "passed"]:
+        for key in [
+            "margin",
+            "margin_ci_low",
+            "margin_ci_high",
+            "margin_ci_width",
+            "system_ci_width",
+            "control_ci_width",
+            "passed",
+        ]:
             if key not in comparison:
                 failures.append(f"claim_lacks_best_comparison_{key}:{claim_id}")
         for key in ["system_patch", "matched_user_control"]:
@@ -2026,6 +2034,9 @@ def _claim_recompute_failures(
         min_human_audit_delta=float(thresholds.get("min_human_audit_delta", 0.0)),
         max_primary_ci_width=float(thresholds.get("max_primary_ci_width", PRIMARY_MAX_CI_WIDTH)),
         max_causal_ci_width=float(thresholds.get("max_causal_ci_width", CAUSAL_MAX_CI_WIDTH)),
+        max_causal_margin_ci_width=float(
+            thresholds.get("max_causal_margin_ci_width", CAUSAL_MAX_CI_WIDTH * 2)
+        ),
         require_human_audit_support=True,
     )
     failures = []

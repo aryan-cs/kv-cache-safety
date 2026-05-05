@@ -30,6 +30,7 @@ def main() -> None:
     parser.add_argument("--min-human-audit-delta", type=float, default=0.0)
     parser.add_argument("--max-primary-ci-width", type=float, default=0.08)
     parser.add_argument("--max-causal-ci-width", type=float, default=0.12)
+    parser.add_argument("--max-causal-margin-ci-width", type=float, default=0.24)
     parser.add_argument("--require-human-audit-support", action="store_true")
     parser.add_argument(
         "--require-cache-mediated-claim",
@@ -54,6 +55,7 @@ def main() -> None:
         min_human_audit_delta=args.min_human_audit_delta,
         max_primary_ci_width=args.max_primary_ci_width,
         max_causal_ci_width=args.max_causal_ci_width,
+        max_causal_margin_ci_width=args.max_causal_margin_ci_width,
         require_human_audit_support=(
             args.require_human_audit_support or args.require_cache_mediated_claim
         ),
@@ -105,6 +107,7 @@ def assess_claims(
     min_human_audit_delta: float = 0.0,
     max_primary_ci_width: float = 0.08,
     max_causal_ci_width: float = 0.12,
+    max_causal_margin_ci_width: float = 0.24,
     require_human_audit_support: bool = False,
 ) -> dict[str, Any]:
     thresholds = {
@@ -115,6 +118,7 @@ def assess_claims(
         "min_human_audit_delta": min_human_audit_delta,
         "max_primary_ci_width": max_primary_ci_width,
         "max_causal_ci_width": max_causal_ci_width,
+        "max_causal_margin_ci_width": max_causal_margin_ci_width,
     }
     h1 = _assess_behavioral_cache_sensitivity(
         primary_metrics,
@@ -131,6 +135,7 @@ def assess_claims(
         min_restoration_fraction=min_restoration_fraction,
         min_restoration_margin=min_restoration_margin,
         max_ci_width=max_causal_ci_width,
+        max_margin_ci_width=max_causal_margin_ci_width,
     )
     audit_support = _assess_human_audit_support(
         primary_audit_metrics,
@@ -546,6 +551,7 @@ def _assess_causal_restoration(
     min_restoration_fraction: float,
     min_restoration_margin: float,
     max_ci_width: float,
+    max_margin_ci_width: float,
 ) -> dict[str, Any]:
     grouped: dict[tuple[str, str, str, str], dict[str, list[dict[str, Any]]]] = {}
     for key, values in metrics.get("causal_restoration", {}).items():
@@ -583,6 +589,8 @@ def _assess_causal_restoration(
             continue
         margin = system["value"] - user_control["value"]
         margin_ci_low = system["ci_low"] - user_control["ci_high"]
+        margin_ci_high = system["ci_high"] - user_control["ci_low"]
+        margin_ci_width = _ci_width(margin_ci_low, margin_ci_high)
         system_ci_width = _ci_width(system["ci_low"], system["ci_high"])
         control_ci_width = _ci_width(user_control["ci_low"], user_control["ci_high"])
         passed = (
@@ -590,6 +598,7 @@ def _assess_causal_restoration(
             and margin_ci_low >= min_restoration_margin
             and _ci_width_ok(system_ci_width, max_ci_width)
             and _ci_width_ok(control_ci_width, max_ci_width)
+            and _ci_width_ok(margin_ci_width, max_margin_ci_width)
         )
         comparisons.append(
             {
@@ -600,6 +609,8 @@ def _assess_causal_restoration(
                 "matched_user_control": user_control,
                 "margin": margin,
                 "margin_ci_low": margin_ci_low,
+                "margin_ci_high": margin_ci_high,
+                "margin_ci_width": margin_ci_width,
                 "system_ci_width": system_ci_width,
                 "control_ci_width": control_ci_width,
                 "passed": passed,
@@ -1052,7 +1063,9 @@ def _summarize_causal_evidence(best: dict[str, Any] | None, passed: bool) -> str
         f"95% CI [{_fmt(system['ci_low'])}, {_fmt(system['ci_high'])}] versus user control "
         f"{_fmt(control['value'])} 95% CI [{_fmt(control['ci_low'])}, "
         f"{_fmt(control['ci_high'])}]; margin {_fmt(best['margin'])}, "
-        f"conservative lower bound {_fmt(best['margin_ci_low'])}; "
+        f"conservative 95% CI [{_fmt(best['margin_ci_low'])}, "
+        f"{_fmt(best.get('margin_ci_high'))}] "
+        f"with width {_fmt(best.get('margin_ci_width'))}; "
         f"system/control CI widths {_fmt(best.get('system_ci_width'))}/"
         f"{_fmt(best.get('control_ci_width'))}."
     )

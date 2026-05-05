@@ -3476,6 +3476,7 @@ def _passing_claim_assessment(
             "min_human_audit_delta": 0.0,
             "max_primary_ci_width": 0.08,
             "max_causal_ci_width": 0.12,
+            "max_causal_margin_ci_width": 0.24,
         },
         "claims": {
             "H1_behavioral_cache_sensitivity": {
@@ -3522,8 +3523,10 @@ def _passing_claim_assessment(
                         "ci_low": 0.16,
                         "ci_high": 0.25,
                     },
-                    "margin": 0.3,
-                    "margin_ci_low": 0.1,
+                    "margin": 0.42,
+                    "margin_ci_low": 0.31,
+                    "margin_ci_high": 0.51,
+                    "margin_ci_width": 0.20,
                     "system_ci_width": 0.11,
                     "control_ci_width": 0.09,
                     "passed": True,
