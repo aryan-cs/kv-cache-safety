@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 from dataclasses import asdict, replace
 from pathlib import Path
 from typing import Any
@@ -24,6 +25,7 @@ from cache_safety_erasure.utils.io import (
     environment_snapshot,
     make_run_dir,
     read_jsonl,
+    read_jsonl_tolerant,
     utc_timestamp,
     write_json,
     write_jsonl,
@@ -55,23 +57,18 @@ def main() -> None:
     run_dir = make_run_dir(
         config.run.output_dir, config.run.name, config.run.run_id, config.run.resume
     )
-    dump_yaml(raw_config, run_dir / "config.resolved.yaml")
     env = environment_snapshot()
-    write_json(run_dir / "environment.json", env)
     generations_path = run_dir / "generations.jsonl"
-    existing = read_jsonl(generations_path) if config.run.resume else []
     if config.run.resume:
-        existing = _reconcile_resume_generations(run_dir, existing)
-    done_keys = {
-        (row["prompt_id"], row["suite"], row["policy"], int(row["seed"])) for row in existing
-    }
+        existing, corrupt_tail_path = read_jsonl_tolerant(generations_path)
+        if corrupt_tail_path is not None:
+            print(
+                "Resume recovery quarantined a corrupt generations.jsonl tail at "
+                f"{corrupt_tail_path}."
+            )
+    else:
+        existing = []
 
-    model_bundle = load_model(config.model)
-    device_map = (
-        hf_device_map(model_bundle.model)
-        if getattr(model_bundle, "model", None) is not None
-        else None
-    )
     suite_prompts = {}
     prompt_counts = {}
     prompt_suite_manifests = {}
@@ -85,27 +82,40 @@ def main() -> None:
     policy_labels = [cache_policy_label(policy) for policy in config.cache_policies]
     expected_generation_count = sum(prompt_counts.values()) * len(config.seeds) * len(policy_labels)
 
-    write_json(
-        run_dir / "manifest.json",
-        {
-            "run_name": config.run.name,
-            "model_id": config.model.model_id,
-            "model_provider": config.model.provider,
-            "model_config": asdict(config.model),
-            "model_device_map": device_map,
-            "git_commit": env.get("git_commit"),
-            "git_dirty": env.get("git_dirty"),
-            "config_sha256": _stable_hash(raw_config),
-            "prompt_suites": list(config.prompt_suites),
-            "prompt_counts": prompt_counts,
-            "prompt_suite_manifests": prompt_suite_manifests,
-            "cache_policy_configs": [_policy_manifest(policy) for policy in config.cache_policies],
-            "cache_policy_labels": policy_labels,
-            "seeds": list(config.seeds),
-            "limit_per_suite": config.limit_per_suite,
-            "expected_generation_count": expected_generation_count,
-        },
+    manifest_base = {
+        "run_name": config.run.name,
+        "model_id": config.model.model_id,
+        "model_provider": config.model.provider,
+        "model_config": asdict(config.model),
+        "model_device_map": None,
+        "git_commit": env.get("git_commit"),
+        "git_dirty": env.get("git_dirty"),
+        "config_sha256": _stable_hash(raw_config),
+        "resume_compatible_config_sha256": _stable_hash(_resume_compatible_config(raw_config)),
+        "prompt_suites": list(config.prompt_suites),
+        "prompt_counts": prompt_counts,
+        "prompt_suite_manifests": prompt_suite_manifests,
+        "cache_policy_configs": [_policy_manifest(policy) for policy in config.cache_policies],
+        "cache_policy_labels": policy_labels,
+        "seeds": list(config.seeds),
+        "limit_per_suite": config.limit_per_suite,
+        "expected_generation_count": expected_generation_count,
+    }
+    if config.run.resume:
+        _validate_resume_manifest(run_dir, manifest_base, env)
+        existing = _reconcile_resume_generations(run_dir, existing)
+    done_keys = {
+        (row["prompt_id"], row["suite"], row["policy"], int(row["seed"])) for row in existing
+    }
+
+    model_bundle = load_model(config.model)
+    device_map = (
+        hf_device_map(model_bundle.model)
+        if getattr(model_bundle, "model", None) is not None
+        else None
     )
+    manifest = {**manifest_base, "model_device_map": device_map}
+    _write_run_start_artifacts(run_dir, raw_config, env, manifest, resume=config.run.resume)
 
     cache_stat_rows: list[dict] = []
     cache_stats_sink = _CacheStatsSink(run_dir / "cache_stats.parquet", resume=config.run.resume)
@@ -198,6 +208,87 @@ def _raw_config_with_run_overrides(
     return updated
 
 
+def _resume_compatible_config(raw_config: dict[str, Any]) -> dict[str, Any]:
+    updated = json.loads(json.dumps(raw_config, default=str))
+    run = updated.get("run")
+    if isinstance(run, dict):
+        run.pop("resume", None)
+    return updated
+
+
+RESUME_MANIFEST_STABLE_KEYS = [
+    "run_name",
+    "model_id",
+    "model_provider",
+    "model_config",
+    "prompt_suites",
+    "prompt_counts",
+    "prompt_suite_manifests",
+    "cache_policy_configs",
+    "cache_policy_labels",
+    "seeds",
+    "limit_per_suite",
+    "expected_generation_count",
+]
+
+
+def _validate_resume_manifest(
+    run_dir: Path, planned_manifest: dict[str, Any], env: dict[str, Any]
+) -> None:
+    manifest_path = run_dir / "manifest.json"
+    if not manifest_path.exists():
+        return
+    existing_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    failures = []
+    for key in RESUME_MANIFEST_STABLE_KEYS:
+        if existing_manifest.get(key) != planned_manifest.get(key):
+            failures.append(f"resume_manifest_mismatch:{key}")
+    existing_compat_hash = existing_manifest.get("resume_compatible_config_sha256")
+    planned_compat_hash = planned_manifest.get("resume_compatible_config_sha256")
+    if existing_compat_hash and planned_compat_hash and existing_compat_hash != planned_compat_hash:
+        failures.append("resume_manifest_mismatch:resume_compatible_config_sha256")
+    existing_commit = existing_manifest.get("git_commit")
+    current_commit = env.get("git_commit")
+    allow_commit_mismatch = os.environ.get("ALLOW_RESUME_GIT_MISMATCH") == "1"
+    if existing_commit and current_commit and existing_commit != current_commit:
+        if allow_commit_mismatch:
+            print(
+                "WARNING: resuming across git commits because "
+                "ALLOW_RESUME_GIT_MISMATCH=1. "
+                f"existing={existing_commit} current={current_commit}"
+            )
+        else:
+            failures.append("resume_manifest_mismatch:git_commit")
+    if not failures:
+        return
+    details = "\n".join(f"  - {failure}" for failure in failures)
+    raise RuntimeError(
+        "Refusing to resume from an incompatible run directory. "
+        "Use the original git commit, a new run id, or set "
+        "ALLOW_RESUME_GIT_MISMATCH=1 only after verifying the experiment matrix "
+        f"is unchanged.\n{details}"
+    )
+
+
+def _write_run_start_artifacts(
+    run_dir: Path,
+    raw_config: dict[str, Any],
+    env: dict[str, Any],
+    manifest: dict[str, Any],
+    *,
+    resume: bool,
+) -> None:
+    if resume and (run_dir / "manifest.json").exists():
+        stamp = utc_timestamp()
+        dump_yaml(raw_config, run_dir / f"config.resume.{stamp}.yaml")
+        write_json(run_dir / f"environment.resume.{stamp}.json", env)
+        write_json(run_dir / f"manifest.resume.{stamp}.json", manifest)
+        return
+    dump_yaml(raw_config, run_dir / "config.resolved.yaml")
+    write_json(run_dir / "environment.json", env)
+    write_json(run_dir / "manifest.json", manifest)
+
+
 def _policy_manifest(policy: Any) -> dict[str, Any]:
     return asdict(policy)
 
@@ -230,6 +321,7 @@ def _reconcile_resume_generations(run_dir: Path, rows: list[dict[str, Any]]) -> 
 
 
 def _cache_stats_generation_keys(cache_stats_path: Path) -> set[tuple[str, str, int]]:
+    cache_stats_path = _promote_recoverable_cache_stats_temp(cache_stats_path)
     if not cache_stats_path.exists():
         return set()
     try:
@@ -248,6 +340,42 @@ def _cache_stats_generation_keys(cache_stats_path: Path) -> set[tuple[str, str, 
         for prompt_id, policy, seed in zip(prompt_ids, policies, seeds, strict=False)
         if prompt_id is not None and policy is not None
     }
+
+
+def _promote_recoverable_cache_stats_temp(cache_stats_path: Path) -> Path:
+    temp_path = cache_stats_path.with_suffix(".parquet.tmp")
+    if not temp_path.exists():
+        return cache_stats_path
+    try:
+        import pyarrow.parquet as pq
+    except ModuleNotFoundError as exc:
+        raise RuntimeError("pyarrow is required for cache stats resume reconciliation.") from exc
+
+    def num_rows(path: Path) -> int | None:
+        if not path.exists():
+            return None
+        try:
+            return int(pq.ParquetFile(path).metadata.num_rows)
+        except Exception:
+            return None
+
+    temp_rows = num_rows(temp_path)
+    if temp_rows is None:
+        return cache_stats_path
+    main_rows = num_rows(cache_stats_path)
+    if main_rows is not None and temp_rows < main_rows:
+        return cache_stats_path
+    if cache_stats_path.exists():
+        backup_path = cache_stats_path.with_name(
+            f"{cache_stats_path.name}.pre_temp_recovery.{utc_timestamp()}"
+        )
+        cache_stats_path.replace(backup_path)
+    temp_path.replace(cache_stats_path)
+    print(
+        "Recovered resume cache stats from valid temporary parquet "
+        f"with {temp_rows} row(s): {cache_stats_path}"
+    )
+    return cache_stats_path
 
 
 CACHE_STATS_COLUMNS = [

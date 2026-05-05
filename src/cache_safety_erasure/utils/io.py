@@ -42,6 +42,44 @@ def read_jsonl(path: Path) -> list[dict[str, Any]]:
         return [json.loads(line) for line in f if line.strip()]
 
 
+def read_jsonl_tolerant(path: Path) -> tuple[list[dict[str, Any]], Path | None]:
+    """Read the valid JSONL prefix and quarantine a corrupt tail.
+
+    This is intentionally stricter than a best-effort line skipper: once a
+    corrupt or non-object row is found, that line and every following line are
+    preserved in a quarantine file and removed from the active JSONL. For
+    resumed H200 runs, that avoids silently continuing past a mid-write final
+    line while still keeping all bytes needed for later inspection.
+    """
+
+    if not path.exists():
+        return [], None
+    rows: list[dict[str, Any]] = []
+    quarantined_lines: list[str] = []
+    with path.open("r", encoding="utf-8") as f:
+        for line in f:
+            if quarantined_lines:
+                quarantined_lines.append(line)
+                continue
+            if not line.strip():
+                continue
+            try:
+                row = json.loads(line)
+            except json.JSONDecodeError:
+                quarantined_lines.append(line)
+                continue
+            if not isinstance(row, dict):
+                quarantined_lines.append(line)
+                continue
+            rows.append(row)
+    if not quarantined_lines:
+        return rows, None
+    quarantine_path = path.with_name(f"{path.stem}.corrupt_tail.{utc_timestamp()}{path.suffix}")
+    quarantine_path.write_text("".join(quarantined_lines), encoding="utf-8")
+    write_jsonl(path, rows)
+    return rows, quarantine_path
+
+
 def append_jsonl(path: Path, rows: Iterable[dict[str, Any]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a", encoding="utf-8") as f:

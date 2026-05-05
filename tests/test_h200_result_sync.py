@@ -84,6 +84,39 @@ def test_fetch_h200_results_script_is_guarded_and_checksum_verified() -> None:
     assert "git pull" not in script
 
 
+def test_h200_snapshot_script_copies_run_and_writes_manifest() -> None:
+    script = Path("scripts/snapshot_h200_run.sh").read_text(encoding="utf-8")
+
+    assert "/home/aryang9/sandbox/llm-safety" in script
+    assert "RUN_ID:-h200_causal_patch_qwen7b" in script
+    assert "snapshots/h200" in script
+    assert "rsync -az --checksum" in script
+    assert "tar --warning=no-file-changed --ignore-failed-read -cf -" in script
+    assert "scripts/write_artifact_manifest.py" in script
+    assert "snapshot_manifest.json" in script
+    assert "snapshot_summary.json" in script
+    assert "generation_rows" in script
+    assert "expected_generation_count" in script
+    assert "remote_git_head" in script
+    assert "restore_h200_snapshot.sh" in script
+    assert "git pull" not in script
+
+
+def test_h200_restore_script_verifies_snapshot_and_prints_resume_command() -> None:
+    script = Path("scripts/restore_h200_snapshot.sh").read_text(encoding="utf-8")
+
+    assert "/home/aryang9/sandbox/llm-safety" in script
+    assert "SNAPSHOT_DIR=snapshots/h200/<timestamp>" in script
+    assert "snapshot_manifest.local_recheck.json" in script
+    assert "scripts/compare_artifact_manifests.py" in script
+    assert "pre_restore" in script
+    assert "rsync -az --checksum" in script
+    assert "tar -cf -" in script
+    assert "--resume" in script
+    assert "ALLOW_RESUME_GIT_MISMATCH=1" in script
+    assert "does not start compute" in script
+
+
 def test_compare_artifact_manifests_reports_missing_paths() -> None:
     report = compare_manifests({"files": [], "missing_paths": ["results/run"]}, {"files": []})
 

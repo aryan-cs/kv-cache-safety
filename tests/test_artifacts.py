@@ -1,13 +1,32 @@
 import json
 from pathlib import Path
 
-from cache_safety_erasure.utils.io import append_jsonl, file_sha256, read_jsonl, write_json
+from cache_safety_erasure.utils.io import (
+    append_jsonl,
+    file_sha256,
+    read_jsonl,
+    read_jsonl_tolerant,
+    write_json,
+)
 
 
 def test_json_artifacts_roundtrip(tmp_path: Path) -> None:
     write_json(tmp_path / "environment.json", {"ok": True})
     append_jsonl(tmp_path / "generations.jsonl", [{"prompt_id": "p1", "text": "hello"}])
     assert read_jsonl(tmp_path / "generations.jsonl")[0]["prompt_id"] == "p1"
+
+
+def test_tolerant_jsonl_reader_quarantines_corrupt_tail(tmp_path: Path) -> None:
+    path = tmp_path / "generations.jsonl"
+    path.write_text('{"prompt_id": "p1"}\n{"prompt_id": ', encoding="utf-8")
+
+    rows, quarantine_path = read_jsonl_tolerant(path)
+
+    assert rows == [{"prompt_id": "p1"}]
+    assert read_jsonl(path) == [{"prompt_id": "p1"}]
+    assert quarantine_path is not None
+    assert quarantine_path.exists()
+    assert quarantine_path.read_text(encoding="utf-8") == '{"prompt_id": '
 
 
 def test_cache_stats_sink_preserves_existing_rows_on_resume(tmp_path: Path) -> None:
@@ -231,6 +250,100 @@ def test_cache_stats_sink_migrates_legacy_sparse_schema_on_resume(tmp_path: Path
     assert str(schema.field("retained_generated_tokens").type) == "int64"
     assert str(schema.field("attention_scores_used").type) == "bool"
     assert str(schema.field("protected_spans").type) == "large_string"
+
+
+def test_cache_stats_resume_recovers_valid_temp_checkpoint(tmp_path: Path) -> None:
+    import sys
+
+    import pandas as pd
+
+    sys.path.insert(0, str(Path("scripts").resolve()))
+    from run_experiment import _cache_stats_generation_keys
+
+    path = tmp_path / "cache_stats.parquet"
+    temp_path = path.with_suffix(".parquet.tmp")
+    pd.DataFrame([{"prompt_id": "p1", "policy": "none", "seed": 0}]).to_parquet(
+        path, index=False
+    )
+    pd.DataFrame(
+        [
+            {"prompt_id": "p1", "policy": "none", "seed": 0},
+            {"prompt_id": "p2", "policy": "kv_int4_sim", "seed": 0},
+        ]
+    ).to_parquet(temp_path, index=False)
+
+    keys = _cache_stats_generation_keys(path)
+
+    assert ("p1", "none", 0) in keys
+    assert ("p2", "kv_int4_sim", 0) in keys
+    assert not temp_path.exists()
+    assert list(tmp_path.glob("cache_stats.parquet.pre_temp_recovery.*"))
+
+
+def test_resume_manifest_validation_rejects_matrix_drift(tmp_path: Path) -> None:
+    import sys
+
+    sys.path.insert(0, str(Path("scripts").resolve()))
+    from run_experiment import _validate_resume_manifest
+
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    base_manifest = _minimal_resume_manifest()
+    write_json(run_dir / "manifest.json", {**base_manifest, "model_id": "old/model"})
+
+    try:
+        _validate_resume_manifest(
+            run_dir,
+            {**base_manifest, "model_id": "new/model"},
+            {"git_commit": base_manifest["git_commit"]},
+        )
+    except RuntimeError as exc:
+        assert "resume_manifest_mismatch:model_id" in str(exc)
+    else:
+        raise AssertionError("expected resume manifest drift to fail")
+
+
+def test_resume_manifest_validation_requires_explicit_commit_mismatch(
+    tmp_path: Path, monkeypatch
+) -> None:
+    import sys
+
+    sys.path.insert(0, str(Path("scripts").resolve()))
+    from run_experiment import _validate_resume_manifest
+
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    manifest = _minimal_resume_manifest()
+    write_json(run_dir / "manifest.json", manifest)
+
+    try:
+        _validate_resume_manifest(run_dir, manifest, {"git_commit": "different"})
+    except RuntimeError as exc:
+        assert "resume_manifest_mismatch:git_commit" in str(exc)
+    else:
+        raise AssertionError("expected git commit mismatch to fail")
+
+    monkeypatch.setenv("ALLOW_RESUME_GIT_MISMATCH", "1")
+    _validate_resume_manifest(run_dir, manifest, {"git_commit": "different"})
+
+
+def _minimal_resume_manifest() -> dict:
+    return {
+        "run_name": "run",
+        "model_id": "model",
+        "model_provider": "mock",
+        "model_config": {"provider": "mock", "model_id": "model"},
+        "git_commit": "commit",
+        "resume_compatible_config_sha256": "abc",
+        "prompt_suites": ["suite"],
+        "prompt_counts": {"suite": 1},
+        "prompt_suite_manifests": {"suite": {"sha256": "def"}},
+        "cache_policy_configs": [{"name": "none"}],
+        "cache_policy_labels": ["none"],
+        "seeds": [0],
+        "limit_per_suite": 1,
+        "expected_generation_count": 1,
+    }
 
 
 def test_latex_table_export_escapes_policy_names(tmp_path: Path) -> None:

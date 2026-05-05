@@ -10,6 +10,9 @@ __pycache__/
 .locks/
 logs/
 
+# Local H200 interruption snapshots. Keep raw experiment artifacts out of git.
+snapshots/h200/
+
 # Local model and dataset caches
 .cache/
 hf_cache/

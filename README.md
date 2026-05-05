@@ -136,6 +136,66 @@ uv run python scripts/package_h200_support_bundle.py \
   --output logs/h200/h200_support_bundle_latest.tar.gz
 ```
 
+If the notebook allocation may expire before the current run finishes, snapshot
+the partial run from the local checkout. The snapshot includes the run directory,
+checksums, the observed generation count, the expected generation count, and the
+remote git commit. To include bounded H200 launcher/finalizer log tails, set
+`H200_SNAPSHOT_LOG_FILE_LIMIT=<n>`:
+
+```bash
+RUN_ID=h200_causal_patch_qwen7b bash scripts/snapshot_h200_run.sh
+```
+
+After restarting the H200 allocation, restore the latest snapshot and resume
+from the H200 checkout:
+
+```bash
+SNAPSHOT_DIR=snapshots/h200/latest bash scripts/restore_h200_snapshot.sh
+ssh uiuc-h200
+cd /home/aryang9/sandbox/llm-safety
+UV_CACHE_DIR=.cache/uv uv run python scripts/run_experiment.py \
+  --config configs/experiments/h200_causal_patch_qwen7b.yaml \
+  --run-id h200_causal_patch_qwen7b \
+  --resume
+```
+
+Resume is fail-closed. It preserves the original `manifest.json`,
+`config.resolved.yaml`, and `environment.json`; writes
+`manifest.resume.<timestamp>.json`, `config.resume.<timestamp>.yaml`, and
+`environment.resume.<timestamp>.json`; quarantines a truncated
+`generations.jsonl` tail; recovers a valid `cache_stats.parquet.tmp`; and refuses
+to append if the model, prompt suites, policy matrix, seeds, expected row count,
+or git commit do not match the original run. Use
+`ALLOW_RESUME_GIT_MISMATCH=1` only after confirming the experiment matrix is
+unchanged and the newer code is a resume-only compatibility patch.
+
+If the H200 allocation expires and is not restarted for a while, keep the Mac
+working on a bounded Qwen 7B diagnostic instead of attempting the H200-only 14B
+or 32B sweeps locally:
+
+```bash
+bash scripts/run_mac_fallback.sh
+```
+
+This fallback is intentionally conservative for a 24 GB M4 Pro: it checks macOS
+and the PyTorch MPS backend, requires at least 22 GiB unified memory, uses
+`configs/experiments/mac_qwen7b_causal_fallback.yaml`, writes artifacts to
+`results/mac_qwen7b_causal_fallback`, and isolates model downloads under
+`.cache/mac_fallback`. By default it deletes `.cache/mac_fallback/huggingface`
+and `.cache/mac_fallback/torch` when the script exits, even on failure or
+interruption. It is a fallback diagnostic, not a replacement for the registered
+H200 Qwen 14B CI extension or any Qwen 32B follow-up. Do not resume `h200_*`
+run ids on the Mac; Mac fallback runs use separate `mac_*` run ids so they
+cannot contaminate H200 evidence.
+
+To clean model caches manually, dry-run first and then delete only repo-local
+model caches:
+
+```bash
+bash scripts/cleanup_local_model_caches.sh
+bash scripts/cleanup_local_model_caches.sh --yes
+```
+
 Run the prompt-count extension for narrower confidence intervals after the primary pilot identifies viable effects:
 
 ```bash
