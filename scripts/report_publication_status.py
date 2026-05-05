@@ -34,6 +34,7 @@ from check_human_audit_readiness import (
     check_audit_summary_source_match,
     check_human_audit_readiness,
 )
+from check_latex_citations import citation_failures
 from check_publication_readiness import _check_figure_manifest, _pdf_page_failure
 from package_arxiv_submission import (
     FIGURE_SOURCES,
@@ -1556,12 +1557,22 @@ def _arxiv_status(
             elif manifest.get(manifest_key) != file_sha256(source_path):
                 failures.append(f"stale_source_hash:{source_name}")
         main_tex_path = source_dir / "main.tex"
+        references_path = source_dir / "references.bib"
         if main_tex_path.exists():
             main_tex = main_tex_path.read_text(encoding="utf-8")
             for marker in _rewrite_failures(main_tex):
                 failures.append(f"main_tex_repo_local_path:{marker}")
             for failure in _final_source_failures(main_tex):
                 failures.append(f"main_tex_draft_placeholder:{failure}")
+        if main_tex_path.exists() and references_path.exists():
+            failures.extend(
+                f"latex_citation_failure:{failure}"
+                for failure in citation_failures(
+                    main_tex_path,
+                    references_path,
+                    require_all_bib_used=True,
+                )
+            )
         copied_generated_names = {
             Path(str(path)).name for path in manifest.get("copied_generated", [])
         }

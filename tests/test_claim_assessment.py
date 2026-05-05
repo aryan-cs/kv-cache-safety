@@ -388,6 +388,44 @@ def test_claim_assessment_require_flag_failure(tmp_path: Path) -> None:
     assert "do not yet justify" in result.stderr
 
 
+def test_claim_assessment_require_flag_requires_audit_support(tmp_path: Path) -> None:
+    import json
+    import subprocess
+
+    primary_dir = tmp_path / "primary"
+    causal_dir = tmp_path / "causal"
+    primary_dir.mkdir()
+    causal_dir.mkdir()
+    (primary_dir / "metrics.json").write_text(
+        json.dumps(_primary_positive_metrics()), encoding="utf-8"
+    )
+    (causal_dir / "metrics.json").write_text(
+        json.dumps(_causal_positive_metrics()), encoding="utf-8"
+    )
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "scripts/assess_claims.py",
+            "--primary-results-dir",
+            str(primary_dir),
+            "--causal-results-dir",
+            str(causal_dir),
+            "--output-dir",
+            str(tmp_path / "out"),
+            "--require-cache-mediated-claim",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 1
+    assessment = json.loads((tmp_path / "out" / "claim_assessment.json").read_text())
+    assert assessment["human_audit_support"]["required"] is True
+    assert assessment["human_audit_support"]["passed"] is False
+
+
 def _primary_positive_metrics() -> dict:
     return {
         "selective_safety_erasure": {

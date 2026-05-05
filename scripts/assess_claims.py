@@ -54,7 +54,9 @@ def main() -> None:
         min_human_audit_delta=args.min_human_audit_delta,
         max_primary_ci_width=args.max_primary_ci_width,
         max_causal_ci_width=args.max_causal_ci_width,
-        require_human_audit_support=args.require_human_audit_support,
+        require_human_audit_support=(
+            args.require_human_audit_support or args.require_cache_mediated_claim
+        ),
     )
     assessment["source_artifacts"] = _claim_source_artifacts(
         primary_results_dir=args.primary_results_dir,

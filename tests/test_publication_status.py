@@ -641,6 +641,56 @@ def test_publication_status_requires_complete_arxiv_bundle_when_requested(tmp_pa
     assert status["gates"]["arxiv_bundle_ready"] is True
 
 
+def test_publication_status_rechecks_arxiv_citations(tmp_path: Path) -> None:
+    primary = tmp_path / "primary"
+    causal = tmp_path / "causal"
+    primary_audit = tmp_path / "primary_audit"
+    causal_audit = tmp_path / "causal_audit"
+    arxiv_dir = tmp_path / "arxiv_source"
+    archive = tmp_path / "arxiv_source.tar.gz"
+    _write_run(primary)
+    _write_run(causal)
+    _write_audit(primary_audit, primary)
+    _write_audit(causal_audit, causal)
+    _write_arxiv_bundle(arxiv_dir, archive)
+    (arxiv_dir / "main.tex").write_text(r"\citep{missingref}", encoding="utf-8")
+    (arxiv_dir / "references.bib").write_text("", encoding="utf-8")
+    manifest = json.loads((arxiv_dir / "manifest.json").read_text(encoding="utf-8"))
+    manifest["main_tex_sha256"] = _sha256(arxiv_dir / "main.tex")
+    manifest["references_sha256"] = _sha256(arxiv_dir / "references.bib")
+    manifest["copied_file_provenance"] = _arxiv_provenance_rows(
+        [path for path in sorted(arxiv_dir.rglob("*")) if path.is_file() and path.name != "manifest.json"],
+        arxiv_dir,
+    )
+    (arxiv_dir / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+    _rewrite_arxiv_archive(arxiv_dir, archive)
+    claim_path = tmp_path / "claim_assessment.json"
+    claim_path.write_text(
+        json.dumps(_passing_claim_assessment(primary, causal, primary_audit, causal_audit)),
+        encoding="utf-8",
+    )
+    pdf_path = tmp_path / "paper.pdf"
+    pdf_path.write_bytes(PDF_BYTES)
+
+    status = publication_status(
+        primary_results_dir=primary,
+        causal_results_dir=causal,
+        primary_audit_dir=primary_audit,
+        causal_audit_dir=causal_audit,
+        claim_assessment_path=claim_path,
+        paper_pdf=pdf_path,
+        arxiv_source_dir=arxiv_dir,
+        arxiv_archive=archive,
+        require_arxiv_bundle=True,
+    )
+
+    assert status["publication_ready"] is False
+    assert (
+        "latex_citation_failure:missing_bib_entry:missingref"
+        in status["arxiv_bundle"]["failures"]
+    )
+
+
 def test_publication_status_rejects_malformed_arxiv_figure_pdf(tmp_path: Path) -> None:
     primary = tmp_path / "primary"
     causal = tmp_path / "causal"

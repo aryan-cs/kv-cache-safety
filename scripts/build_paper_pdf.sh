@@ -165,6 +165,10 @@ uv run python scripts/sync_active_paper_assets.py \
   --strict
 
 if [[ "${REQUIRE_COMPLETE_PAPER:-0}" == "1" ]]; then
+  uv run python scripts/check_latex_citations.py \
+    --tex "$src_dir/main.tex" \
+    --bib paper/references.bib \
+    --require-all-bib-used
   uv run python scripts/check_latex_placeholders.py --tex "$src_dir/main.tex"
   uv run python scripts/check_paper_asset_freshness.py \
     --pair "$primary_paper_dir=$primary_results" \

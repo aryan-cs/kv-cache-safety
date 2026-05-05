@@ -8,6 +8,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path("scripts").resolve()))
 
 from check_final_pdf_text import forbidden_final_prose_failures, placeholder_text_failures
+from check_latex_citations import citation_failures
 from check_latex_placeholders import missing_placeholder_artifacts, placeholder_artifact_failures
 from export_paper_assets import export_paper_assets
 from package_arxiv_submission import (
@@ -201,6 +202,46 @@ def test_latex_citations_and_bibliography_are_consistent() -> None:
 
     assert cited_keys <= bib_keys
     assert bib_keys <= cited_keys
+
+
+def test_latex_citation_checker_rejects_missing_unused_and_duplicate_keys(
+    tmp_path: Path,
+) -> None:
+    tex = tmp_path / "main.tex"
+    bib = tmp_path / "references.bib"
+    tex.write_text(
+        "% ignored missing citation: \\citep{commented_missing}\n"
+        r"\citep*{present,missing}",
+        encoding="utf-8",
+    )
+    bib.write_text(
+        "@article{present,\n  title={TBD},\n  year={2024},\n  url={https://example.com}\n}\n"
+        "@article{unused,\n  title={Unused},\n  year={2024},\n  url={https://example.com}\n}\n"
+        "@article{present,\n  title={TBD},\n  year={2025},\n  url={https://example.com}\n}\n",
+        encoding="utf-8",
+    )
+
+    failures = citation_failures(tex, bib, require_all_bib_used=True)
+
+    assert "missing_bib_entry:commented_missing" not in failures
+    assert "missing_bib_entry:missing" in failures
+    assert "unused_bib_entry:unused" in failures
+    assert "duplicate_bib_key:present" in failures
+    assert "bib_entry_placeholder_field:present:title" in failures
+
+
+def test_latex_citation_checker_requires_support_locator(tmp_path: Path) -> None:
+    tex = tmp_path / "main.tex"
+    bib = tmp_path / "references.bib"
+    tex.write_text(r"\citet{unsupported}", encoding="utf-8")
+    bib.write_text(
+        "@article{unsupported,\n  title={Unsupported Entry},\n  year={2024}\n}\n",
+        encoding="utf-8",
+    )
+
+    assert citation_failures(tex, bib) == [
+        "bib_entry_lacks_support_locator:unsupported"
+    ]
 
 
 def test_arxiv_rewrite_uses_local_bibliography_and_figures() -> None:

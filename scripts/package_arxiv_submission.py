@@ -10,6 +10,7 @@ from _path import add_src_to_path
 add_src_to_path()
 
 from check_final_pdf_text import forbidden_final_prose_failures
+from check_latex_citations import citation_failures
 from check_latex_placeholders import (
     PLACEHOLDER_TEXT_MARKERS,
     _semantic_tex_failures,
@@ -195,6 +196,15 @@ def main() -> None:
         raise SystemExit("Refusing to package arXiv source with draft fallback text in main.tex.")
     (source_dir / "main.tex").write_text(rewritten_main_tex, encoding="utf-8")
     shutil.copyfile("paper/references.bib", source_dir / "references.bib")
+    citation_check_failures = citation_failures(
+        source_dir / "main.tex",
+        source_dir / "references.bib",
+        require_all_bib_used=not args.allow_missing,
+    )
+    if citation_check_failures:
+        for failure in citation_check_failures:
+            print(f"LaTeX citation failure: {failure}")
+        raise SystemExit("Refusing to package arXiv source with inconsistent citations.")
     copied_file_provenance = [
         _file_provenance(
             kind="latex_main",

@@ -397,6 +397,8 @@ def test_complete_paper_build_checks_publication_status_before_latex() -> None:
     assert "Skipping final PDF text check because ALLOW_DRAFT_PDF=1." in script
     assert 'rm -f "$pdf" "${pdf}.manifest.json"' in script
     assert "uv run python scripts/check_final_pdf_text.py --pdf \"$pdf\"" in script
+    assert "scripts/check_latex_citations.py" in script
+    assert "--require-all-bib-used" in script
     assert "scripts/check_latex_placeholders.py" in script
     assert "scripts/sync_active_paper_assets.py" in script
     assert "scripts/check_paper_asset_freshness.py" in script
