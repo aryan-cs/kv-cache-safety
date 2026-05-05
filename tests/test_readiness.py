@@ -15,6 +15,7 @@ from check_publication_readiness import (
     _check_paper_assets,
     _check_policy_level_contrast_readiness,
     _combined_source_commit_failures,
+    _figure_numeric_data_failure,
     _run_commit_history_failures,
 )
 
@@ -400,6 +401,25 @@ def test_causal_restoration_readiness_exempts_smoke_suite_ci_width() -> None:
     )
 
     assert failures == []
+
+
+def test_causal_restoration_fraction_allows_over_and_under_correction() -> None:
+    rows = [
+        {
+            "safety_restoration_fraction": "-1.25",
+            "safety_restoration_ci_low": "0.35",
+            "safety_restoration_ci_high": "0.55",
+            "safety_restoration_ci_width": "0.20",
+        },
+        {
+            "safety_restoration_fraction": "1.30",
+            "safety_restoration_ci_low": "0.52",
+            "safety_restoration_ci_high": "0.66",
+            "safety_restoration_ci_width": "0.14",
+        },
+    ]
+
+    assert _figure_numeric_data_failure("causal_restoration_flow", rows) == ""
 
 
 def test_policy_level_contrast_readiness_rejects_wide_ssei_ci() -> None:

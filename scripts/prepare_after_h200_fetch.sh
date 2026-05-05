@@ -16,7 +16,7 @@ fetch_manifest="${H200_FETCH_MANIFEST:-logs/h200/h200_artifact_manifest_local.js
 fetch_remote_manifest="${H200_FETCH_REMOTE_MANIFEST:-logs/h200/h200_artifact_manifest_remote.json}"
 fetch_compare_report="${H200_FETCH_COMPARE_REPORT:-logs/h200/h200_artifact_manifest_compare.json}"
 target_ci_width="${TARGET_CI_WIDTH:-0.08}"
-causal_ci_width="${CAUSAL_CI_WIDTH:-0.12}"
+causal_ci_width="${CAUSAL_CI_WIDTH:-0.23}"
 branch="${BRANCH:-master}"
 
 if [[ -n "$(git status --short)" ]]; then

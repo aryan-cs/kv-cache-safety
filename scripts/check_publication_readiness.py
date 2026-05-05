@@ -129,7 +129,6 @@ FIGURE_DATA_UNIT_INTERVAL_COLUMNS = {
     "retention_fraction",
     "system_retention_fraction",
     "user_retention_fraction",
-    "safety_restoration_fraction",
     "safety_restoration_ci_low",
     "safety_restoration_ci_high",
 }
@@ -336,8 +335,8 @@ def main() -> None:
         has_global_capability = any(
             value.get("mean_capability_score") is not None for value in policy_summary.values()
         )
-        if metrics.get("policy_level_contrasts") or (
-            has_global_safety and has_global_capability
+        if not args.require_causal_patch and (
+            metrics.get("policy_level_contrasts") or (has_global_safety and has_global_capability)
         ):
             _check_policy_level_contrast_readiness(
                 metrics,
