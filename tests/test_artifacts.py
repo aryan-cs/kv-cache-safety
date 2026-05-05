@@ -462,3 +462,70 @@ def test_paper_asset_freshness_detects_stale_tables_and_sources(tmp_path: Path) 
 
     assert any("dirty analysis tree" in failure for failure in failures)
     assert any("source run was dirty" in failure for failure in failures)
+
+
+def test_paper_asset_freshness_requires_selected_tables_under_paper_dir(
+    tmp_path: Path,
+) -> None:
+    import sys
+
+    sys.path.insert(0, str(Path("scripts").resolve()))
+    from check_paper_asset_freshness import check_paper_asset_freshness
+
+    paper_dir = tmp_path / "paper" / "generated" / "run"
+    results_dir = tmp_path / "results" / "run"
+    outside_dir = tmp_path / "outside"
+    paper_dir.mkdir(parents=True)
+    outside_dir.mkdir()
+    (results_dir / "figures").mkdir(parents=True)
+    for name in ["manifest.json", "metrics.json", "figures/manifest.json"]:
+        path = results_dir / name
+        if name == "manifest.json":
+            write_json(path, {"git_commit": "run-commit", "git_dirty": False})
+        else:
+            path.write_text(f"{name}\n", encoding="utf-8")
+    table = outside_dir / "main_results_table.tex"
+    table.write_text("fresh but wrong location\n", encoding="utf-8")
+    wrong_in_tree = paper_dir / "wrong_result_macros.tex"
+    wrong_in_tree.write_text("fresh but wrong filename\n", encoding="utf-8")
+    write_json(
+        paper_dir / "artifact_manifest.json",
+        {
+            "tables": {
+                "main_results_table.tex": {
+                    "path": str(table),
+                    "sha256": file_sha256(table),
+                    "bytes": table.stat().st_size,
+                },
+                "result_macros.tex": {
+                    "path": str(wrong_in_tree),
+                    "sha256": file_sha256(wrong_in_tree),
+                    "bytes": wrong_in_tree.stat().st_size + 1,
+                },
+            },
+            "source_artifacts": {
+                name: {"sha256": file_sha256(results_dir / name)}
+                for name in ["manifest.json", "metrics.json", "figures/manifest.json"]
+            },
+            "source_run_git_commit": "run-commit",
+            "source_run_git_dirty": False,
+            "analysis_git_commit": "analysis-commit",
+            "analysis_git_dirty": False,
+        },
+    )
+
+    failures = check_paper_asset_freshness(
+        paper_dir,
+        results_dir,
+        required_tables=[
+            "main_results_table.tex",
+            "result_macros.tex",
+            "suite_level_effects_table.tex",
+        ],
+    )
+
+    assert "paper artifact manifest lacks required table `suite_level_effects_table.tex`" in failures
+    assert "paper artifact required table `main_results_table.tex` path is unexpected" in failures
+    assert "paper artifact table `main_results_table.tex` path is outside paper dir" in failures
+    assert "paper artifact required table `result_macros.tex` path is unexpected" in failures
+    assert "paper artifact table `result_macros.tex` byte count is stale" in failures

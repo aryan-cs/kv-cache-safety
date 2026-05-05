@@ -9,6 +9,8 @@ from _path import add_src_to_path
 
 add_src_to_path()
 
+from export_paper_assets import TABLE_FILES as EXPORTED_TABLE_FILES
+
 from cache_safety_erasure.utils.io import file_sha256
 
 SOURCE_ARTIFACTS = ["manifest.json", "metrics.json", "figures/manifest.json"]
@@ -24,12 +26,33 @@ def main() -> None:
         required=True,
         help="Paper/results pair in the form paper/generated/run=results/run.",
     )
+    parser.add_argument(
+        "--required-table",
+        action="append",
+        default=[],
+        help="Generated paper table/macro filename that must be manifest-pinned.",
+    )
+    parser.add_argument(
+        "--require-exported-table-set",
+        action="store_true",
+        help="Require the full table/macro set written by export_paper_assets.py.",
+    )
     args = parser.parse_args()
 
+    required_tables = list(args.required_table)
+    if args.require_exported_table_set:
+        required_tables.extend(EXPORTED_TABLE_FILES)
+    required_tables = sorted(set(required_tables))
     failures: list[str] = []
     for value in args.pair:
         paper_dir, results_dir = _parse_pair(value)
-        failures.extend(check_paper_asset_freshness(paper_dir, results_dir))
+        failures.extend(
+            check_paper_asset_freshness(
+                paper_dir,
+                results_dir,
+                required_tables=required_tables or None,
+            )
+        )
     if failures:
         print("PAPER ASSET FRESHNESS CHECK FAILED")
         for failure in failures:
@@ -38,7 +61,12 @@ def main() -> None:
     print("PAPER ASSET FRESHNESS CHECK PASSED")
 
 
-def check_paper_asset_freshness(paper_dir: Path, results_dir: Path) -> list[str]:
+def check_paper_asset_freshness(
+    paper_dir: Path,
+    results_dir: Path,
+    *,
+    required_tables: list[str] | None = None,
+) -> list[str]:
     failures: list[str] = []
     manifest_path = paper_dir / "artifact_manifest.json"
     if not manifest_path.exists():
@@ -47,27 +75,44 @@ def check_paper_asset_freshness(paper_dir: Path, results_dir: Path) -> list[str]
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     except json.JSONDecodeError as exc:
         return [f"invalid paper artifact manifest `{manifest_path}`: {exc}"]
-    failures.extend(_table_failures(manifest, paper_dir))
+    failures.extend(_table_failures(manifest, paper_dir, required_tables=required_tables))
     failures.extend(_source_failures(manifest, results_dir))
     failures.extend(_provenance_failures(manifest, results_dir))
     return failures
 
 
-def _table_failures(manifest: dict[str, Any], paper_dir: Path) -> list[str]:
+def _table_failures(
+    manifest: dict[str, Any],
+    paper_dir: Path,
+    *,
+    required_tables: list[str] | None = None,
+) -> list[str]:
     failures: list[str] = []
     tables = manifest.get("tables")
     if not isinstance(tables, dict) or not tables:
         return [f"paper artifact manifest lacks table entries: {paper_dir}"]
+    for name in required_tables or []:
+        if name not in tables:
+            failures.append(f"paper artifact manifest lacks required table `{name}`")
     for name, table in tables.items():
         if not isinstance(table, dict):
             failures.append(f"paper artifact table entry `{name}` is malformed")
             continue
         path = Path(str(table.get("path", "")))
+        expected_path = paper_dir / name
+        if name in (required_tables or []) and path.resolve() != expected_path.resolve():
+            failures.append(f"paper artifact required table `{name}` path is unexpected")
+        try:
+            path.resolve().relative_to(paper_dir.resolve())
+        except ValueError:
+            failures.append(f"paper artifact table `{name}` path is outside paper dir")
         if not path.exists():
             failures.append(f"paper artifact table `{name}` is missing")
             continue
         if table.get("sha256") != file_sha256(path):
             failures.append(f"paper artifact table `{name}` hash is stale")
+        if "bytes" in table and table.get("bytes") != path.stat().st_size:
+            failures.append(f"paper artifact table `{name}` byte count is stale")
     return failures
 
 

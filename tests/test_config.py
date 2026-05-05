@@ -368,6 +368,7 @@ def test_complete_paper_build_checks_publication_status_before_latex() -> None:
     assert "scripts/check_latex_placeholders.py" in script
     assert "scripts/sync_active_paper_assets.py" in script
     assert "scripts/check_paper_asset_freshness.py" in script
+    assert "--require-exported-table-set" in script
     assert "ALLOW_NONPASSING_CLAIM_PAPER" in script
     assert "publication_status_fail_args" in script
     assert "scripts/report_publication_status.py" in script

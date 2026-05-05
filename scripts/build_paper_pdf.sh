@@ -138,7 +138,8 @@ if [[ "${REQUIRE_COMPLETE_PAPER:-0}" == "1" ]]; then
   uv run python scripts/check_latex_placeholders.py --tex "$src_dir/main.tex"
   uv run python scripts/check_paper_asset_freshness.py \
     --pair "$primary_paper_dir=$primary_results" \
-    --pair "$causal_paper_dir=$causal_results"
+    --pair "$causal_paper_dir=$causal_results" \
+    --require-exported-table-set
   uv run python scripts/report_publication_status.py \
     "${publication_status_args[@]}" \
     --paper-pdf "$build_dir/cache_mediated_safety_erasure.pdf" \

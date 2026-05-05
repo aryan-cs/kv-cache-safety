@@ -215,7 +215,11 @@ def _active_source_failures(
 ) -> list[str]:
     failures = [
         f"{kind}:{failure}"
-        for failure in check_paper_asset_freshness(generated_dir, results_dir)
+        for failure in check_paper_asset_freshness(
+            generated_dir,
+            results_dir,
+            required_tables=generated_files,
+        )
     ]
     artifact_manifest = _read_json(generated_dir / "artifact_manifest.json")
     failures.extend(
