@@ -30,12 +30,51 @@ remote_generated_paths=(
   "paper/generated/h200_causal_patch_qwen7b"
   "paper/generated/preliminary_claim_assessment"
   "paper/generated/preliminary_followup_plan"
+  "paper/generated/registered_followup_plan"
   "paper/generated/post_h200_next_steps.json"
   "paper/generated/post_h200_next_steps.md"
 )
 
+finalized_optional_paths=(
+  "results/h200_qwen14b_ci_extension_primary"
+  "results/h200_qwen_full_sweep_plus_ci_extension"
+  "paper/generated/h200_qwen14b_ci_extension"
+  "paper/generated/h200_qwen_full_sweep_plus_ci_extension"
+  "paper/generated/h200_qwen_full_sweep"
+  "paper/generated/h200_causal_patch_qwen7b"
+  "paper/generated/active_primary"
+  "paper/generated/active_causal"
+  "paper/generated/claim_assessment"
+  "paper/generated/registered_followup_plan"
+  "paper/generated/post_h200_next_steps.json"
+  "paper/generated/post_h200_next_steps.md"
+  "paper/audit/h200_qwen_full_sweep_summary"
+  "paper/audit/h200_qwen_full_sweep_plus_ci_extension_summary"
+  "paper/audit/h200_causal_patch_qwen7b_summary"
+  "paper/audit/active_primary_summary"
+  "paper/audit/active_causal_summary"
+  "paper/audit/h200_qwen_full_sweep_audit_blinded_annotator_open_judge_v1.csv"
+  "paper/audit/h200_qwen_full_sweep_audit_blinded_annotator_open_judge_v2.csv"
+  "paper/audit/h200_qwen_full_sweep_audit_blinded_annotator_open_judge_v3.csv"
+  "paper/audit/h200_qwen_full_sweep_plus_ci_extension_audit_blinded.csv"
+  "paper/audit/h200_qwen_full_sweep_plus_ci_extension_audit_blinded_annotator_open_judge_v1.csv"
+  "paper/audit/h200_qwen_full_sweep_plus_ci_extension_audit_blinded_annotator_open_judge_v2.csv"
+  "paper/audit/h200_qwen_full_sweep_plus_ci_extension_audit_blinded_annotator_open_judge_v3.csv"
+  "paper/audit/h200_qwen_full_sweep_plus_ci_extension_audit_export_manifest.json"
+  "paper/audit/h200_qwen_full_sweep_plus_ci_extension_audit_key.jsonl"
+  "paper/audit/h200_causal_patch_qwen7b_audit_blinded_annotator_open_judge_v1.csv"
+  "paper/audit/h200_causal_patch_qwen7b_audit_blinded_annotator_open_judge_v2.csv"
+  "paper/audit/h200_causal_patch_qwen7b_audit_blinded_annotator_open_judge_v3.csv"
+)
+
+optional_paths=()
+
 if [[ "${FETCH_H200_REMOTE_GENERATED:-0}" == "1" ]]; then
-  default_paths+=("${remote_generated_paths[@]}")
+  optional_paths+=("${remote_generated_paths[@]}")
+fi
+
+if [[ "${FETCH_H200_FINALIZED:-0}" == "1" ]]; then
+  optional_paths+=("${finalized_optional_paths[@]}")
 fi
 
 if [[ "$#" -gt 0 ]]; then
@@ -61,6 +100,19 @@ for path in "${paths[@]}"; do
 done
 
 mkdir -p "$local_log_dir"
+
+for path in "${optional_paths[@]}"; do
+  if ! safe_artifact_path "$path"; then
+    echo "Refusing unsafe or unsupported optional artifact path: $path" >&2
+    exit 1
+  fi
+  remote_path="${remote_dir}/${path}"
+  if ssh -n "$host" "test -e '$remote_path'"; then
+    paths+=("$path")
+  else
+    echo "Skipping absent optional remote artifact path: $remote_path"
+  fi
+done
 
 fetch_with_tar() {
   local path="$1"

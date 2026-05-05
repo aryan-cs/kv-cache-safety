@@ -209,6 +209,15 @@ primary and causal result directories above; `prepare_after_h200_fetch.sh`
 requires that passing checksum manifest before regenerating publication-valid
 audit sheets locally.
 
+After the post-causal H200 finalizer has run, fetch the finalized handoff set
+instead. This includes optional merged-primary CI-extension artifacts,
+open-local-judge audit CSVs, audit summaries, generated claim files, and active
+paper assets when they exist:
+
+```bash
+FETCH_H200_FINALIZED=1 bash scripts/fetch_h200_results.sh
+```
+
 If you need only an intermediate run or want to archive remote-generated debug
 artifacts, pass explicit artifact paths, for example:
 
