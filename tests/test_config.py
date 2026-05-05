@@ -205,6 +205,7 @@ def test_h200_readiness_uses_paper_grade_prompt_thresholds() -> None:
     for script in [primary, extension, qwen32, publication]:
         assert "--min-prompts-per-suite 600" in script
         assert "--suite-min-prompts system_leakage=2" in script
+        assert "--ci-width-exempt-suite system_leakage" in script
     for script in [primary, qwen32]:
         assert "--suite-min-prompts public_xstest_safe=200" in script
     assert "scripts/check_prompt_disjointness.py" in extension

@@ -376,6 +376,32 @@ def test_causal_restoration_readiness_rejects_wide_intervals() -> None:
     assert any("safety_restoration_fraction_ci` width 0.300" in failure for failure in failures)
 
 
+def test_causal_restoration_readiness_exempts_smoke_suite_ci_width() -> None:
+    failures: list[str] = []
+
+    _check_causal_restoration_metric_readiness(
+        {
+            "causal_restoration": {
+                "system_leakage::kv_int4_sim__patchkey-value__rolesystem": {
+                    "compressed_policy": "kv_int4_sim",
+                    "safety_restoration_fraction": 0.6,
+                    "safety_restoration_fraction_ci": {"ci_low": 0.1, "ci_high": 0.4},
+                },
+                "system_leakage::kv_int4_sim__patchkey-value__roleuser__matchsystem": {
+                    "compressed_policy": "kv_int4_sim",
+                    "safety_restoration_fraction": 0.2,
+                    "safety_restoration_fraction_ci": {"ci_low": 0.1, "ci_high": 0.2},
+                },
+            }
+        },
+        failures,
+        max_ci_width=0.12,
+        ci_width_exempt_suites={"system_leakage"},
+    )
+
+    assert failures == []
+
+
 def test_policy_level_contrast_readiness_rejects_wide_ssei_ci() -> None:
     failures: list[str] = []
 
