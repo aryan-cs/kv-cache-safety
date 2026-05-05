@@ -1,5 +1,7 @@
 # Testing Cache-Mediated Safety Erasure
 
+Repository: <https://github.com/aryan-cs/kv-cache-safety>
+
 This repository tests a phenomenon-first alignment hypothesis:
 
 > Inference-time KV-cache optimizations may selectively weaken safety/refusal behavior while preserving ordinary model capability, because some safety behavior may depend on fragile cache-resident routing state.

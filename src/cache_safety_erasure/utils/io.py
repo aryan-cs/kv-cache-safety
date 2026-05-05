@@ -11,6 +11,12 @@ from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import Any
 
+from cache_safety_erasure.project import (
+    PROJECT_NAME,
+    PROJECT_REPOSITORY_GIT_URL,
+    PROJECT_REPOSITORY_URL,
+)
+
 
 def utc_timestamp() -> str:
     return datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
@@ -111,7 +117,13 @@ def environment_snapshot() -> dict[str, Any]:
         "git_commit": git_commit(),
         "git_dirty": git_dirty(),
         "git_status_short": git_status_short(),
+        "git_remote_origin": git_remote_url("origin"),
         "uv_lock_sha256": file_sha256(Path("uv.lock")),
+        "project": {
+            "name": PROJECT_NAME,
+            "repository_url": PROJECT_REPOSITORY_URL,
+            "repository_git_url": PROJECT_REPOSITORY_GIT_URL,
+        },
         "cwd": str(Path.cwd()),
         "env": {
             key: os.environ.get(key)
@@ -202,6 +214,19 @@ def git_status_short() -> str | None:
     try:
         result = subprocess.run(
             ["git", "status", "--short"],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        return result.stdout.strip()
+    except Exception:
+        return None
+
+
+def git_remote_url(remote: str = "origin") -> str | None:
+    try:
+        result = subprocess.run(
+            ["git", "remote", "get-url", remote],
             check=True,
             capture_output=True,
             text=True,
