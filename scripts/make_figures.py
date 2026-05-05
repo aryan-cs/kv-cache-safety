@@ -485,8 +485,8 @@ def main() -> None:
                             [row.safety_restoration_fraction],
                             [y],
                             xerr=[
-                                [row.safety_restoration_fraction - row.safety_restoration_ci_low],
-                                [row.safety_restoration_ci_high - row.safety_restoration_fraction],
+                                [max(0.0, row.safety_restoration_fraction - row.safety_restoration_ci_low)],
+                                [max(0.0, row.safety_restoration_ci_high - row.safety_restoration_fraction)],
                             ],
                             fmt="none",
                             ecolor=color,
@@ -1087,8 +1087,8 @@ def _draw_restoration_intervals(ax: Any, plot_df: Any) -> None:
         valid["safety_restoration_fraction"],
         y_positions,
         xerr=[
-            valid["safety_restoration_fraction"] - valid["safety_restoration_ci_low"],
-            valid["safety_restoration_ci_high"] - valid["safety_restoration_fraction"],
+            (valid["safety_restoration_fraction"] - valid["safety_restoration_ci_low"]).clip(lower=0),
+            (valid["safety_restoration_ci_high"] - valid["safety_restoration_fraction"]).clip(lower=0),
         ],
         fmt="none",
         ecolor="0.15",
