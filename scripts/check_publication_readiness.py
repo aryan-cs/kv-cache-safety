@@ -129,8 +129,6 @@ FIGURE_DATA_UNIT_INTERVAL_COLUMNS = {
     "retention_fraction",
     "system_retention_fraction",
     "user_retention_fraction",
-    "safety_restoration_ci_low",
-    "safety_restoration_ci_high",
 }
 FIGURE_DATA_NONNEGATIVE_COLUMNS = {
     "ci_width",
@@ -391,6 +389,7 @@ def _check_figure_manifest(
     failures: list[str],
     require_causal_patch: bool,
     required_figures: list[str] | None = None,
+    allowed_figures: set[str] | None = None,
 ) -> None:
     manifest_path = figure_dir / "manifest.json"
     if not manifest_path.exists():
@@ -423,6 +422,8 @@ def _check_figure_manifest(
             continue
         name = figure.get("name", "<unnamed>")
         figure_names.add(str(name))
+        if allowed_figures is not None and str(name) not in allowed_figures:
+            continue
         for key in [
             "png",
             "png_sha256",

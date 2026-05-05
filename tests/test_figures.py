@@ -581,10 +581,37 @@ def test_restoration_flow_rows_preserve_confidence_intervals() -> None:
             "safety_restoration_fraction": 0.6,
             "safety_restoration_ci_low": 0.5,
             "safety_restoration_ci_high": 0.75,
+            "safety_restoration_display_ci_low": 0.5,
+            "safety_restoration_display_ci_high": 0.75,
             "safety_restoration_ci_width": 0.25,
             "label": "public_refusal_safety / patch_system",
         }
     ]
+
+
+def test_restoration_flow_rows_clip_display_intervals_only() -> None:
+    import pandas as pd
+
+    rows = _restoration_flow_rows(
+        pd.DataFrame(
+            [
+                {
+                    "suite": "public_refusal_safety",
+                    "policy": "patch_rolesystem",
+                    "compressed_policy": "kv_int4_sim",
+                    "safety_restoration_fraction": 1.3,
+                    "safety_restoration_ci_low": 1.12,
+                    "safety_restoration_ci_high": 1.46,
+                }
+            ]
+        )
+    )
+    row = rows.to_dict(orient="records")[0]
+
+    assert row["safety_restoration_ci_low"] == 1.12
+    assert row["safety_restoration_ci_high"] == 1.46
+    assert row["safety_restoration_display_ci_low"] == 1.0
+    assert row["safety_restoration_display_ci_high"] == 1.0
 
 
 def test_figure_manifest_rejects_stale_hash(tmp_path: Path) -> None:

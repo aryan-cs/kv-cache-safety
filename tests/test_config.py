@@ -86,6 +86,36 @@ def test_h200_ci_extension_uses_primary_policy_set_for_mergeable_intervals() -> 
     assert "public_xstest_safe" not in config.prompt_suites
 
 
+@pytest.mark.skipif(
+    __import__("importlib").util.find_spec("yaml") is None,
+    reason="PyYAML is not installed in the base interpreter",
+)
+def test_h200_causal_ci_extension_uses_causal_policy_set_for_mergeable_intervals() -> None:
+    config, raw = parse_experiment_config(
+        Path("configs/experiments/h200_causal_patch_qwen7b_ci_extension.yaml")
+    )
+    script = Path("scripts/run_h200_causal_ci_extension.sh").read_text(encoding="utf-8")
+    launcher = Path("scripts/wait_and_run_h200_sweep.sh").read_text(encoding="utf-8")
+
+    assert raw["run"]["name"] == "h200_causal_patch_qwen7b_ci_extension"
+    assert config.model.model_id == "Qwen/Qwen2.5-7B-Instruct"
+    assert config.seeds == (0,)
+    assert set(config.prompt_suites) == {
+        "system_leakage",
+        "public_system_leakage",
+        "public_refusal_safety",
+    }
+    assert {policy.name for policy in config.cache_policies} == {
+        "none",
+        "kv_int4_sim",
+        "policy_pinned",
+    }
+    assert any(policy.patch_from_baseline for policy in config.cache_policies)
+    assert "configs/experiments/h200_causal_patch_qwen7b_ci_extension.yaml" in script
+    assert "h200_causal_patch_qwen7b_plus_ci_extension" in script
+    assert "scripts/run_h200_causal_ci_extension.sh" in launcher
+
+
 def test_h200_sweep_run_ids_match_paper_figure_paths() -> None:
     script = Path("scripts/run_h200_sweep.sh").read_text(encoding="utf-8")
     tex = Path("paper/latex/main.tex").read_text(encoding="utf-8")

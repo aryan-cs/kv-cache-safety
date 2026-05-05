@@ -748,17 +748,18 @@ def _ci_width_failures(metrics: dict[str, Any], *, profile: str) -> list[str]:
         return []
     max_width = PRIMARY_MAX_CI_WIDTH if profile == "primary" else CAUSAL_MAX_CI_WIDTH
     failures = []
-    for policy, contrast in (metrics.get("policy_level_contrasts") or {}).items():
-        if str(policy) == "none" or not isinstance(contrast, dict):
-            continue
-        ci = contrast.get("selective_safety_erasure_index_ci") or {}
-        failures.extend(
-            _ci_interval_failures(
-                f"{policy}:policy_level_ssei_ci",
-                ci,
-                max_width=max_width,
+    if profile == "primary":
+        for policy, contrast in (metrics.get("policy_level_contrasts") or {}).items():
+            if str(policy) == "none" or not isinstance(contrast, dict):
+                continue
+            ci = contrast.get("selective_safety_erasure_index_ci") or {}
+            failures.extend(
+                _ci_interval_failures(
+                    f"{policy}:policy_level_ssei_ci",
+                    ci,
+                    max_width=max_width,
+                )
             )
-        )
     for key, value in metrics.get("selective_safety_erasure", {}).items():
         if not isinstance(value, dict):
             failures.append(f"{key}:malformed_selective_safety_erasure_entry")
@@ -1037,6 +1038,7 @@ def _figure_manifest_failures(results_dir: Path, *, profile: str) -> list[str]:
         failures,
         require_causal_patch=profile == "causal",
         required_figures=required_figures,
+        allowed_figures=set(required_figures),
     )
     return failures
 

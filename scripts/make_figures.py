@@ -427,6 +427,7 @@ def main() -> None:
             plot_df = restoration_df.dropna(subset=["safety_restoration_fraction"]).copy()
             if not plot_df.empty:
                 plot_df = plot_df.sort_values("safety_restoration_fraction")
+                plot_df = _with_restoration_display_bounds(plot_df)
                 fig_height = max(4, 0.35 * len(plot_df))
                 fig, ax = plt.subplots(figsize=(10, fig_height))
                 labels = [f"{row.suite}\n{row.policy}" for row in plot_df.itertuples()]
@@ -485,8 +486,20 @@ def main() -> None:
                             [row.safety_restoration_fraction],
                             [y],
                             xerr=[
-                                [max(0.0, row.safety_restoration_fraction - row.safety_restoration_ci_low)],
-                                [max(0.0, row.safety_restoration_ci_high - row.safety_restoration_fraction)],
+                                [
+                                    max(
+                                        0.0,
+                                        row.safety_restoration_fraction
+                                        - row.safety_restoration_display_ci_low,
+                                    )
+                                ],
+                                [
+                                    max(
+                                        0.0,
+                                        row.safety_restoration_display_ci_high
+                                        - row.safety_restoration_fraction,
+                                    )
+                                ],
                             ],
                             fmt="none",
                             ecolor=color,
@@ -1063,6 +1076,8 @@ def _restoration_flow_rows(restoration_df: Any) -> Any:
                 "safety_restoration_fraction": fraction,
                 "safety_restoration_ci_low": ci_low,
                 "safety_restoration_ci_high": ci_high,
+                "safety_restoration_display_ci_low": _clip_unit_interval(ci_low),
+                "safety_restoration_display_ci_high": _clip_unit_interval(ci_high),
                 "safety_restoration_ci_width": ci_high - ci_low,
                 "label": f"{row.suite} / {_short_policy_label(row.policy)}",
             }
@@ -1071,13 +1086,16 @@ def _restoration_flow_rows(restoration_df: Any) -> Any:
 
 
 def _draw_restoration_intervals(ax: Any, plot_df: Any) -> None:
-    if not {"safety_restoration_ci_low", "safety_restoration_ci_high"}.issubset(plot_df.columns):
+    if not {
+        "safety_restoration_display_ci_low",
+        "safety_restoration_display_ci_high",
+    }.issubset(plot_df.columns):
         return
     valid = plot_df.dropna(
         subset=[
             "safety_restoration_fraction",
-            "safety_restoration_ci_low",
-            "safety_restoration_ci_high",
+            "safety_restoration_display_ci_low",
+            "safety_restoration_display_ci_high",
         ]
     )
     if valid.empty:
@@ -1087,8 +1105,14 @@ def _draw_restoration_intervals(ax: Any, plot_df: Any) -> None:
         valid["safety_restoration_fraction"],
         y_positions,
         xerr=[
-            (valid["safety_restoration_fraction"] - valid["safety_restoration_ci_low"]).clip(lower=0),
-            (valid["safety_restoration_ci_high"] - valid["safety_restoration_fraction"]).clip(lower=0),
+            (
+                valid["safety_restoration_fraction"]
+                - valid["safety_restoration_display_ci_low"]
+            ).clip(lower=0),
+            (
+                valid["safety_restoration_display_ci_high"]
+                - valid["safety_restoration_fraction"]
+            ).clip(lower=0),
         ],
         fmt="none",
         ecolor="0.15",
@@ -1096,6 +1120,20 @@ def _draw_restoration_intervals(ax: Any, plot_df: Any) -> None:
         capsize=3,
         alpha=0.75,
     )
+
+
+def _with_restoration_display_bounds(df: Any) -> Any:
+    bounded = df.copy()
+    for source, target in [
+        ("safety_restoration_ci_low", "safety_restoration_display_ci_low"),
+        ("safety_restoration_ci_high", "safety_restoration_display_ci_high"),
+    ]:
+        bounded[target] = bounded[source].clip(lower=0.0, upper=1.0)
+    return bounded
+
+
+def _clip_unit_interval(value: float) -> float:
+    return min(1.0, max(0.0, value))
 
 
 def _short_policy_label(policy: str) -> str:
