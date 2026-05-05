@@ -22,6 +22,9 @@ from report_publication_status import (
     render_markdown,
 )
 from report_publication_status import (
+    _combined_source_commit_failures as _status_combined_source_commit_failures,
+)
+from report_publication_status import (
     _run_commit_history_failures as _status_run_commit_history_failures,
 )
 
@@ -139,6 +142,28 @@ def test_publication_status_rejects_unknown_generation_commit() -> None:
         f"run_git_commit_not_in_analysis_checkout:{'f' * 40}"
     ]
     assert _status_run_commit_history_failures({"git_commit": "abc123"}) == []
+
+
+def test_publication_status_rejects_unknown_or_dirty_combined_source_commit() -> None:
+    failures = _status_combined_source_commit_failures(
+        {
+            "combined_results": {
+                "base_git_commit": "f" * 40,
+                "base_git_dirty": False,
+                "extension_git_commit": "abc123",
+                "extension_git_dirty": True,
+            }
+        }
+    )
+
+    assert f"combined_source_git_commit_not_in_analysis_checkout:base:{'f' * 40}" in failures
+    assert "combined_source_dirty_git_tree:extension" in failures
+    assert _status_combined_source_commit_failures({"combined_results": {}}) == [
+        "combined_source_lacks_git_dirty:base",
+        "combined_source_lacks_git_commit:base",
+        "combined_source_lacks_git_dirty:extension",
+        "combined_source_lacks_git_commit:extension",
+    ]
 
 
 def test_publication_status_can_ignore_pdf_when_prechecking_complete_build(tmp_path: Path) -> None:

@@ -434,6 +434,33 @@ def test_paper_asset_freshness_recomputes_generated_outputs(tmp_path: Path) -> N
     assert "paper artifact generated output `main_results_table.tex` differs from metrics export" in failures
 
 
+def test_paper_asset_freshness_can_require_current_analysis_commit(tmp_path: Path) -> None:
+    import sys
+
+    sys.path.insert(0, str(Path("scripts").resolve()))
+    from check_paper_asset_freshness import check_paper_asset_freshness
+    from export_paper_assets import export_paper_assets
+
+    results_dir = tmp_path / "results" / "h200_qwen_full_sweep"
+    paper_dir = tmp_path / "paper" / "generated" / "h200_qwen_full_sweep"
+    _write_paper_asset_export_fixture(results_dir)
+    export_paper_assets(results_dir, paper_dir, "Primary")
+    _mark_clean_export_manifest(paper_dir)
+    manifest_path = paper_dir / "artifact_manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["analysis_git_commit"] = "f" * 40
+    write_json(manifest_path, manifest)
+
+    assert check_paper_asset_freshness(paper_dir, results_dir) == []
+    failures = check_paper_asset_freshness(
+        paper_dir,
+        results_dir,
+        require_current_analysis_commit=True,
+    )
+
+    assert f"paper artifact manifest analysis git commit is stale: {results_dir}" in failures
+
+
 def test_paper_asset_freshness_recompute_infers_causal_macro_prefix(tmp_path: Path) -> None:
     import sys
 

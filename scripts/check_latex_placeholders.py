@@ -114,9 +114,9 @@ def placeholder_artifact_failures(tex_path: Path) -> list[str]:
             if path.suffix.lower() == ".tex":
                 text = path.read_text(encoding="utf-8", errors="replace")
                 rendered_text = _strip_tex_comments(text)
-                text_lower = text.lower()
+                rendered_text_lower = rendered_text.lower()
                 for marker in PLACEHOLDER_TEXT_MARKERS:
-                    if marker.lower() in text_lower:
+                    if marker.lower() in rendered_text_lower:
                         failures.append(f"placeholder text in artifact: {raw_path}")
                         break
                 failures.extend(

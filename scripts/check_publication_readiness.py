@@ -149,6 +149,7 @@ def main() -> None:
         if manifest.get("git_dirty") and not args.allow_dirty:
             failures.append("run was produced from a dirty git working tree")
         failures.extend(_run_commit_history_failures(manifest))
+        failures.extend(_combined_source_commit_failures(manifest))
         if manifest.get("model_provider") == "mock" and not args.allow_mock_model:
             failures.append("mock model runs are not paper evidence")
         model_id = str(manifest.get("model_id", ""))
@@ -676,6 +677,48 @@ def _run_commit_history_failures(manifest: dict) -> list[str]:
     commit = str(manifest.get("git_commit") or "").strip()
     if not _looks_like_git_commit(commit):
         return []
+    return _commit_history_failures(
+        commit,
+        missing_message=f"run git commit `{commit}` is not present in the analysis checkout",
+        ancestor_message=f"run git commit `{commit}` is not an ancestor of analysis HEAD",
+    )
+
+
+def _combined_source_commit_failures(manifest: dict) -> list[str]:
+    combined_results = manifest.get("combined_results")
+    if not isinstance(combined_results, dict):
+        return []
+    failures: list[str] = []
+    for label in ["base", "extension"]:
+        if f"{label}_git_dirty" not in combined_results:
+            failures.append(f"combined {label} run lacks git dirty provenance")
+        if combined_results.get(f"{label}_git_dirty"):
+            failures.append(f"combined {label} run was produced from a dirty git working tree")
+        commit = str(combined_results.get(f"{label}_git_commit") or "").strip()
+        if not commit:
+            failures.append(f"combined {label} run lacks git commit provenance")
+            continue
+        if not _looks_like_git_commit(commit):
+            continue
+        failures.extend(
+            _commit_history_failures(
+                commit,
+                missing_message=(
+                    f"combined {label} run git commit `{commit}` is not present "
+                    "in the analysis checkout"
+                ),
+                ancestor_message=(
+                    f"combined {label} run git commit `{commit}` is not an ancestor "
+                    "of analysis HEAD"
+                ),
+            )
+        )
+    return failures
+
+
+def _commit_history_failures(
+    commit: str, *, missing_message: str, ancestor_message: str
+) -> list[str]:
     exists = subprocess.run(
         ["git", "cat-file", "-e", f"{commit}^{{commit}}"],
         check=False,
@@ -683,7 +726,7 @@ def _run_commit_history_failures(manifest: dict) -> list[str]:
         text=True,
     )
     if exists.returncode != 0:
-        return [f"run git commit `{commit}` is not present in the analysis checkout"]
+        return [missing_message]
     ancestor = subprocess.run(
         ["git", "merge-base", "--is-ancestor", commit, "HEAD"],
         check=False,
@@ -691,7 +734,7 @@ def _run_commit_history_failures(manifest: dict) -> list[str]:
         text=True,
     )
     if ancestor.returncode != 0:
-        return [f"run git commit `{commit}` is not an ancestor of analysis HEAD"]
+        return [ancestor_message]
     return []
 
 

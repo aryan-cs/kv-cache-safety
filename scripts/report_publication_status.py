@@ -529,6 +529,7 @@ def _profile_identity_failures(
     if environment.get("git_commit") and manifest.get("git_commit") != environment.get("git_commit"):
         failures.append("manifest_environment_git_commit_mismatch")
     failures.extend(_run_commit_history_failures(manifest))
+    failures.extend(_combined_source_commit_failures(manifest))
     if environment.get("git_dirty"):
         failures.append("dirty_environment_git_tree")
     if environment:
@@ -680,6 +681,42 @@ def _run_commit_history_failures(manifest: dict[str, Any]) -> list[str]:
     commit = str(manifest.get("git_commit") or "").strip()
     if not _looks_like_git_commit(commit):
         return []
+    return _commit_history_failures(
+        commit,
+        missing_message=f"run_git_commit_not_in_analysis_checkout:{commit}",
+        ancestor_message=f"run_git_commit_not_ancestor_of_analysis_head:{commit}",
+    )
+
+
+def _combined_source_commit_failures(manifest: dict[str, Any]) -> list[str]:
+    combined_results = manifest.get("combined_results")
+    if not isinstance(combined_results, dict):
+        return []
+    failures: list[str] = []
+    for label in ["base", "extension"]:
+        if f"{label}_git_dirty" not in combined_results:
+            failures.append(f"combined_source_lacks_git_dirty:{label}")
+        if combined_results.get(f"{label}_git_dirty"):
+            failures.append(f"combined_source_dirty_git_tree:{label}")
+        commit = str(combined_results.get(f"{label}_git_commit") or "").strip()
+        if not commit:
+            failures.append(f"combined_source_lacks_git_commit:{label}")
+            continue
+        if not _looks_like_git_commit(commit):
+            continue
+        failures.extend(
+            _commit_history_failures(
+                commit,
+                missing_message=f"combined_source_git_commit_not_in_analysis_checkout:{label}:{commit}",
+                ancestor_message=f"combined_source_git_commit_not_ancestor_of_analysis_head:{label}:{commit}",
+            )
+        )
+    return failures
+
+
+def _commit_history_failures(
+    commit: str, *, missing_message: str, ancestor_message: str
+) -> list[str]:
     exists = subprocess.run(
         ["git", "cat-file", "-e", f"{commit}^{{commit}}"],
         check=False,
@@ -687,7 +724,7 @@ def _run_commit_history_failures(manifest: dict[str, Any]) -> list[str]:
         text=True,
     )
     if exists.returncode != 0:
-        return [f"run_git_commit_not_in_analysis_checkout:{commit}"]
+        return [missing_message]
     ancestor = subprocess.run(
         ["git", "merge-base", "--is-ancestor", commit, "HEAD"],
         check=False,
@@ -695,7 +732,7 @@ def _run_commit_history_failures(manifest: dict[str, Any]) -> list[str]:
         text=True,
     )
     if ancestor.returncode != 0:
-        return [f"run_git_commit_not_ancestor_of_analysis_head:{commit}"]
+        return [ancestor_message]
     return []
 
 

@@ -19,6 +19,9 @@ require_qwen32_followup="${REQUIRE_QWEN32_FOLLOWUP:-0}"
 publication_status_dir="${PUBLICATION_STATUS_DIR:-paper/build}"
 arxiv_source_dir="${ARXIV_SOURCE_DIR:-paper/build/arxiv_source}"
 arxiv_archive="${ARXIV_ARCHIVE:-paper/build/arxiv_source.tar.gz}"
+fetch_manifest="${H200_FETCH_MANIFEST:-logs/h200/h200_artifact_manifest_local.json}"
+fetch_remote_manifest="${H200_FETCH_REMOTE_MANIFEST:-logs/h200/h200_artifact_manifest_remote.json}"
+fetch_compare_report="${H200_FETCH_COMPARE_REPORT:-logs/h200/h200_artifact_manifest_compare.json}"
 branch="${BRANCH:-master}"
 qwen32_package_args=()
 
@@ -43,6 +46,13 @@ require_current_origin_head() {
 }
 
 require_current_origin_head
+
+uv run python scripts/check_h200_fetch_manifest.py \
+  --remote-manifest "$fetch_remote_manifest" \
+  --local-manifest "$fetch_manifest" \
+  --compare-report "$fetch_compare_report" \
+  --required-path "$primary_results" \
+  --required-path "$causal_results"
 
 clear_stale_publication_pdfs() {
   rm -f \

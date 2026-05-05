@@ -14,6 +14,7 @@ from check_publication_readiness import (
     _check_generation_matrix,
     _check_paper_assets,
     _check_policy_level_contrast_readiness,
+    _combined_source_commit_failures,
     _run_commit_history_failures,
 )
 
@@ -79,6 +80,31 @@ def test_run_commit_history_rejects_unknown_generation_commit() -> None:
         f"run git commit `{'f' * 40}` is not present in the analysis checkout"
     ]
     assert _run_commit_history_failures({"git_commit": "abc123"}) == []
+
+
+def test_combined_source_commit_history_rejects_unknown_or_dirty_sources() -> None:
+    failures = _combined_source_commit_failures(
+        {
+            "combined_results": {
+                "base_git_commit": "f" * 40,
+                "base_git_dirty": False,
+                "extension_git_commit": "abc123",
+                "extension_git_dirty": True,
+            }
+        }
+    )
+
+    assert (
+        f"combined base run git commit `{'f' * 40}` is not present in the analysis checkout"
+        in failures
+    )
+    assert "combined extension run was produced from a dirty git working tree" in failures
+    assert _combined_source_commit_failures({"combined_results": {}}) == [
+        "combined base run lacks git dirty provenance",
+        "combined base run lacks git commit provenance",
+        "combined extension run lacks git dirty provenance",
+        "combined extension run lacks git commit provenance",
+    ]
 
 
 @pytest.mark.skipif(

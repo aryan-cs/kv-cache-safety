@@ -855,6 +855,7 @@ def test_arxiv_packager_ignores_internal_operational_tex_comments(tmp_path: Path
     artifact = generated / "claim_interpretation.tex"
     artifact.write_text(
         "% H200 finalizer draft-only\n"
+        "% Results pending; no readiness-passing rows exported.\n"
         "The results support the registered causal restoration claim.",
         encoding="utf-8",
     )
@@ -970,6 +971,7 @@ def test_latex_placeholder_checker_ignores_nonrendered_internal_comments(
     artifact = generated / "claim_interpretation.tex"
     artifact.write_text(
         "% H200 finalizer draft-only\n"
+        "% Results pending; no readiness-passing rows exported.\n"
         "The causal results show restored refusal behavior after targeted cache repair.",
         encoding="utf-8",
     )

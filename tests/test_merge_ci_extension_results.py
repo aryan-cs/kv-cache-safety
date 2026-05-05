@@ -48,6 +48,10 @@ def test_merge_ci_extension_adds_only_new_prompt_clusters(tmp_path: Path) -> Non
     assert manifest["combined_results"]["base_run_name"] == "h200_qwen_full_sweep"
     assert manifest["combined_results"]["merged_run_name"] == "merged"
     assert manifest["combined_results"]["output_results_dir"] == str(output)
+    assert manifest["combined_results"]["base_git_commit"] == "abc"
+    assert manifest["combined_results"]["extension_git_commit"] == "abc"
+    assert manifest["combined_results"]["base_git_dirty"] is False
+    assert manifest["combined_results"]["extension_git_dirty"] is False
     assert manifest["combined_results"]["skipped_duplicate_prompt_count"] == 1
     assert (output / "metrics.json").exists()
     assert (output / "cache_stats.parquet").exists()

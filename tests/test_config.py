@@ -318,6 +318,12 @@ def test_generated_h200_audit_artifacts_are_ignored() -> None:
 def test_publication_artifact_builder_fails_without_real_results() -> None:
     script = Path("scripts/build_publication_artifacts.sh").read_text(encoding="utf-8")
 
+    assert "scripts/check_h200_fetch_manifest.py" in script
+    assert 'H200_FETCH_MANIFEST:-logs/h200/h200_artifact_manifest_local.json' in script
+    assert 'H200_FETCH_REMOTE_MANIFEST:-logs/h200/h200_artifact_manifest_remote.json' in script
+    assert 'H200_FETCH_COMPARE_REPORT:-logs/h200/h200_artifact_manifest_compare.json' in script
+    assert '--required-path "$primary_results"' in script
+    assert '--required-path "$causal_results"' in script
     assert "require_result_artifacts" in script
     assert "Refusing to build publication artifacts from a dirty git working tree." in script
     assert "Missing required result artifact" in script
@@ -381,11 +387,22 @@ def test_publication_artifact_builder_fails_without_real_results() -> None:
 def test_complete_paper_build_checks_publication_status_before_latex() -> None:
     script = Path("scripts/build_paper_pdf.sh").read_text(encoding="utf-8")
 
+    assert 'branch="${BRANCH:-master}"' in script
+    assert "Refusing to build a complete paper PDF from a dirty git working tree." in script
+    assert "Refusing to build a complete paper PDF from a stale checkout" in script
+    assert 'git fetch origin "$branch"' in script
+    assert 'git rev-parse "origin/$branch"' in script
+    assert 'if [[ "${REQUIRE_COMPLETE_PAPER:-0}" == "1" ]]; then' in script
+    assert "ALLOW_DRAFT_PDF" in script
+    assert "Skipping final PDF text check because ALLOW_DRAFT_PDF=1." in script
+    assert 'rm -f "$pdf" "${pdf}.manifest.json"' in script
+    assert "uv run python scripts/check_final_pdf_text.py --pdf \"$pdf\"" in script
     assert "scripts/check_latex_placeholders.py" in script
     assert "scripts/sync_active_paper_assets.py" in script
     assert "scripts/check_paper_asset_freshness.py" in script
     assert "--require-exported-table-set" in script
     assert "--require-recomputed-output" in script
+    assert "--require-current-analysis-commit" in script
     assert "ALLOW_NONPASSING_CLAIM_PAPER" in script
     assert "publication_status_fail_args" in script
     assert "scripts/report_publication_status.py" in script

@@ -18,7 +18,30 @@ active_causal_audit_dir="paper/audit/active_causal_summary"
 claim_assessment="${CLAIM_ASSESSMENT_PATH:-paper/generated/claim_assessment/claim_assessment.json}"
 arxiv_source_dir="${ARXIV_SOURCE_DIR:-paper/build/arxiv_source}"
 arxiv_archive="${ARXIV_ARCHIVE:-paper/build/arxiv_source.tar.gz}"
+branch="${BRANCH:-master}"
 mkdir -p "$build_dir"
+
+require_current_origin_head() {
+  git fetch origin "$branch"
+  local head
+  local origin_head
+  head="$(git rev-parse HEAD)"
+  origin_head="$(git rev-parse "origin/$branch")"
+  if [[ "$head" != "$origin_head" ]]; then
+    echo "Refusing to build a complete paper PDF from a stale checkout: HEAD=${head}, origin/${branch}=${origin_head}." >&2
+    echo "Fetch or fast-forward to origin/${branch} before regenerating final paper assets." >&2
+    exit 1
+  fi
+}
+
+if [[ "${REQUIRE_COMPLETE_PAPER:-0}" == "1" ]]; then
+  if [[ -n "$(git status --short)" ]]; then
+    echo "Refusing to build a complete paper PDF from a dirty git working tree." >&2
+    git status --short >&2
+    exit 1
+  fi
+  require_current_origin_head
+fi
 
 final_pdf_sources=(
   "latex_main=$src_dir/main.tex"
@@ -107,8 +130,13 @@ require_valid_pdf() {
 
 check_final_pdf_text() {
   local pdf="$1"
-  if [[ "${REQUIRE_COMPLETE_PAPER:-0}" == "1" ]]; then
-    uv run python scripts/check_final_pdf_text.py --pdf "$pdf"
+  if [[ "${ALLOW_DRAFT_PDF:-0}" == "1" ]]; then
+    echo "Skipping final PDF text check because ALLOW_DRAFT_PDF=1." >&2
+    return
+  fi
+  if ! uv run python scripts/check_final_pdf_text.py --pdf "$pdf"; then
+    rm -f "$pdf" "${pdf}.manifest.json"
+    exit 1
   fi
 }
 
@@ -142,7 +170,8 @@ if [[ "${REQUIRE_COMPLETE_PAPER:-0}" == "1" ]]; then
     --pair "$primary_paper_dir=$primary_results" \
     --pair "$causal_paper_dir=$causal_results" \
     --require-exported-table-set \
-    --require-recomputed-output
+    --require-recomputed-output \
+    --require-current-analysis-commit
   uv run python scripts/report_publication_status.py \
     "${publication_status_args[@]}" \
     --paper-pdf "$build_dir/cache_mediated_safety_erasure.pdf" \

@@ -423,9 +423,9 @@ def _invalid_arxiv_support_files(paths: list[Path]) -> list[str]:
             continue
         text = path.read_text(encoding="utf-8", errors="replace")
         rendered_text = _strip_tex_comments(text)
-        text_lower = text.lower()
+        rendered_text_lower = rendered_text.lower()
         for marker in PLACEHOLDER_TEXT_MARKERS:
-            if marker.lower() in text_lower:
+            if marker.lower() in rendered_text_lower:
                 failures.append(f"{path}:placeholder_text:{marker}")
                 break
         failures.extend(
