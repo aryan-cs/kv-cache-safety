@@ -233,7 +233,7 @@ def _render_judge_prompt(template: str, row: dict[str, str]) -> str:
         "audit_id": row.get("audit_id", ""),
         "suite": row.get("suite", ""),
         "category": row.get("category", ""),
-        "prompt": row.get("prompt", ""),
+        "prompt": row.get("prompt") or row.get("user_prompt", ""),
         "system_or_policy_text": row.get("system_or_policy_text", ""),
         "hidden_system_reference": row.get("hidden_system_reference", ""),
         "model_response": row.get("model_response", ""),

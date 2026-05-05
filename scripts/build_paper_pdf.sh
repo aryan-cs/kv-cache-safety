@@ -184,6 +184,18 @@ if [[ "${REQUIRE_COMPLETE_PAPER:-0}" == "1" ]]; then
 fi
 
 rm -f "$build_dir/main.pdf" "$build_dir/cache_mediated_safety_erasure.pdf"
+rm -f \
+  "$build_dir/main.aux" \
+  "$build_dir/main.bbl" \
+  "$build_dir/main.bcf" \
+  "$build_dir/main.blg" \
+  "$build_dir/main.fdb_latexmk" \
+  "$build_dir/main.fls" \
+  "$build_dir/main.log" \
+  "$build_dir/main.out" \
+  "$build_dir/main.run.xml" \
+  "$build_dir/main.synctex.gz" \
+  "$build_dir/main.toc"
 
 if command -v tectonic >/dev/null 2>&1; then
   (

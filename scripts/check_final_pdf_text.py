@@ -67,6 +67,14 @@ FORBIDDEN_RESOURCE_CONTEXT_PATTERNS: list[tuple[str, str]] = [
         rf"|\b(?:{RESOURCE_STATUS_WORDS})\b(?:\s+\w+){{0,12}}\s+\bv\s*r\s*a\s*m\b",
     ),
 ]
+UNRESOLVED_REFERENCE_PATTERNS: list[tuple[str, str]] = [
+    (
+        "unresolved_latex_reference",
+        r"\b(?:figure|fig\.?|table|section|sec\.?|appendix|equation|eq\.?|algorithm)\s*\?\?",
+    ),
+    ("unresolved_latex_citation", r"\[\s*\?\s*\]"),
+    ("unresolved_latex_citation", r"\bcitation\s*\?\?"),
+]
 
 
 def main() -> None:
@@ -99,9 +107,20 @@ def placeholder_text_failures(text: str) -> list[str]:
 
 def final_pdf_text_failures(text: str, extractor: str) -> list[str]:
     failures = placeholder_text_failures(text)
+    failures.extend(unresolved_reference_failures(text))
     if not text.strip():
         failures.append(f"empty_extracted_pdf_text:{extractor}")
     return failures
+
+
+def unresolved_reference_failures(text: str) -> list[str]:
+    return sorted(
+        {
+            f"unresolved_reference:{marker}"
+            for marker, pattern in UNRESOLVED_REFERENCE_PATTERNS
+            if re.search(pattern, text, flags=re.IGNORECASE)
+        }
+    )
 
 
 def forbidden_final_prose_failures(text: str) -> list[str]:

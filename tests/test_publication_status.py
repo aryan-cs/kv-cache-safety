@@ -198,6 +198,41 @@ def test_publication_status_can_ignore_pdf_when_prechecking_complete_build(tmp_p
     assert "paper_pdf_valid" not in status["blockers"]
 
 
+def test_publication_status_rejects_invalid_existing_pdf_during_prebuild(
+    tmp_path: Path,
+) -> None:
+    primary = tmp_path / "primary"
+    causal = tmp_path / "causal"
+    primary_audit = tmp_path / "primary_audit"
+    causal_audit = tmp_path / "causal_audit"
+    _write_run(primary)
+    _write_run(causal)
+    _write_audit(primary_audit, primary)
+    _write_audit(causal_audit, causal)
+    claim_path = tmp_path / "claim_assessment.json"
+    claim_path.write_text(
+        json.dumps(_passing_claim_assessment(primary, causal, primary_audit, causal_audit)),
+        encoding="utf-8",
+    )
+    pdf_path = tmp_path / "paper.pdf"
+    pdf_path.write_bytes(_test_pdf_bytes("registered analysis protocol"))
+
+    status = publication_status(
+        primary_results_dir=primary,
+        causal_results_dir=causal,
+        primary_audit_dir=primary_audit,
+        causal_audit_dir=causal_audit,
+        claim_assessment_path=claim_path,
+        paper_pdf=pdf_path,
+        require_paper_pdf=False,
+    )
+
+    assert status["publication_ready"] is False
+    assert "paper_pdf_exists" not in status["blockers"]
+    assert "paper_pdf_valid" in status["blockers"]
+    assert "placeholder_text:registered analysis protocol" in status["paper_pdf"]["failure"]
+
+
 def test_publication_markdown_marks_existing_pdf_as_draft_until_evidence_ready(
     tmp_path: Path,
 ) -> None:
@@ -3415,25 +3450,25 @@ def _write_arxiv_bundle(
 def _arxiv_support_text(path: Path) -> str:
     if path.name == "main_results_table.tex":
         return (
-            "% policy level ssei\n"
-            "% policy level ssei ci low\n"
-            "% policy level ssei ci high\n"
+            "policy level ssei\n"
+            "policy level ssei ci low\n"
+            "policy level ssei ci high\n"
             "policy & estimate \\\\\n"
         )
     if path.name == "suite_level_effects_table.tex":
         return (
-            "% paired n\n"
-            "% cluster n\n"
-            "% safety ci low\n"
-            "% safety ci high\n"
+            "paired n\n"
+            "cluster n\n"
+            "safety ci low\n"
+            "safety ci high\n"
             "suite & estimate \\\\\n"
         )
     if path.name == "causal_restoration_table.tex":
         return (
-            "% safety ci low\n"
-            "% safety ci high\n"
-            "% refusal ci low\n"
-            "% refusal ci high\n"
+            "safety ci low\n"
+            "safety ci high\n"
+            "refusal ci low\n"
+            "refusal ci high\n"
             "rolesystem & 0.62 \\\\\n"
             "roleuser & 0.20 \\\\\n"
             "policy_pinned & 0.58 \\\\\n"

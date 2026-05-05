@@ -123,7 +123,7 @@ def placeholder_artifact_failures(tex_path: Path) -> list[str]:
                     f"forbidden final prose in artifact: {raw_path}::{failure}"
                     for failure in forbidden_final_prose_failures(rendered_text)
                 )
-                failures.extend(_semantic_tex_failures(raw_path, path.name, text))
+                failures.extend(_semantic_tex_failures(raw_path, path.name, rendered_text))
     return sorted(set(failures))
 
 

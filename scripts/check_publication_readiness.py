@@ -82,6 +82,62 @@ REQUIRED_FIGURE_DATA_COLUMNS = {
         "label",
     },
 }
+FIGURE_DATA_NUMERIC_COLUMNS = {
+    "selective_safety_erasure_heatmap": {
+        "safety_degradation",
+        "capability_degradation",
+    },
+    "safety_capability_phase_portrait": {
+        "safety_degradation",
+        "capability_degradation",
+        "selective_safety_erasure_index",
+    },
+    "prompt_effect_constellation": {
+        "x",
+        "y",
+        "effect_magnitude",
+    },
+    "cache_state_fingerprint": {
+        "layer_bin",
+        "token_bin",
+        "retention_fraction",
+    },
+    "safety_state_atlas": {
+        "selective_safety_erasure_index",
+        "system_retention_fraction",
+        "user_retention_fraction",
+    },
+    "policy_uncertainty_braid": {
+        "mean",
+        "ci_low",
+        "ci_high",
+        "ci_width",
+    },
+    "causal_restoration_fraction": {
+        "safety_restoration_fraction",
+        "safety_restoration_ci_low",
+        "safety_restoration_ci_high",
+    },
+    "causal_restoration_flow": {
+        "safety_restoration_fraction",
+        "safety_restoration_ci_low",
+        "safety_restoration_ci_high",
+        "safety_restoration_ci_width",
+    },
+}
+FIGURE_DATA_UNIT_INTERVAL_COLUMNS = {
+    "retention_fraction",
+    "system_retention_fraction",
+    "user_retention_fraction",
+    "safety_restoration_fraction",
+    "safety_restoration_ci_low",
+    "safety_restoration_ci_high",
+}
+FIGURE_DATA_NONNEGATIVE_COLUMNS = {
+    "ci_width",
+    "safety_restoration_ci_width",
+    "effect_magnitude",
+}
 FIGURE_DATA_COLUMN_ALIASES = {
     "selective_safety_erasure_heatmap": [
         {"selective_safety_erasure_index", "index"},
@@ -576,23 +632,55 @@ def _is_white_pdf_color(command: tuple[str, tuple[float, ...]]) -> bool:
 
 
 def _figure_data_schema_failure(figure: dict, path: Path) -> str:
-    required_columns = REQUIRED_FIGURE_DATA_COLUMNS.get(str(figure.get("name")))
+    figure_name = str(figure.get("name"))
+    required_columns = REQUIRED_FIGURE_DATA_COLUMNS.get(figure_name)
     if not required_columns:
         return ""
     try:
         with path.open("r", encoding="utf-8", newline="") as f:
-            reader = csv.reader(f)
-            header = next(reader, [])
+            reader = csv.DictReader(f)
+            header = reader.fieldnames or []
+            rows = list(reader)
     except OSError as exc:
         return str(exc)
     observed = {str(column) for column in header}
     missing = sorted(required_columns - observed)
-    for aliases in FIGURE_DATA_COLUMN_ALIASES.get(str(figure.get("name")), []):
+    for aliases in FIGURE_DATA_COLUMN_ALIASES.get(figure_name, []):
         if observed.isdisjoint(aliases):
             missing.append("/".join(sorted(aliases)))
     if missing:
         return f"missing required columns: {', '.join(missing)}"
+    if not rows:
+        return "missing data rows"
+    numeric_failure = _figure_numeric_data_failure(figure_name, rows)
+    if numeric_failure:
+        return numeric_failure
     return ""
+
+
+def _figure_numeric_data_failure(figure_name: str, rows: list[dict[str, str]]) -> str:
+    failures = []
+    for column in sorted(FIGURE_DATA_NUMERIC_COLUMNS.get(figure_name, set())):
+        for row_index, row in enumerate(rows, start=2):
+            raw_value = str(row.get(column, "")).strip()
+            if raw_value == "":
+                failures.append(f"{column} row {row_index} is blank")
+                break
+            try:
+                value = float(raw_value)
+            except ValueError:
+                failures.append(f"{column} row {row_index} is not numeric")
+                break
+            if not math.isfinite(value):
+                failures.append(f"{column} row {row_index} is non-finite")
+                break
+            if column in FIGURE_DATA_UNIT_INTERVAL_COLUMNS and not 0.0 <= value <= 1.0:
+                failures.append(f"{column} row {row_index} is outside [0, 1]")
+                break
+            if column in FIGURE_DATA_NONNEGATIVE_COLUMNS and value < 0.0:
+                failures.append(f"{column} row {row_index} is negative")
+                break
+    return "; ".join(failures[:5])
 
 
 def _public_prompt_precise_provenance_failure(row: dict, metadata: dict) -> bool:

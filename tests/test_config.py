@@ -416,6 +416,9 @@ def test_complete_paper_build_checks_publication_status_before_latex() -> None:
     copy_cmd = 'cp "$build_dir/cache_mediated_safety_erasure.pdf" paper/cache_mediated_safety_erasure.pdf'
     assert copy_cmd in script
     assert 'rm -f "$build_dir/main.pdf" "$build_dir/cache_mediated_safety_erasure.pdf"' in script
+    assert '"$build_dir/main.aux"' in script
+    assert '"$build_dir/main.bbl"' in script
+    assert '"$build_dir/main.fdb_latexmk"' in script
     assert script.index("scripts/sync_active_paper_assets.py") < script.index(
         "scripts/check_latex_placeholders.py"
     )

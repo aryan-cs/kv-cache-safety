@@ -7,7 +7,11 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path("scripts").resolve()))
 
-from check_final_pdf_text import forbidden_final_prose_failures, placeholder_text_failures
+from check_final_pdf_text import (
+    final_pdf_text_failures,
+    forbidden_final_prose_failures,
+    placeholder_text_failures,
+)
 from check_latex_citations import citation_failures
 from check_latex_placeholders import missing_placeholder_artifacts, placeholder_artifact_failures
 from export_paper_assets import export_paper_assets
@@ -146,6 +150,16 @@ def test_final_pdf_text_checker_normalizes_escaped_operational_terms() -> None:
     assert "forbidden_final_prose:launcher" in failures
     assert "forbidden_final_prose:MacBook" in failures
     assert "forbidden_final_prose:GPU operational status" in failures
+
+
+def test_final_pdf_text_checker_rejects_unresolved_latex_markers() -> None:
+    failures = final_pdf_text_failures(
+        "Figure ?? summarizes the main effect. See Table ?? and [?] for prior work.",
+        "synthetic",
+    )
+
+    assert "unresolved_reference:unresolved_latex_reference" in failures
+    assert "unresolved_reference:unresolved_latex_citation" in failures
 
 
 def test_final_pdf_text_checker_allows_relevant_cache_memory_prose() -> None:
@@ -918,6 +932,23 @@ def test_arxiv_packager_rejects_semantically_incomplete_generated_tex(tmp_path: 
     assert any("policy level ssei" in failure for failure in failures)
 
 
+def test_arxiv_packager_ignores_comments_for_semantic_markers(tmp_path: Path) -> None:
+    generated = tmp_path / "generated" / "h200_qwen_full_sweep"
+    generated.mkdir(parents=True)
+    table = generated / "main_results_table.tex"
+    table.write_text(
+        "% policy level ssei\n"
+        "% policy level ssei ci low\n"
+        "% policy level ssei ci high\n"
+        "policy & estimate \\\\\n",
+        encoding="utf-8",
+    )
+
+    failures = _invalid_arxiv_support_files([table])
+
+    assert f"{table}:missing required table marker in artifact: {table}::policy level ssei" in failures
+
+
 def test_latex_placeholder_checker_reports_missing_artifacts(tmp_path: Path) -> None:
     tex = tmp_path / "main.tex"
     existing = tmp_path / "figure.pdf"
@@ -1050,6 +1081,33 @@ def test_latex_placeholder_checker_requires_result_macro_values(tmp_path: Path) 
     assert (
         "missing required macro in artifact: "
         "h200_qwen_full_sweep/result_macros.tex::PrimaryTopSSEI"
+    ) in failures
+
+
+def test_latex_placeholder_checker_ignores_comments_for_required_macros(tmp_path: Path) -> None:
+    tex = tmp_path / "main.tex"
+    generated = tmp_path / "h200_qwen_full_sweep"
+    generated.mkdir()
+    macros = generated / "result_macros.tex"
+    macros.write_text(
+        "% \\renewcommand{\\PrimaryRunId}{h200_qwen_full_sweep}\n"
+        "% \\renewcommand{\\PrimaryPolicyCount}{6}\n",
+        encoding="utf-8",
+    )
+    tex.write_text(
+        r"\requiredartifact{h200_qwen_full_sweep/result_macros.tex}",
+        encoding="utf-8",
+    )
+
+    failures = placeholder_artifact_failures(tex)
+
+    assert (
+        "missing required macro in artifact: "
+        "h200_qwen_full_sweep/result_macros.tex::PrimaryRunId"
+    ) in failures
+    assert (
+        "missing required macro in artifact: "
+        "h200_qwen_full_sweep/result_macros.tex::PrimaryPolicyCount"
     ) in failures
 
 

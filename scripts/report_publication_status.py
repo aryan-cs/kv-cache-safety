@@ -345,14 +345,16 @@ def publication_status(
         causal_audit_dir=causal_audit_dir,
     )
 
+    paper_pdf_exists = pdf["exists"] or not require_paper_pdf
+    paper_pdf_valid = pdf["valid"] if pdf["exists"] else not require_paper_pdf
     gates = {
         "primary_results_complete": primary["complete"],
         "causal_results_complete": causal["complete"],
         "primary_human_audit_complete": primary_audit["complete"],
         "causal_human_audit_complete": causal_audit["complete"],
         "claim_assessment_passed": claim_assessment["passed"],
-        "paper_pdf_exists": pdf["exists"] or not require_paper_pdf,
-        "paper_pdf_valid": pdf["valid"] or not require_paper_pdf,
+        "paper_pdf_exists": paper_pdf_exists,
+        "paper_pdf_valid": paper_pdf_valid,
     }
     if require_arxiv_bundle:
         gates["arxiv_bundle_ready"] = arxiv["complete"]

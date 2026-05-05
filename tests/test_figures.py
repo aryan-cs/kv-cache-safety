@@ -5,7 +5,11 @@ import pytest
 
 sys.path.insert(0, str(Path("scripts").resolve()))
 
-from check_publication_readiness import _check_figure_manifest, _figure_artifact_failure
+from check_publication_readiness import (
+    _check_figure_manifest,
+    _figure_artifact_failure,
+    _figure_data_schema_failure,
+)
 from make_figures import (
     _paired_safety_forest_rows,
     _phase_portrait_rows,
@@ -746,6 +750,37 @@ def test_figure_artifact_signature_validator_accepts_real_headers(tmp_path: Path
     assert _figure_artifact_failure("pdf", pdf) == ""
     assert _figure_artifact_failure("svg", svg) == ""
     assert _figure_artifact_failure("data_csv", csv) == ""
+
+
+def test_figure_data_schema_rejects_nonfinite_values(tmp_path: Path) -> None:
+    csv_path = tmp_path / "cache_state_fingerprint.csv"
+    csv_path.write_text(
+        "policy,layer_bin,layer_label,layer_source,layer_source_label,role,token_bin,retention_fraction\n"
+        "sliding_window,0,L00-L01,attention_cache_stats,explicit,user,0,nan\n"
+        "sliding_window,1,L02-L03,attention_cache_stats,explicit,user,1,1.2\n",
+        encoding="utf-8",
+    )
+
+    failure = _figure_data_schema_failure({"name": "cache_state_fingerprint"}, csv_path)
+
+    assert "retention_fraction row 2 is non-finite" in failure
+
+
+def test_figure_data_schema_requires_numeric_values(tmp_path: Path) -> None:
+    csv_path = tmp_path / "phase.csv"
+    csv_path.write_text(
+        "suite,policy,policy_family,safety_degradation,capability_degradation,"
+        "selective_safety_erasure_index\n"
+        "public_refusal_safety,kv_int4_sim,kv_int4_sim,0.1,,0.2\n",
+        encoding="utf-8",
+    )
+
+    failure = _figure_data_schema_failure(
+        {"name": "safety_capability_phase_portrait"},
+        csv_path,
+    )
+
+    assert "capability_degradation row 2 is blank" in failure
 
 
 def test_figure_artifact_validator_rejects_blank_pdf_page(tmp_path: Path) -> None:

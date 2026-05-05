@@ -443,7 +443,7 @@ def _invalid_arxiv_support_files(paths: list[Path]) -> list[str]:
         )
         failures.extend(
             f"{path}:{failure}"
-            for failure in _semantic_tex_failures(str(path), path.name, text)
+            for failure in _semantic_tex_failures(str(path), path.name, rendered_text)
         )
     return failures
 
