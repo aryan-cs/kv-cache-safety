@@ -138,11 +138,33 @@ def _is_pdf(path: Path) -> bool:
         content = path.read_bytes()
     except OSError:
         return False
-    return (
+    if not (
         content.startswith(b"%PDF-")
         and len(content) >= 32
         and b"%%EOF" in content[-2048:]
-    )
+    ):
+        return False
+    try:
+        from pypdf import PdfReader
+
+        reader = PdfReader(str(path))
+        if not reader.pages:
+            return False
+        for page in reader.pages:
+            if float(page.mediabox.width) <= 32 or float(page.mediabox.height) <= 32:
+                return False
+            content_stream = page.get_contents()
+            if content_stream is None:
+                return False
+            try:
+                stream_data = content_stream.get_data()
+            except AttributeError:
+                stream_data = b"".join(stream.get_data() for stream in content_stream)
+            if len(stream_data.strip()) < 32:
+                return False
+    except Exception:
+        return False
+    return True
 
 
 def _strip_tex_comments(text: str) -> str:

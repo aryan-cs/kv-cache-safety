@@ -570,6 +570,23 @@ def test_latex_placeholder_checker_reports_missing_artifacts(tmp_path: Path) -> 
     ]
 
 
+def test_latex_placeholder_checker_rejects_blank_pdf_figures(tmp_path: Path) -> None:
+    from pypdf import PdfWriter
+
+    tex = tmp_path / "main.tex"
+    blank = tmp_path / "blank.pdf"
+    writer = PdfWriter()
+    writer.add_blank_page(width=300, height=144)
+    with blank.open("wb") as f:
+        writer.write(f)
+    tex.write_text(
+        r"\maybeincludegraphic{blank.pdf}{0.9\linewidth}{ok}",
+        encoding="utf-8",
+    )
+
+    assert placeholder_artifact_failures(tex) == ["invalid PDF artifact: blank.pdf"]
+
+
 def test_latex_placeholder_checker_rejects_placeholder_artifacts(tmp_path: Path) -> None:
     tex = tmp_path / "main.tex"
     generated = tmp_path / "generated"
