@@ -48,6 +48,7 @@ def test_latex_manuscript_is_formal_registered_protocol() -> None:
     assert r"\maybeinputtable{../audit/active_causal_summary/human_audit_summary_table.tex}" in tex
     assert r"\maybeinputtable{../audit/active_causal_summary/human_audit_deltas_table.tex}" in tex
     assert "causal_restoration_fraction.pdf" in tex
+    assert "policy_uncertainty_braid.pdf" in tex
     assert r"\PrimaryTopSSEIPolicy" in tex
     assert r"\bibliography{../references}" in tex
     assert "neurips" not in tex.lower()
@@ -222,6 +223,9 @@ def test_arxiv_rewrite_uses_local_bibliography_and_figures() -> None:
     assert "figures/safety_state_atlas.pdf" in _rewrite_main_tex_for_arxiv(
         "../../results/h200_qwen_full_sweep/figures/safety_state_atlas.pdf"
     )
+    assert "figures/policy_uncertainty_braid.pdf" in _rewrite_main_tex_for_arxiv(
+        "../../results/h200_qwen_full_sweep/figures/policy_uncertainty_braid.pdf"
+    )
     assert "figures/causal_restoration_fraction.pdf" in _rewrite_main_tex_for_arxiv(
         "../../results/h200_causal_patch_qwen7b/figures/causal_restoration_fraction.pdf"
     )
@@ -267,6 +271,9 @@ def test_arxiv_packager_can_target_custom_result_figure_dirs(tmp_path: Path) -> 
 
     assert figure_sources["safety_state_atlas.pdf"] == (
         primary / "figures" / "safety_state_atlas.pdf"
+    )
+    assert figure_sources["policy_uncertainty_braid.pdf"] == (
+        primary / "figures" / "policy_uncertainty_braid.pdf"
     )
     assert figure_sources["causal_restoration_flow.pdf"] == (
         causal / "figures" / "causal_restoration_flow.pdf"
@@ -345,6 +352,7 @@ def test_active_paper_asset_sync_copies_selected_sources(tmp_path: Path) -> None
         primary_results / "figures" / "prompt_effect_constellation.pdf",
         primary_results / "figures" / "cache_state_fingerprint.pdf",
         primary_results / "figures" / "safety_state_atlas.pdf",
+        primary_results / "figures" / "policy_uncertainty_braid.pdf",
         causal_results / "figures" / "causal_restoration_fraction.pdf",
         causal_results / "figures" / "causal_restoration_flow.pdf",
     ]:
@@ -369,6 +377,7 @@ def test_active_paper_asset_sync_copies_selected_sources(tmp_path: Path) -> None
         "main_results_table.tex\n"
     )
     assert (active_primary / "figures" / "safety_state_atlas.pdf").exists()
+    assert (active_primary / "figures" / "policy_uncertainty_braid.pdf").exists()
     manifest = json.loads(
         (active_primary / "active_asset_manifest.json").read_text(encoding="utf-8")
     )
@@ -420,6 +429,7 @@ def test_active_paper_asset_sync_strict_rejects_stale_generated_sources(
             "prompt_effect_constellation.pdf",
             "cache_state_fingerprint.pdf",
             "safety_state_atlas.pdf",
+            "policy_uncertainty_braid.pdf",
         ],
     )
     _write_active_sync_fixture(
@@ -476,6 +486,7 @@ def test_active_paper_asset_sync_strict_requires_manifest_pinned_tables_and_figu
             "prompt_effect_constellation.pdf",
             "cache_state_fingerprint.pdf",
             "safety_state_atlas.pdf",
+            "policy_uncertainty_braid.pdf",
         ],
     )
     _write_active_sync_fixture(

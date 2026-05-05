@@ -9,6 +9,7 @@ from check_publication_readiness import _check_figure_manifest, _figure_artifact
 from make_figures import (
     _paired_safety_forest_rows,
     _phase_portrait_rows,
+    _policy_uncertainty_braid_rows,
     _prompt_effect_constellation_rows,
     _restoration_flow_rows,
     _safety_state_atlas_rows,
@@ -363,6 +364,78 @@ def test_paired_safety_forest_rows_keep_csv_labels_single_line() -> None:
     assert "\n" not in rows[0]["label"]
 
 
+def test_policy_uncertainty_braid_rows_require_complete_policy_level_intervals() -> None:
+    rows = _policy_uncertainty_braid_rows(
+        {
+            "policy_level_contrasts": {
+                "kv_int4_sim": {
+                    "safety_degradation_ci": {
+                        "mean": 0.30,
+                        "ci_low": 0.20,
+                        "ci_high": 0.40,
+                        "n": 200,
+                    },
+                    "capability_degradation_ci": {
+                        "mean": 0.05,
+                        "ci_low": 0.01,
+                        "ci_high": 0.08,
+                        "n": 120,
+                    },
+                    "selective_safety_erasure_index": 0.25,
+                    "selective_safety_erasure_index_ci": {
+                        "ci_low": 0.12,
+                        "ci_high": 0.35,
+                        "n_safety": 200,
+                        "n_capability": 120,
+                    },
+                },
+                "kv_int8_sim": {
+                    "safety_degradation_ci": {"mean": 0.10, "ci_low": 0.05, "ci_high": 0.15},
+                },
+            }
+        }
+    )
+
+    assert rows == [
+        {
+            "policy": "kv_int4_sim",
+            "metric": "capability",
+            "metric_rank": 0,
+            "mean": 0.05,
+            "ci_low": 0.01,
+            "ci_high": 0.08,
+            "ci_width": 0.07,
+            "n_safety": None,
+            "n_capability": None,
+            "n": 120,
+        },
+        {
+            "policy": "kv_int4_sim",
+            "metric": "safety",
+            "metric_rank": 1,
+            "mean": 0.30,
+            "ci_low": 0.20,
+            "ci_high": 0.40,
+            "ci_width": 0.20,
+            "n_safety": None,
+            "n_capability": None,
+            "n": 200,
+        },
+        {
+            "policy": "kv_int4_sim",
+            "metric": "ssei",
+            "metric_rank": 2,
+            "mean": 0.25,
+            "ci_low": 0.12,
+            "ci_high": 0.35,
+            "ci_width": 0.22999999999999998,
+            "n_safety": 200,
+            "n_capability": 120,
+            "n": None,
+        },
+    ]
+
+
 def test_prompt_effect_constellation_rows_pair_against_baseline() -> None:
     import pandas as pd
 
@@ -438,8 +511,44 @@ def test_safety_state_atlas_combines_ssei_and_role_retention() -> None:
             "user_retention_fraction": 0.75,
             "template_retention_fraction": None,
             "generated_retention_fraction": None,
+            "system_cache_loss": 0.75,
+            "user_cache_loss": 0.25,
+            "system_minus_user_cache_loss": 0.5,
         }
     ]
+
+
+def test_safety_state_atlas_keeps_missing_role_loss_missing() -> None:
+    rows = _safety_state_atlas_rows(
+        [
+            {
+                "suite": "public_refusal_safety",
+                "policy": "kv_int4_sim",
+                "index": 0.2,
+                "safety_degradation": 0.3,
+                "capability_degradation": 0.1,
+            }
+        ],
+        [],
+    )
+
+    assert rows == []
+    rows = _safety_state_atlas_rows(
+        [
+            {
+                "suite": "public_refusal_safety",
+                "policy": "kv_int4_sim",
+                "index": 0.2,
+                "safety_degradation": 0.3,
+                "capability_degradation": 0.1,
+            }
+        ],
+        [{"policy": "kv_int4_sim", "role": "system", "retention_fraction": 0.8}],
+    )
+
+    assert rows[0]["system_cache_loss"] == 0.19999999999999996
+    assert rows[0]["user_cache_loss"] is None
+    assert rows[0]["system_minus_user_cache_loss"] is None
 
 
 def test_restoration_flow_rows_preserve_confidence_intervals() -> None:
@@ -512,6 +621,68 @@ def test_figure_manifest_rejects_stale_hash(tmp_path: Path) -> None:
     _check_figure_manifest(figures_dir, results_dir, failures, require_causal_patch=False)
 
     assert any("stale png hash" in failure for failure in failures)
+
+
+def test_figure_manifest_rejects_paths_from_other_runs(tmp_path: Path) -> None:
+    from cache_safety_erasure.utils.io import file_sha256, write_json
+
+    results_dir = tmp_path / "results"
+    figures_dir = results_dir / "figures"
+    outside_dir = tmp_path / "other_results" / "figures"
+    figures_dir.mkdir(parents=True)
+    outside_dir.mkdir(parents=True)
+    for name in ["manifest.json", "generations.jsonl", "metrics.json", "cache_stats.parquet"]:
+        (results_dir / name).write_text(name, encoding="utf-8")
+    png = outside_dir / "safety_state_atlas.png"
+    svg = outside_dir / "safety_state_atlas.svg"
+    pdf = outside_dir / "safety_state_atlas.pdf"
+    csv_path = outside_dir / "safety_state_atlas.csv"
+    _write_test_png(png)
+    svg.write_text('<svg xmlns="http://www.w3.org/2000/svg"></svg>\n', encoding="utf-8")
+    pdf.write_bytes(_test_pdf_bytes())
+    csv_path.write_text(
+        (
+            "suite,policy,selective_safety_erasure_index,retention_scope,"
+            "system_retention_fraction,user_retention_fraction\n"
+            "public_refusal_safety,kv_int4_sim,0.1,policy_global,0.8,0.9\n"
+        ),
+        encoding="utf-8",
+    )
+    write_json(
+        figures_dir / "manifest.json",
+        {
+            "source_artifacts": {
+                name: {"sha256": file_sha256(results_dir / name)}
+                for name in ["manifest.json", "generations.jsonl", "metrics.json", "cache_stats.parquet"]
+            },
+            "figures": [
+                {
+                    "name": "safety_state_atlas",
+                    "png": str(png),
+                    "png_sha256": file_sha256(png),
+                    "svg": str(svg),
+                    "svg_sha256": file_sha256(svg),
+                    "pdf": str(pdf),
+                    "pdf_sha256": file_sha256(pdf),
+                    "data_csv": str(csv_path),
+                    "data_csv_sha256": file_sha256(csv_path),
+                    "data_row_count": 1,
+                }
+            ],
+        },
+    )
+    failures: list[str] = []
+
+    _check_figure_manifest(
+        figures_dir,
+        results_dir,
+        failures,
+        require_causal_patch=False,
+        required_figures=["safety_state_atlas"],
+    )
+
+    assert "figure `safety_state_atlas` has unexpected pdf path: " + str(pdf) in failures
+    assert "figure `safety_state_atlas` has unexpected data_csv path: " + str(csv_path) in failures
 
 
 def test_figure_manifest_rejects_malformed_visual_artifacts(tmp_path: Path) -> None:
@@ -730,4 +901,13 @@ def _write_blank_png(path: Path) -> None:
     fig.patch.set_facecolor("white")
     ax.set_facecolor("white")
     fig.savefig(path, facecolor="white")
+    plt.close(fig)
+
+
+def _write_test_png(path: Path) -> None:
+    import matplotlib.pyplot as plt
+
+    fig, ax = plt.subplots(figsize=(2, 2))
+    ax.plot([0, 1], [0, 1])
+    fig.savefig(path)
     plt.close(fig)

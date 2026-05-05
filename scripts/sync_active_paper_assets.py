@@ -34,6 +34,7 @@ PRIMARY_FIGURES = [
     "prompt_effect_constellation.pdf",
     "cache_state_fingerprint.pdf",
     "safety_state_atlas.pdf",
+    "policy_uncertainty_braid.pdf",
 ]
 CAUSAL_FIGURES = [
     "causal_restoration_fraction.pdf",

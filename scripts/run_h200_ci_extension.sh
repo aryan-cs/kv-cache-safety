@@ -140,6 +140,7 @@ uv run python scripts/check_publication_readiness.py \
   --required-figure prompt_effect_constellation \
   --required-figure cache_state_fingerprint \
   --required-figure safety_state_atlas \
+  --required-figure policy_uncertainty_braid \
   --require-public-provenance
 uv run python scripts/export_human_audit_sample.py \
   --results-dir "$merged" \

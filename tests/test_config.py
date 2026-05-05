@@ -359,6 +359,7 @@ def test_publication_artifact_builder_fails_without_real_results() -> None:
     assert '"${qwen32_package_args[@]}"' in script
     assert "--required-figure prompt_effect_constellation" in script
     assert "--required-figure safety_state_atlas" in script
+    assert "--required-figure policy_uncertainty_braid" in script
     assert "--required-figure causal_restoration_fraction" in script
 
 

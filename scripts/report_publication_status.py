@@ -94,6 +94,7 @@ PRIMARY_REQUIRED_FIGURES = [
     "prompt_effect_constellation",
     "cache_state_fingerprint",
     "safety_state_atlas",
+    "policy_uncertainty_braid",
 ]
 CAUSAL_REQUIRED_FIGURES = [
     "causal_restoration_fraction",
@@ -1388,11 +1389,13 @@ def _final_pdf_expected_sources(
         ("primary_figure", primary_results_dir / "figures" / "prompt_effect_constellation.pdf"),
         ("primary_figure", primary_results_dir / "figures" / "cache_state_fingerprint.pdf"),
         ("primary_figure", primary_results_dir / "figures" / "safety_state_atlas.pdf"),
+        ("primary_figure", primary_results_dir / "figures" / "policy_uncertainty_braid.pdf"),
         ("active_primary_figure", active_primary_dir / "figures" / "safety_capability_phase_portrait.pdf"),
         ("active_primary_figure", active_primary_dir / "figures" / "selective_safety_erasure_heatmap.pdf"),
         ("active_primary_figure", active_primary_dir / "figures" / "prompt_effect_constellation.pdf"),
         ("active_primary_figure", active_primary_dir / "figures" / "cache_state_fingerprint.pdf"),
         ("active_primary_figure", active_primary_dir / "figures" / "safety_state_atlas.pdf"),
+        ("active_primary_figure", active_primary_dir / "figures" / "policy_uncertainty_braid.pdf"),
         ("causal_figure", causal_results_dir / "figures" / "causal_restoration_fraction.pdf"),
         ("causal_figure", causal_results_dir / "figures" / "causal_restoration_flow.pdf"),
         ("active_causal_figure", active_causal_dir / "figures" / "causal_restoration_fraction.pdf"),

@@ -298,6 +298,80 @@ def main() -> None:
                 )
                 plt.close(fig)
 
+            braid_rows = _policy_uncertainty_braid_rows(metrics)
+            if braid_rows:
+                braid_df = pd.DataFrame(braid_rows)
+                policy_order = (
+                    braid_df[braid_df["metric"] == "ssei"]
+                    .sort_values("mean")
+                    ["policy"]
+                    .tolist()
+                )
+                y_lookup = {policy: idx for idx, policy in enumerate(policy_order)}
+                metric_offsets = {"capability": -0.22, "safety": 0.0, "ssei": 0.22}
+                metric_colors = {
+                    "capability": "#377eb8",
+                    "safety": "#e41a1c",
+                    "ssei": "#984ea3",
+                }
+                fig_height = max(4.5, 0.46 * len(policy_order))
+                fig, ax = plt.subplots(figsize=(10, fig_height))
+                ax.axvline(0, color="0.2", linewidth=0.9)
+                for policy in policy_order:
+                    policy_df = braid_df[braid_df["policy"] == policy]
+                    connector = policy_df.sort_values("metric_rank")
+                    ax.plot(
+                        connector["mean"],
+                        [
+                            y_lookup[policy] + metric_offsets[metric]
+                            for metric in connector["metric"]
+                        ],
+                        color="0.72",
+                        linewidth=1.0,
+                        alpha=0.7,
+                        zorder=1,
+                    )
+                for metric, metric_df in braid_df.groupby("metric"):
+                    y = [
+                        y_lookup[policy] + metric_offsets[metric]
+                        for policy in metric_df["policy"]
+                    ]
+                    xerr = [
+                        metric_df["mean"] - metric_df["ci_low"],
+                        metric_df["ci_high"] - metric_df["mean"],
+                    ]
+                    ax.errorbar(
+                        metric_df["mean"],
+                        y,
+                        xerr=xerr,
+                        fmt="o",
+                        color=metric_colors.get(metric, "0.2"),
+                        ecolor=metric_colors.get(metric, "0.2"),
+                        elinewidth=1.2,
+                        capsize=3,
+                        markersize=5.5,
+                        label=metric,
+                        alpha=0.9,
+                        zorder=2,
+                    )
+                ax.set_yticks(
+                    range(len(policy_order)),
+                    labels=[_short_policy_label(policy) for policy in policy_order],
+                )
+                ax.set_xlabel("Degradation estimate or selective safety erasure index")
+                ax.set_title("Policy-Level Uncertainty Braid")
+                ax.legend(title="estimate", fontsize=8)
+                ax.grid(axis="x", alpha=0.22)
+                fig.tight_layout()
+                _save_figure(
+                    fig,
+                    figures_dir,
+                    "policy_uncertainty_braid",
+                    made,
+                    data_rows=braid_rows,
+                )
+                plt.close(fig)
+
             fig, ax = plt.subplots(figsize=(10, 5))
             top = selective_df.sort_values("index", ascending=False).head(12)
             labels = [f"{row.suite}\n{row.policy}" for row in top.itertuples()]
@@ -511,24 +585,26 @@ def main() -> None:
                         row = lookup.get((suite, policy))
                         if row is None:
                             continue
-                        system_loss = 1.0 - (row.system_retention_fraction or 0.0)
-                        user_loss = 1.0 - (row.user_retention_fraction or 0.0)
-                        ax.scatter(
-                            [x - 0.16],
-                            [y],
-                            s=30 + 170 * max(0.0, system_loss),
-                            facecolors="none",
-                            edgecolors="black",
-                            linewidths=1.0,
-                        )
-                        ax.scatter(
-                            [x + 0.16],
-                            [y],
-                            s=30 + 170 * max(0.0, user_loss),
-                            facecolors="none",
-                            edgecolors="white",
-                            linewidths=1.0,
-                        )
+                        system_loss = _finite_float(getattr(row, "system_cache_loss", None))
+                        user_loss = _finite_float(getattr(row, "user_cache_loss", None))
+                        if system_loss is not None:
+                            ax.scatter(
+                                [x - 0.16],
+                                [y],
+                                s=30 + 170 * max(0.0, system_loss),
+                                facecolors="none",
+                                edgecolors="black",
+                                linewidths=1.0,
+                            )
+                        if user_loss is not None:
+                            ax.scatter(
+                                [x + 0.16],
+                                [y],
+                                s=30 + 170 * max(0.0, user_loss),
+                                facecolors="none",
+                                edgecolors="white",
+                                linewidths=1.0,
+                            )
                 ax.text(
                     0.99,
                     -0.18,
@@ -759,6 +835,47 @@ def _paired_safety_forest_rows(metrics: dict[str, Any]) -> list[dict[str, Any]]:
     return rows
 
 
+def _policy_uncertainty_braid_rows(metrics: dict[str, Any]) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    metric_specs = [
+        ("capability", "capability_degradation_ci", 0),
+        ("safety", "safety_degradation_ci", 1),
+        ("ssei", "selective_safety_erasure_index_ci", 2),
+    ]
+    for policy, value in metrics.get("policy_level_contrasts", {}).items():
+        policy_rows: list[dict[str, Any]] = []
+        for metric, ci_key, rank in metric_specs:
+            ci = value.get(ci_key) or {}
+            mean = _finite_float(
+                ci.get("mean")
+                if ci.get("mean") is not None
+                else value.get("selective_safety_erasure_index")
+                if metric == "ssei"
+                else None
+            )
+            ci_low = _finite_float(ci.get("ci_low"))
+            ci_high = _finite_float(ci.get("ci_high"))
+            if mean is None or ci_low is None or ci_high is None:
+                policy_rows = []
+                break
+            policy_rows.append(
+                {
+                    "policy": policy,
+                    "metric": metric,
+                    "metric_rank": rank,
+                    "mean": mean,
+                    "ci_low": ci_low,
+                    "ci_high": ci_high,
+                    "ci_width": ci_high - ci_low,
+                    "n_safety": ci.get("n_safety"),
+                    "n_capability": ci.get("n_capability"),
+                    "n": ci.get("n"),
+                }
+            )
+        rows.extend(policy_rows)
+    return rows
+
+
 def _phase_portrait_rows(selective_df: Any) -> Any:
     import pandas as pd
 
@@ -885,6 +1002,10 @@ def _safety_state_atlas_rows(
     rows = []
     for row in selective_rows:
         policy = str(row.get("policy"))
+        system_retention = role_lookup.get((policy, "system"))
+        user_retention = role_lookup.get((policy, "user"))
+        system_loss = None if system_retention is None else 1.0 - system_retention
+        user_loss = None if user_retention is None else 1.0 - user_retention
         rows.append(
             {
                 "suite": row.get("suite"),
@@ -895,10 +1016,15 @@ def _safety_state_atlas_rows(
                 "safety_degradation": row.get("safety_degradation"),
                 "capability_degradation": row.get("capability_degradation"),
                 "retention_scope": "policy_global",
-                "system_retention_fraction": role_lookup.get((policy, "system")),
-                "user_retention_fraction": role_lookup.get((policy, "user")),
+                "system_retention_fraction": system_retention,
+                "user_retention_fraction": user_retention,
                 "template_retention_fraction": role_lookup.get((policy, "template")),
                 "generated_retention_fraction": role_lookup.get((policy, "generated")),
+                "system_cache_loss": system_loss,
+                "user_cache_loss": user_loss,
+                "system_minus_user_cache_loss": (
+                    None if system_loss is None or user_loss is None else system_loss - user_loss
+                ),
             }
         )
     return rows

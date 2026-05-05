@@ -116,6 +116,7 @@ rebuild_primary() {
     --required-figure prompt_effect_constellation \
     --required-figure cache_state_fingerprint \
     --required-figure safety_state_atlas \
+    --required-figure policy_uncertainty_braid \
     --require-public-provenance
 }
 
@@ -190,6 +191,7 @@ rebuild_qwen32_if_present() {
     --required-figure prompt_effect_constellation \
     --required-figure cache_state_fingerprint \
     --required-figure safety_state_atlas \
+    --required-figure policy_uncertainty_braid \
     --require-public-provenance
   qwen32_package_args=(--qwen32-generated-dir "$qwen32_generated_dir")
 }

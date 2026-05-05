@@ -51,6 +51,9 @@ def build_figure_sources(
             primary_results_dir / "figures" / "cache_state_fingerprint.pdf"
         ),
         "safety_state_atlas.pdf": primary_results_dir / "figures" / "safety_state_atlas.pdf",
+        "policy_uncertainty_braid.pdf": (
+            primary_results_dir / "figures" / "policy_uncertainty_braid.pdf"
+        ),
         "causal_restoration_fraction.pdf": (
             causal_results_dir / "figures" / "causal_restoration_fraction.pdf"
         ),

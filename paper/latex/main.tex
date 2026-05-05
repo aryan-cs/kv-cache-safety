@@ -243,6 +243,9 @@ For each policy-budget condition, the analysis renders a layer-by-token retentio
 \paragraph{Safety-capability phase portraits.}
 Instead of a static scatterplot alone, each policy traces a trajectory through safety loss and capability loss as the cache budget tightens. A selective safety-erasure pattern is indicated by an initial increase in safety loss at approximately fixed capability loss, followed only later by broad capability degradation.
 
+\paragraph{Uncertainty braids.}
+For each cache policy, the analysis draws a linked row of capability degradation, safety degradation, and selective safety-erasure estimates with their confidence intervals. This makes the evidential pattern visible: a strong positive result needs the safety interval to separate from capability loss and the derived $\ssei$ interval to remain positive.
+
 \paragraph{Restoration flow diagrams.}
 Causal patching is shown as a flow from baseline to compressed decoding to system-patched, matched-user-patched, and policy-pinned conditions. The diagnostic pattern is movement back toward the baseline only when policy-relevant cache slices are restored or protected.
 
@@ -284,6 +287,13 @@ For audited prompts, the analysis embeds each prompt-condition pair using open e
   \maybeincludegraphic{../generated/active_primary/figures/safety_state_atlas.pdf}{0.92\linewidth}{Suite-policy atlas combining selective safety degradation with role-level cache loss.}
   \caption{Safety-state atlas. Color shows selective safety degradation while overlaid circles show token-role cache loss, making it possible to compare behavioral safety loss against system-token and user-token retention patterns.}
   \label{fig:safety-state-atlas}
+\end{figure}
+
+\begin{figure}[t]
+  \centering
+  \maybeincludegraphic{../generated/active_primary/figures/policy_uncertainty_braid.pdf}{0.92\linewidth}{Policy-level safety, capability, and selective safety erasure intervals.}
+  \caption{Policy-level uncertainty braid. Each row links capability degradation, safety degradation, and $\ssei$ intervals for one cache policy, exposing whether selective effects are both large and statistically tight.}
+  \label{fig:uncertainty-braid}
 \end{figure}
 
 \begin{figure}[t]

@@ -53,6 +53,14 @@ REQUIRED_FIGURE_DATA_COLUMNS = {
         "system_retention_fraction",
         "user_retention_fraction",
     },
+    "policy_uncertainty_braid": {
+        "policy",
+        "metric",
+        "mean",
+        "ci_low",
+        "ci_high",
+        "ci_width",
+    },
     "causal_restoration_fraction": {
         "suite",
         "policy",
@@ -365,6 +373,11 @@ def _check_figure_manifest(
             if not raw_path:
                 continue
             path = Path(str(raw_path))
+            expected_path = figure_dir / f"{name}.{_figure_path_suffix(path_key)}"
+            if path.resolve() != expected_path.resolve():
+                failures.append(
+                    f"figure `{name}` has unexpected {path_key} path: {raw_path}"
+                )
             if not path.exists():
                 failures.append(f"figure `{name}` references missing {path_key}: {raw_path}")
                 continue
@@ -415,6 +428,10 @@ def _figure_artifact_failure(path_key: str, path: Path) -> str:
         if not first_line:
             return "missing CSV header"
     return ""
+
+
+def _figure_path_suffix(path_key: str) -> str:
+    return "csv" if path_key == "data_csv" else path_key
 
 
 def _figure_data_row_count_failure(figure: dict) -> str:

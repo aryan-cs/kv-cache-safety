@@ -115,6 +115,7 @@ check_primary_readiness() {
     --required-figure prompt_effect_constellation \
     --required-figure cache_state_fingerprint \
     --required-figure safety_state_atlas \
+    --required-figure policy_uncertainty_braid \
     --require-public-provenance
 }
 

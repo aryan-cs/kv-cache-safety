@@ -2438,6 +2438,11 @@ def _figure_csv_content() -> str:
         "retention_scope",
         "system_retention_fraction",
         "user_retention_fraction",
+        "metric",
+        "mean",
+        "ci_low",
+        "ci_high",
+        "ci_width",
         "safety_restoration_fraction",
         "safety_restoration_ci_low",
         "safety_restoration_ci_high",
@@ -2703,6 +2708,7 @@ def _write_paper_generated_assets(
             "prompt_effect_constellation.pdf",
             "cache_state_fingerprint.pdf",
             "safety_state_atlas.pdf",
+            "policy_uncertainty_braid.pdf",
         ]
     )
     causal_copied = [
@@ -2853,6 +2859,7 @@ def _final_pdf_sources(
         ),
         ("primary_figure", primary / "figures" / "cache_state_fingerprint.pdf"),
         ("primary_figure", primary / "figures" / "safety_state_atlas.pdf"),
+        ("primary_figure", primary / "figures" / "policy_uncertainty_braid.pdf"),
         (
             "active_primary_figure",
             active_primary / "figures" / "safety_capability_phase_portrait.pdf",
@@ -2870,6 +2877,7 @@ def _final_pdf_sources(
             active_primary / "figures" / "cache_state_fingerprint.pdf",
         ),
         ("active_primary_figure", active_primary / "figures" / "safety_state_atlas.pdf"),
+        ("active_primary_figure", active_primary / "figures" / "policy_uncertainty_braid.pdf"),
         (
             "causal_figure",
             causal / "figures" / "causal_restoration_fraction.pdf",
