@@ -42,8 +42,12 @@ def test_merge_ci_extension_adds_only_new_prompt_clusters(tmp_path: Path) -> Non
         ("p2", "kv_int4_sim"),
     }
     manifest = json.loads((output / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["run_name"] == "merged"
     assert manifest["prompt_counts"] == {"public_refusal_safety": 2}
     assert manifest["expected_generation_count"] == 4
+    assert manifest["combined_results"]["base_run_name"] == "h200_qwen_full_sweep"
+    assert manifest["combined_results"]["merged_run_name"] == "merged"
+    assert manifest["combined_results"]["output_results_dir"] == str(output)
     assert manifest["combined_results"]["skipped_duplicate_prompt_count"] == 1
     assert (output / "metrics.json").exists()
     assert (output / "cache_stats.parquet").exists()

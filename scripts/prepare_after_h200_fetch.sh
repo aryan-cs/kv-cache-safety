@@ -17,6 +17,7 @@ fetch_remote_manifest="${H200_FETCH_REMOTE_MANIFEST:-logs/h200/h200_artifact_man
 fetch_compare_report="${H200_FETCH_COMPARE_REPORT:-logs/h200/h200_artifact_manifest_compare.json}"
 target_ci_width="${TARGET_CI_WIDTH:-0.08}"
 causal_ci_width="${CAUSAL_CI_WIDTH:-0.12}"
+branch="${BRANCH:-master}"
 
 if [[ -n "$(git status --short)" ]]; then
   echo "Refusing to prepare paper evidence from a dirty git working tree." >&2
@@ -24,6 +25,21 @@ if [[ -n "$(git status --short)" ]]; then
   git status --short >&2
   exit 1
 fi
+
+require_current_origin_head() {
+  git fetch origin "$branch"
+  local head
+  local origin_head
+  head="$(git rev-parse HEAD)"
+  origin_head="$(git rev-parse "origin/$branch")"
+  if [[ "$head" != "$origin_head" ]]; then
+    echo "Refusing to prepare paper evidence from a stale checkout: HEAD=${head}, origin/${branch}=${origin_head}." >&2
+    echo "Fetch or fast-forward to origin/${branch} before regenerating paper evidence." >&2
+    exit 1
+  fi
+}
+
+require_current_origin_head
 
 require_raw_result_artifacts() {
   local results_dir="$1"

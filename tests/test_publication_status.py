@@ -2,6 +2,7 @@ import csv
 import hashlib
 import io
 import json
+import subprocess
 import sys
 import tarfile
 from pathlib import Path
@@ -19,6 +20,9 @@ from report_publication_status import (
     _required_arxiv_bundle_files,
     publication_status,
     render_markdown,
+)
+from report_publication_status import (
+    _run_commit_history_failures as _status_run_commit_history_failures,
 )
 
 REQUIRED_AUDIT_LABELS = [
@@ -120,6 +124,21 @@ def test_publication_status_reports_missing_artifacts_as_blockers(tmp_path: Path
     assert "claim_assessment_passed" in status["blockers"]
     assert "paper_pdf_exists" in status["blockers"]
     assert "paper_pdf_valid" in status["blockers"]
+
+
+def test_publication_status_rejects_unknown_generation_commit() -> None:
+    current = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+
+    assert _status_run_commit_history_failures({"git_commit": current}) == []
+    assert _status_run_commit_history_failures({"git_commit": "f" * 40}) == [
+        f"run_git_commit_not_in_analysis_checkout:{'f' * 40}"
+    ]
+    assert _status_run_commit_history_failures({"git_commit": "abc123"}) == []
 
 
 def test_publication_status_can_ignore_pdf_when_prechecking_complete_build(tmp_path: Path) -> None:
@@ -1804,6 +1823,61 @@ def test_publication_status_rejects_wrong_registered_h200_identity(tmp_path: Pat
     assert "primary_results_complete" in status["blockers"]
     assert any("expected='Qwen/Qwen2.5-14B-Instruct'" in failure for failure in status["primary_results"]["readiness_failures"])
     assert "environment_lacks_h200_gpu" in status["primary_results"]["readiness_failures"]
+
+
+def test_publication_status_accepts_registered_merged_primary_run_name(tmp_path: Path) -> None:
+    primary = tmp_path / "h200_qwen_full_sweep_plus_ci_extension"
+    causal = tmp_path / "causal"
+    _write_run(
+        primary,
+        manifest_overrides={
+            "run_name": primary.name,
+            "combined_results": {
+                "base_run_name": "h200_qwen_full_sweep",
+                "extension_run_name": "h200_qwen_full_sweep_ci_extension",
+                "merged_run_name": primary.name,
+                "output_results_dir": str(primary),
+            },
+        },
+    )
+    _write_run(causal)
+
+    status = publication_status(
+        primary_results_dir=primary,
+        causal_results_dir=causal,
+        primary_audit_dir=tmp_path / "primary_audit",
+        causal_audit_dir=tmp_path / "causal_audit",
+        claim_assessment_path=tmp_path / "claim_assessment.json",
+        paper_pdf=tmp_path / "paper.pdf",
+    )
+
+    assert not any(
+        failure.startswith("run_name=")
+        for failure in status["primary_results"]["readiness_failures"]
+    )
+
+
+def test_publication_status_rejects_unregistered_merged_primary_run_name(
+    tmp_path: Path,
+) -> None:
+    primary = tmp_path / "h200_qwen_full_sweep_plus_ci_extension"
+    causal = tmp_path / "causal"
+    _write_run(primary, manifest_overrides={"run_name": primary.name})
+    _write_run(causal)
+
+    status = publication_status(
+        primary_results_dir=primary,
+        causal_results_dir=causal,
+        primary_audit_dir=tmp_path / "primary_audit",
+        causal_audit_dir=tmp_path / "causal_audit",
+        claim_assessment_path=tmp_path / "claim_assessment.json",
+        paper_pdf=tmp_path / "paper.pdf",
+    )
+
+    assert any(
+        failure.startswith("run_name=")
+        for failure in status["primary_results"]["readiness_failures"]
+    )
 
 
 def test_publication_status_rejects_obvious_run_readiness_failures(tmp_path: Path) -> None:

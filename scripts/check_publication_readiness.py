@@ -5,6 +5,7 @@ import csv
 import json
 import math
 import re
+import subprocess
 from pathlib import Path
 
 from _path import add_src_to_path
@@ -147,6 +148,7 @@ def main() -> None:
             manifest = json.load(f)
         if manifest.get("git_dirty") and not args.allow_dirty:
             failures.append("run was produced from a dirty git working tree")
+        failures.extend(_run_commit_history_failures(manifest))
         if manifest.get("model_provider") == "mock" and not args.allow_mock_model:
             failures.append("mock model runs are not paper evidence")
         model_id = str(manifest.get("model_id", ""))
@@ -668,6 +670,33 @@ def _check_paper_assets(paper_dir: Path, results_dir: Path, failures: list[str])
         failures.append("paper artifact manifest source run git commit is stale")
     elif not observed_run_commit:
         failures.append("paper artifact manifest lacks source run git commit")
+
+
+def _run_commit_history_failures(manifest: dict) -> list[str]:
+    commit = str(manifest.get("git_commit") or "").strip()
+    if not _looks_like_git_commit(commit):
+        return []
+    exists = subprocess.run(
+        ["git", "cat-file", "-e", f"{commit}^{{commit}}"],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if exists.returncode != 0:
+        return [f"run git commit `{commit}` is not present in the analysis checkout"]
+    ancestor = subprocess.run(
+        ["git", "merge-base", "--is-ancestor", commit, "HEAD"],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if ancestor.returncode != 0:
+        return [f"run git commit `{commit}` is not an ancestor of analysis HEAD"]
+    return []
+
+
+def _looks_like_git_commit(value: str) -> bool:
+    return bool(re.fullmatch(r"[0-9a-fA-F]{7,40}", value))
 
 
 def _check_causal_patch_config(policy_configs: list[dict], failures: list[str]) -> None:

@@ -19,6 +19,7 @@ require_qwen32_followup="${REQUIRE_QWEN32_FOLLOWUP:-0}"
 publication_status_dir="${PUBLICATION_STATUS_DIR:-paper/build}"
 arxiv_source_dir="${ARXIV_SOURCE_DIR:-paper/build/arxiv_source}"
 arxiv_archive="${ARXIV_ARCHIVE:-paper/build/arxiv_source.tar.gz}"
+branch="${BRANCH:-master}"
 qwen32_package_args=()
 
 if [[ -n "$(git status --short)" ]]; then
@@ -27,6 +28,21 @@ if [[ -n "$(git status --short)" ]]; then
   git status --short >&2
   exit 1
 fi
+
+require_current_origin_head() {
+  git fetch origin "$branch"
+  local head
+  local origin_head
+  head="$(git rev-parse HEAD)"
+  origin_head="$(git rev-parse "origin/$branch")"
+  if [[ "$head" != "$origin_head" ]]; then
+    echo "Refusing to build publication artifacts from a stale checkout: HEAD=${head}, origin/${branch}=${origin_head}." >&2
+    echo "Fetch or fast-forward to origin/${branch} before regenerating final paper assets." >&2
+    exit 1
+  fi
+}
+
+require_current_origin_head
 
 clear_stale_publication_pdfs() {
   rm -f \

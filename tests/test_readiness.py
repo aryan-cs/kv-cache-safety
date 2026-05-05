@@ -1,4 +1,5 @@
 import json
+import subprocess
 import sys
 from pathlib import Path
 
@@ -13,6 +14,7 @@ from check_publication_readiness import (
     _check_generation_matrix,
     _check_paper_assets,
     _check_policy_level_contrast_readiness,
+    _run_commit_history_failures,
 )
 
 
@@ -62,6 +64,21 @@ def test_generation_matrix_accepts_complete_grid() -> None:
     _check_generation_matrix(manifest, prompts, generations, failures)
 
     assert failures == []
+
+
+def test_run_commit_history_rejects_unknown_generation_commit() -> None:
+    current = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+
+    assert _run_commit_history_failures({"git_commit": current}) == []
+    assert _run_commit_history_failures({"git_commit": "f" * 40}) == [
+        f"run git commit `{'f' * 40}` is not present in the analysis checkout"
+    ]
+    assert _run_commit_history_failures({"git_commit": "abc123"}) == []
 
 
 @pytest.mark.skipif(

@@ -102,14 +102,22 @@ def merge_ci_extension_results(
     write_json(output_results_dir / "environment.json", environment)
 
     prompt_counts = Counter(str(row["suite"]) for row in combined_prompts)
+    primary_run_name = str(primary_manifest.get("run_name", ""))
+    extension_run_name = str(extension_manifest.get("run_name", ""))
+    merged_run_name = output_results_dir.name
     manifest = dict(primary_manifest)
+    manifest["run_name"] = merged_run_name
     manifest["prompt_counts"] = dict(sorted(prompt_counts.items()))
     manifest["prompt_suites"] = sorted(prompt_counts)
     manifest["expected_generation_count"] = len(combined_generations)
     manifest["prompt_suite_manifests"] = _combined_suite_manifests(combined_prompts)
     manifest["combined_results"] = {
+        "base_run_name": primary_run_name,
+        "extension_run_name": extension_run_name,
+        "merged_run_name": merged_run_name,
         "primary_results_dir": str(primary_results_dir),
         "extension_results_dir": str(extension_results_dir),
+        "output_results_dir": str(output_results_dir),
         "skipped_duplicate_prompt_count": skipped_duplicate_prompt_count,
         "added_prompt_counts": dict(Counter(str(row["suite"]) for row in extension_prompt_rows)),
         "generated_by_git_commit": _git_commit(),

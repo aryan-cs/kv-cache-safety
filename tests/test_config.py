@@ -118,6 +118,21 @@ def test_build_paper_pdf_status_checks_use_explicit_artifact_paths() -> None:
     assert "--arxiv-archive \"$arxiv_archive\"" in script
 
 
+def test_final_publication_wrappers_require_current_origin_head() -> None:
+    for script_path in [
+        Path("scripts/finalize_h200_after_causal.sh"),
+        Path("scripts/prepare_after_h200_fetch.sh"),
+        Path("scripts/build_publication_artifacts.sh"),
+        Path("scripts/build_evidence_gated_paper_artifacts.sh"),
+    ]:
+        script = script_path.read_text(encoding="utf-8")
+        assert 'branch="${BRANCH:-master}"' in script
+        assert "require_current_origin_head" in script
+        assert 'git fetch origin "$branch"' in script
+        assert 'git rev-parse "origin/$branch"' in script
+        assert "stale checkout" in script
+
+
 def test_h200_launcher_revalidates_after_gpu_gate() -> None:
     script = Path("scripts/wait_and_run_h200_sweep.sh").read_text(encoding="utf-8")
 

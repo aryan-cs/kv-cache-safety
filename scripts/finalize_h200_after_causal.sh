@@ -29,6 +29,7 @@ allow_evidence_gated_fallback="${ALLOW_EVIDENCE_GATED_FALLBACK:-0}"
 run_ci_extension_if_needed="${RUN_CI_EXTENSION_IF_NEEDED:-1}"
 primary_audit_summary_override="${PRIMARY_AUDIT_SUMMARY_DIR:-}"
 causal_audit_summary_override="${CAUSAL_AUDIT_SUMMARY_DIR:-}"
+branch="${BRANCH:-master}"
 
 update_run_context() {
   primary_run_id="$(basename "$primary_results")"
@@ -63,6 +64,21 @@ if [[ -n "$(git status --short)" ]]; then
   git status --short >&2
   exit 1
 fi
+
+require_current_origin_head() {
+  git fetch origin "$branch"
+  local head
+  local origin_head
+  head="$(git rev-parse HEAD)"
+  origin_head="$(git rev-parse "origin/$branch")"
+  if [[ "$head" != "$origin_head" ]]; then
+    echo "Refusing to finalize from a stale checkout: HEAD=${head}, origin/${branch}=${origin_head}." >&2
+    echo "Fetch or fast-forward to origin/${branch} before regenerating paper evidence." >&2
+    exit 1
+  fi
+}
+
+require_current_origin_head
 
 require_completed_generation_matrix() {
   local results_dir="$1"

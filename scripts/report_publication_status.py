@@ -4,6 +4,7 @@ import argparse
 import json
 import math
 import re
+import subprocess
 import tarfile
 from pathlib import Path
 from typing import Any
@@ -448,7 +449,12 @@ def _run_status(results_dir: Path, *, profile: str) -> dict[str, Any]:
     readiness_failures = _run_readiness_failures(results_dir, manifest, profile=profile)
     if manifest:
         readiness_failures.extend(
-            _profile_identity_failures(manifest, environment, profile=profile)
+            _profile_identity_failures(
+                manifest,
+                environment,
+                profile=profile,
+                results_dir=results_dir,
+            )
         )
     return {
         "path": str(results_dir),
@@ -497,19 +503,32 @@ def _run_readiness_failures(
 
 
 def _profile_identity_failures(
-    manifest: dict[str, Any], environment: dict[str, Any], *, profile: str
+    manifest: dict[str, Any],
+    environment: dict[str, Any],
+    *,
+    profile: str,
+    results_dir: Path,
 ) -> list[str]:
     contract = PROFILE_CONTRACTS.get(profile, {})
     failures = []
     for key in ["run_name", "model_id"]:
         expected = contract.get(key)
         observed = manifest.get(key)
-        if expected and observed != expected:
+        if not expected:
+            continue
+        if key == "run_name" and profile == "primary":
+            expected_run_names = _expected_primary_run_names(manifest, results_dir, str(expected))
+            if observed not in expected_run_names:
+                expected_text = ", ".join(sorted(repr(name) for name in expected_run_names))
+                failures.append(f"{key}={observed!r}; expected one of {expected_text}")
+            continue
+        if observed != expected:
             failures.append(f"{key}={observed!r}; expected={expected!r}")
     if not manifest.get("config_sha256"):
         failures.append("manifest_lacks_config_sha256")
     if environment.get("git_commit") and manifest.get("git_commit") != environment.get("git_commit"):
         failures.append("manifest_environment_git_commit_mismatch")
+    failures.extend(_run_commit_history_failures(manifest))
     if environment.get("git_dirty"):
         failures.append("dirty_environment_git_tree")
     if environment:
@@ -525,6 +544,23 @@ def _profile_identity_failures(
         if not h200_devices:
             failures.append("environment_lacks_h200_gpu")
     return failures
+
+
+def _expected_primary_run_names(
+    manifest: dict[str, Any], results_dir: Path, default_run_name: str
+) -> set[str]:
+    expected = {default_run_name}
+    combined_results = manifest.get("combined_results")
+    if not isinstance(combined_results, dict):
+        return expected
+    merged_run_name = str(combined_results.get("merged_run_name") or "")
+    if merged_run_name and merged_run_name == results_dir.name:
+        expected.add(merged_run_name)
+    output_results_dir = str(combined_results.get("output_results_dir") or "")
+    output_run_name = Path(output_results_dir).name if output_results_dir else ""
+    if output_run_name and output_run_name == results_dir.name:
+        expected.add(output_run_name)
+    return expected
 
 
 def _jsonl_row_count(path: Path) -> int | None:
@@ -638,6 +674,33 @@ def _as_string_list(value: object) -> list[str]:
     if isinstance(value, (list, tuple, set)):
         return [str(item) for item in value]
     return [str(value)]
+
+
+def _run_commit_history_failures(manifest: dict[str, Any]) -> list[str]:
+    commit = str(manifest.get("git_commit") or "").strip()
+    if not _looks_like_git_commit(commit):
+        return []
+    exists = subprocess.run(
+        ["git", "cat-file", "-e", f"{commit}^{{commit}}"],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if exists.returncode != 0:
+        return [f"run_git_commit_not_in_analysis_checkout:{commit}"]
+    ancestor = subprocess.run(
+        ["git", "merge-base", "--is-ancestor", commit, "HEAD"],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if ancestor.returncode != 0:
+        return [f"run_git_commit_not_ancestor_of_analysis_head:{commit}"]
+    return []
+
+
+def _looks_like_git_commit(value: str) -> bool:
+    return bool(re.fullmatch(r"[0-9a-fA-F]{7,40}", value))
 
 
 def _ci_width_failures(metrics: dict[str, Any], *, profile: str) -> list[str]:
