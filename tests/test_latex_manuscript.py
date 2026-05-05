@@ -95,12 +95,18 @@ def test_paper_notes_avoid_internal_planning_language() -> None:
 
 def test_final_pdf_text_checker_rejects_draft_protocol_markers() -> None:
     failures = placeholder_text_failures(
-        "This registered analysis protocol reports no empirical claims. "
+        "This registered analysis protocol reports no empirical claims. This draft "
+        "manuscript must replace these placeholders. Result pending. Figure pending. "
         "Figure unavailable. The H200 launcher produced a smoke run on a MacBook GPU."
     )
 
     assert "placeholder_text:registered analysis protocol" in failures
     assert "placeholder_text:reports no empirical claims" in failures
+    assert "placeholder_text:This draft" in failures
+    assert "placeholder_text:draft manuscript" in failures
+    assert "placeholder_text:must replace these placeholders" in failures
+    assert "placeholder_text:Result pending" in failures
+    assert "placeholder_text:Figure pending" in failures
     assert "placeholder_text:Figure unavailable" in failures
     assert "forbidden_final_prose:H200" in failures
     assert "forbidden_final_prose:launcher" in failures

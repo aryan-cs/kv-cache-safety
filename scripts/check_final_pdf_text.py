@@ -10,10 +10,15 @@ from pathlib import Path
 PLACEHOLDER_MARKERS = [
     "Empirical result not yet reported",
     "Figure unavailable",
+    "Figure pending",
+    "Result pending",
     "Results pending; no readiness-passing rows exported.",
     "results pending",
     "registered analysis protocol",
     "reports no empirical claims",
+    "This draft",
+    "draft manuscript",
+    "must replace these placeholders",
 ]
 FORBIDDEN_FINAL_PROSE_PATTERNS: list[tuple[str, str]] = [
     ("H200", r"\bh\s*200\b"),
@@ -72,9 +77,7 @@ def main() -> None:
     args = parser.parse_args()
 
     text, extractor = extract_pdf_text(args.pdf)
-    failures = placeholder_text_failures(text)
-    if not text.strip():
-        failures.append(f"empty_extracted_pdf_text:{extractor}")
+    failures = final_pdf_text_failures(text, extractor)
     if failures:
         print("FINAL PDF TEXT CHECK FAILED")
         for failure in failures:
@@ -91,6 +94,13 @@ def placeholder_text_failures(text: str) -> list[str]:
         if marker.lower() in text_lower
     ]
     failures.extend(forbidden_final_prose_failures(text))
+    return failures
+
+
+def final_pdf_text_failures(text: str, extractor: str) -> list[str]:
+    failures = placeholder_text_failures(text)
+    if not text.strip():
+        failures.append(f"empty_extracted_pdf_text:{extractor}")
     return failures
 
 

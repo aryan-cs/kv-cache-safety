@@ -14,8 +14,13 @@ PLACEHOLDER_PATTERNS = [
 ]
 PLACEHOLDER_TEXT_MARKERS = [
     "Empirical result not yet reported",
+    "Figure pending",
+    "Result pending",
     "Results pending; no readiness-passing rows exported.",
     "results pending",
+    "This draft",
+    "draft manuscript",
+    "must replace these placeholders",
 ]
 REQUIRED_TEX_MARKERS_BY_NAME = {
     "main_results_table.tex": [

@@ -24,7 +24,7 @@ from assess_claims import (
 )
 from check_final_pdf_text import (
     extract_pdf_text,
-    placeholder_text_failures,
+    final_pdf_text_failures,
 )
 from check_human_audit_readiness import (
     DEFAULT_REQUIRED_LABELS,
@@ -1034,7 +1034,7 @@ def _pdf_text_failure(path: Path) -> str:
         text, extractor = extract_pdf_text(path)
     except Exception as exc:
         return f"PDF text extraction failed: {exc}"
-    failures = placeholder_text_failures(text)
+    failures = final_pdf_text_failures(text, extractor)
     if failures:
         return f"{extractor}: " + "; ".join(failures)
     return ""
