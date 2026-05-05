@@ -811,6 +811,16 @@ def _coerce_nonnegative_int(value: object, *, default: int) -> int:
         return default
 
 
+def _coerce_finite_float(value: object, *, default: float | None = None) -> float | None:
+    try:
+        coerced = float(value)
+    except (TypeError, ValueError):
+        return default
+    if not math.isfinite(coerced):
+        return default
+    return coerced
+
+
 def _prompt_generation_matrix_failures(results_dir: Path, manifest: dict[str, Any]) -> list[str]:
     prompts_path = results_dir / "prompts.jsonl"
     generations_path = results_dir / "generations.jsonl"
@@ -1913,7 +1923,7 @@ def _claim_failures(assessment: dict[str, Any], source_paths: dict[str, Path]) -
             evidence_count = _claim_evidence_count(claim_id, claim)
             if evidence_count <= 0:
                 failures.append(f"claim_lacks_evidence:{claim_id}")
-            failures.extend(_claim_best_evidence_failures(claim_id, claim))
+            failures.extend(_claim_best_evidence_failures(claim_id, claim, thresholds))
     if assessment.get("passed_claim_count") != len(EXPECTED_CLAIM_IDS):
         failures.append(
             f"passed_claim_count={assessment.get('passed_claim_count')}; "
@@ -1967,7 +1977,11 @@ def _claim_evidence_count(claim_id: str, claim: dict[str, Any]) -> int:
         return 0
 
 
-def _claim_best_evidence_failures(claim_id: str, claim: dict[str, Any]) -> list[str]:
+def _claim_best_evidence_failures(
+    claim_id: str,
+    claim: dict[str, Any],
+    thresholds: dict[str, Any] | None = None,
+) -> list[str]:
     if claim_id == "H3_causal_safety_state_erasure":
         comparison = claim.get("best_comparison")
         if not isinstance(comparison, dict):
@@ -1994,6 +2008,18 @@ def _claim_best_evidence_failures(claim_id: str, claim: dict[str, Any]) -> list[
                     failures.append(
                         f"claim_lacks_best_comparison_{key}_{evidence_key}:{claim_id}"
                     )
+        max_margin_ci_width = _coerce_finite_float(
+            (thresholds or {}).get("max_causal_margin_ci_width"),
+            default=CAUSAL_MAX_CI_WIDTH,
+        )
+        margin_ci_width = _coerce_finite_float(comparison.get("margin_ci_width"))
+        if margin_ci_width is None:
+            failures.append(f"claim_invalid_best_comparison_margin_ci_width:{claim_id}")
+        elif margin_ci_width > max_margin_ci_width:
+            failures.append(
+                f"claim_best_comparison_margin_ci_width={margin_ci_width:.3f}; "
+                f"target<={max_margin_ci_width:.3f}:{claim_id}"
+            )
         return failures
     evidence = claim.get("best_evidence")
     if not isinstance(evidence, dict):
@@ -2035,7 +2061,7 @@ def _claim_recompute_failures(
         max_primary_ci_width=float(thresholds.get("max_primary_ci_width", PRIMARY_MAX_CI_WIDTH)),
         max_causal_ci_width=float(thresholds.get("max_causal_ci_width", CAUSAL_MAX_CI_WIDTH)),
         max_causal_margin_ci_width=float(
-            thresholds.get("max_causal_margin_ci_width", CAUSAL_MAX_CI_WIDTH * 2)
+            thresholds.get("max_causal_margin_ci_width", CAUSAL_MAX_CI_WIDTH)
         ),
         require_human_audit_support=True,
     )

@@ -1746,6 +1746,44 @@ def test_publication_status_rejects_claim_without_interval_width_evidence(
     )
 
 
+def test_publication_status_rejects_wide_h3_margin_interval(
+    tmp_path: Path,
+) -> None:
+    primary = tmp_path / "primary"
+    causal = tmp_path / "causal"
+    primary_audit = tmp_path / "primary_audit"
+    causal_audit = tmp_path / "causal_audit"
+    _write_run(primary)
+    _write_run(causal)
+    _write_audit(primary_audit, primary)
+    _write_audit(causal_audit, causal)
+    claim = _passing_claim_assessment(primary, causal, primary_audit, causal_audit)
+    claim["claims"]["H3_causal_safety_state_erasure"]["best_comparison"][
+        "margin_ci_width"
+    ] = 0.20
+    claim_path = tmp_path / "claim_assessment.json"
+    claim_path.write_text(json.dumps(claim), encoding="utf-8")
+    pdf_path = tmp_path / "paper.pdf"
+    pdf_path.write_bytes(PDF_BYTES)
+
+    status = publication_status(
+        primary_results_dir=primary,
+        causal_results_dir=causal,
+        primary_audit_dir=primary_audit,
+        causal_audit_dir=causal_audit,
+        claim_assessment_path=claim_path,
+        paper_pdf=pdf_path,
+    )
+
+    assert status["publication_ready"] is False
+    assert "claim_assessment_passed" in status["blockers"]
+    assert (
+        "claim_best_comparison_margin_ci_width=0.200; target<=0.120:"
+        "H3_causal_safety_state_erasure"
+        in status["claim_assessment"]["failures"]
+    )
+
+
 def test_publication_status_rejects_preliminary_claim_assessment_without_audit_gate(
     tmp_path: Path,
 ) -> None:
@@ -3229,11 +3267,11 @@ def _passing_metrics() -> dict:
         "causal_restoration": {
             "public_refusal_safety::kv_int4_sim__patchkey-value__rolesystem": {
                 "compressed_policy": "kv_int4_sim",
-                "safety_restoration_fraction": 0.62,
+                "safety_restoration_fraction": 0.57,
                 "safety_restoration_fraction_ci": {
-                    "mean": 0.62,
-                    "ci_low": 0.56,
-                    "ci_high": 0.67,
+                    "mean": 0.57,
+                    "ci_low": 0.54,
+                    "ci_high": 0.60,
                     "cluster_n": 100,
                 },
                 "refusal_restoration_fraction": 0.55,
@@ -3249,8 +3287,8 @@ def _passing_metrics() -> dict:
                 "safety_restoration_fraction": 0.20,
                 "safety_restoration_fraction_ci": {
                     "mean": 0.20,
-                    "ci_low": 0.16,
-                    "ci_high": 0.25,
+                    "ci_low": 0.18,
+                    "ci_high": 0.22,
                     "cluster_n": 100,
                 },
                 "refusal_restoration_fraction": 0.18,
@@ -3476,7 +3514,7 @@ def _passing_claim_assessment(
             "min_human_audit_delta": 0.0,
             "max_primary_ci_width": 0.08,
             "max_causal_ci_width": 0.12,
-            "max_causal_margin_ci_width": 0.24,
+            "max_causal_margin_ci_width": 0.12,
         },
         "claims": {
             "H1_behavioral_cache_sensitivity": {
@@ -3523,10 +3561,10 @@ def _passing_claim_assessment(
                         "ci_low": 0.16,
                         "ci_high": 0.25,
                     },
-                    "margin": 0.42,
-                    "margin_ci_low": 0.31,
-                    "margin_ci_high": 0.51,
-                    "margin_ci_width": 0.20,
+                    "margin": 0.37,
+                    "margin_ci_low": 0.32,
+                    "margin_ci_high": 0.42,
+                    "margin_ci_width": 0.10,
                     "system_ci_width": 0.11,
                     "control_ci_width": 0.09,
                     "passed": True,

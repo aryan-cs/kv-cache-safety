@@ -30,7 +30,7 @@ def main() -> None:
     parser.add_argument("--min-human-audit-delta", type=float, default=0.0)
     parser.add_argument("--max-primary-ci-width", type=float, default=0.08)
     parser.add_argument("--max-causal-ci-width", type=float, default=0.12)
-    parser.add_argument("--max-causal-margin-ci-width", type=float, default=0.24)
+    parser.add_argument("--max-causal-margin-ci-width", type=float, default=0.12)
     parser.add_argument("--require-human-audit-support", action="store_true")
     parser.add_argument(
         "--require-cache-mediated-claim",
@@ -107,7 +107,7 @@ def assess_claims(
     min_human_audit_delta: float = 0.0,
     max_primary_ci_width: float = 0.08,
     max_causal_ci_width: float = 0.12,
-    max_causal_margin_ci_width: float = 0.24,
+    max_causal_margin_ci_width: float = 0.12,
     require_human_audit_support: bool = False,
 ) -> dict[str, Any]:
     thresholds = {
