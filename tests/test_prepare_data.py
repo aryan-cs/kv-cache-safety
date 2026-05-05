@@ -40,8 +40,9 @@ def test_load_hf_composite_fills_limit_from_multiple_sources(monkeypatch: pytest
         output_suite: str | None,
         revision: str | None = None,
         offset: int = 0,
+        exclude_user_hashes: set[str] | None = None,
     ) -> list[PromptRecord]:
-        calls.append((name, limit, output_suite, revision, offset))
+        calls.append((name, limit, output_suite, revision, offset, exclude_user_hashes))
         count = 2 if name == "advbench" else 3
         if limit is not None:
             count = min(count, limit)
@@ -74,6 +75,7 @@ def test_load_hf_composite_applies_offset_after_deduplication(
         output_suite: str | None,
         revision: str | None = None,
         offset: int = 0,
+        exclude_user_hashes: set[str] | None = None,
     ) -> list[PromptRecord]:
         assert offset == 0
         count = 6 if limit is None else min(6, limit)
@@ -87,6 +89,41 @@ def test_load_hf_composite_applies_offset_after_deduplication(
     records = load_hf_composite("public_refusal_combo", 3, "public_refusal_safety", offset=2)
 
     assert [record.id for record in records] == ["advbench_2", "advbench_3", "advbench_4"]
+
+
+def test_load_hf_composite_skips_excluded_reference_prompt_text(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fake_load_hf_preset(
+        name: str,
+        limit: int | None,
+        output_suite: str | None,
+        revision: str | None = None,
+        offset: int = 0,
+        exclude_user_hashes: set[str] | None = None,
+    ) -> list[PromptRecord]:
+        assert offset == 0
+        prompts = ["reference duplicate", "fresh one", "fresh two", "fresh three"]
+        records = []
+        for idx, prompt in enumerate(prompts):
+            if prepare_data._normalized_user_hash(prompt) in (exclude_user_hashes or set()):
+                continue
+            records.append(PromptRecord(id=f"{name}_{idx}", suite=str(output_suite), user=prompt))
+            if limit is not None and len(records) >= limit:
+                break
+        return records
+
+    monkeypatch.setattr(prepare_data, "load_hf_preset", fake_load_hf_preset)
+    excluded = {prepare_data._normalized_user_hash("Reference Duplicate")}
+
+    records = load_hf_composite(
+        "public_refusal_combo",
+        2,
+        "public_refusal_safety",
+        exclude_user_hashes=excluded,
+    )
+
+    assert [record.user for record in records] == ["fresh one", "fresh two"]
 
 
 def test_load_hf_preset_applies_offset_after_usable_record_filtering(
@@ -127,6 +164,44 @@ def test_load_hf_preset_applies_offset_after_usable_record_filtering(
 
     assert [record.id for record in records] == ["dolly_benign_000002", "dolly_benign_000003"]
     assert [record.metadata["source_row_index"] for record in records] == [2, 3]
+
+
+def test_load_hf_preset_excludes_reference_prompt_text_before_limit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class FakeDataset:
+        _fingerprint = "fingerprint"
+        info = types.SimpleNamespace(
+            builder_name="builder",
+            config_name="default",
+            version="1.0.0",
+            homepage="",
+            license="",
+        )
+
+        def __iter__(self):
+            yield from [
+                {"instruction": "reference duplicate"},
+                {"instruction": "keep one"},
+                {"instruction": "keep two"},
+                {"instruction": "unused"},
+            ]
+
+    monkeypatch.setitem(
+        sys.modules,
+        "datasets",
+        types.SimpleNamespace(load_dataset=lambda *_args, **_kwargs: FakeDataset()),
+    )
+
+    records = prepare_data.load_hf_preset(
+        "dolly_benign",
+        limit=2,
+        output_suite="public_benign_overrefusal",
+        revision="rev",
+        exclude_user_hashes={prepare_data._normalized_user_hash("Reference Duplicate")},
+    )
+
+    assert [record.user for record in records] == ["keep one", "keep two"]
 
 
 def test_prompt_injection_leakage_record_uses_hidden_system() -> None:

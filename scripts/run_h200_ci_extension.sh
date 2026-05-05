@@ -46,10 +46,10 @@ if [[ "$audit_include_hidden_reference" == "1" ]]; then
 fi
 
 uv run python scripts/prepare_data.py --suite all
-uv run python scripts/prepare_data.py --source hf --suite cyberec_prompt_injection_leakage --limit "$ci_prompt_limit" --offset "$ci_prompt_offset" --output-suite public_system_leakage
-uv run python scripts/prepare_data.py --source hf --suite public_refusal_ci_extension --limit "$ci_prompt_limit" --output-suite public_refusal_safety
-uv run python scripts/prepare_data.py --source hf --suite dolly_benign --limit "$ci_prompt_limit" --offset "$ci_prompt_offset" --output-suite public_benign_overrefusal
-uv run python scripts/prepare_data.py --source hf --suite arc_easy --limit "$ci_prompt_limit" --offset "$ci_prompt_offset" --output-suite public_capability_arc
+uv run python scripts/prepare_data.py --source hf --suite cyberec_prompt_injection_leakage --limit "$ci_prompt_limit" --offset "$ci_prompt_offset" --output-suite public_system_leakage --exclude-results-dir "$primary_results_dir"
+uv run python scripts/prepare_data.py --source hf --suite public_refusal_ci_extension --limit "$ci_prompt_limit" --output-suite public_refusal_safety --exclude-results-dir "$primary_results_dir"
+uv run python scripts/prepare_data.py --source hf --suite dolly_benign --limit "$ci_prompt_limit" --offset "$ci_prompt_offset" --output-suite public_benign_overrefusal --exclude-results-dir "$primary_results_dir"
+uv run python scripts/prepare_data.py --source hf --suite arc_easy --limit "$ci_prompt_limit" --offset "$ci_prompt_offset" --output-suite public_capability_arc --exclude-results-dir "$primary_results_dir"
 uv run python scripts/check_prepared_suites.py \
   --min-records 600 \
   --suite-min-records system_leakage=2 \
