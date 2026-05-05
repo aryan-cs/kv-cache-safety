@@ -112,6 +112,7 @@ def test_build_paper_pdf_status_checks_use_explicit_artifact_paths() -> None:
     assert "scripts/sync_active_paper_assets.py" in script
     assert "--primary-audit-dir \"$primary_audit_dir\"" in script
     assert "--causal-audit-dir \"$causal_audit_dir\"" in script
+    assert "--strict" in script
     assert "--claim-assessment \"$claim_assessment\"" in script
     assert "--arxiv-source-dir \"$arxiv_source_dir\"" in script
     assert "--arxiv-archive \"$arxiv_archive\"" in script
@@ -401,6 +402,7 @@ def test_evidence_gated_paper_builder_allows_nonpassing_claim_pdf() -> None:
     assert "clear_stale_publication_pdfs" in script
     assert "paper/cache_mediated_safety_erasure.pdf.manifest.json" in script
     assert "scripts/package_arxiv_submission.py" in script
+    assert "--strict" in script
     assert "--require-arxiv-bundle" in script
     assert "build_evidence_gated_paper_artifacts.sh" in finalizer
     assert "AUDIT_SOURCE=open_judge \\" in finalizer

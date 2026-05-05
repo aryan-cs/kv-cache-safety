@@ -131,7 +131,8 @@ uv run python scripts/sync_active_paper_assets.py \
   --active-primary-dir "$active_primary_dir" \
   --active-causal-dir "$active_causal_dir" \
   --active-primary-audit-dir "$active_primary_audit_dir" \
-  --active-causal-audit-dir "$active_causal_audit_dir"
+  --active-causal-audit-dir "$active_causal_audit_dir" \
+  --strict
 
 if [[ "${REQUIRE_COMPLETE_PAPER:-0}" == "1" ]]; then
   uv run python scripts/check_latex_placeholders.py --tex "$src_dir/main.tex"

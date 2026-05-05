@@ -202,7 +202,13 @@ def test_publication_status_requires_final_pdf_provenance_for_canonical_pdf(
         json.dumps(_passing_claim_assessment(primary, causal, primary_audit, causal_audit)),
         encoding="utf-8",
     )
-    _write_paper_generated_assets(primary_generated, causal_generated, claim_path)
+    _write_paper_generated_assets(
+        primary_generated,
+        causal_generated,
+        claim_path,
+        primary_results=primary,
+        causal_results=causal,
+    )
     pdf_path = tmp_path / "cache_mediated_safety_erasure.pdf"
     pdf_path.write_bytes(PDF_BYTES)
 
@@ -295,7 +301,13 @@ def test_publication_status_rejects_stale_final_pdf_provenance(tmp_path: Path) -
         json.dumps(_passing_claim_assessment(primary, causal, primary_audit, causal_audit)),
         encoding="utf-8",
     )
-    _write_paper_generated_assets(primary_generated, causal_generated, claim_path)
+    _write_paper_generated_assets(
+        primary_generated,
+        causal_generated,
+        claim_path,
+        primary_results=primary,
+        causal_results=causal,
+    )
     pdf_path = tmp_path / "cache_mediated_safety_erasure.pdf"
     pdf_path.write_bytes(PDF_BYTES)
     _write_final_pdf_manifest(
@@ -329,6 +341,10 @@ def test_publication_status_rejects_stale_final_pdf_provenance(tmp_path: Path) -
     assert status["publication_ready"] is False
     assert (
         "pdf_manifest_source_hash_stale:primary_generated_main_table"
+        in status["paper_pdf"]["failure"]
+    )
+    assert (
+        "active_primary_manifest:active_manifest_source_target_hash_mismatch"
         in status["paper_pdf"]["failure"]
     )
 
@@ -591,6 +607,47 @@ def test_publication_status_rejects_stale_arxiv_provenance_source(
         failure.startswith("provenance_bundle_hash_stale:")
         for failure in status["arxiv_bundle"]["failures"]
     )
+
+
+def test_publication_status_rejects_stale_arxiv_archive_manifest(
+    tmp_path: Path,
+) -> None:
+    primary = tmp_path / "primary"
+    causal = tmp_path / "causal"
+    primary_audit = tmp_path / "primary_audit"
+    causal_audit = tmp_path / "causal_audit"
+    arxiv_dir = tmp_path / "arxiv_source"
+    archive = tmp_path / "arxiv_source.tar.gz"
+    _write_run(primary)
+    _write_run(causal)
+    _write_audit(primary_audit, primary)
+    _write_audit(causal_audit, causal)
+    _write_arxiv_bundle(arxiv_dir, archive)
+    manifest = json.loads((arxiv_dir / "manifest.json").read_text(encoding="utf-8"))
+    manifest["post_archive_mutation"] = True
+    (arxiv_dir / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+    claim_path = tmp_path / "claim_assessment.json"
+    claim_path.write_text(
+        json.dumps(_passing_claim_assessment(primary, causal, primary_audit, causal_audit)),
+        encoding="utf-8",
+    )
+    pdf_path = tmp_path / "paper.pdf"
+    pdf_path.write_bytes(PDF_BYTES)
+
+    status = publication_status(
+        primary_results_dir=primary,
+        causal_results_dir=causal,
+        primary_audit_dir=primary_audit,
+        causal_audit_dir=causal_audit,
+        claim_assessment_path=claim_path,
+        paper_pdf=pdf_path,
+        arxiv_source_dir=arxiv_dir,
+        arxiv_archive=archive,
+        require_arxiv_bundle=True,
+    )
+
+    assert status["publication_ready"] is False
+    assert "archive_stale:manifest.json" in status["arxiv_bundle"]["failures"]
 
 
 def test_publication_status_requires_arxiv_file_provenance(tmp_path: Path) -> None:
@@ -2376,6 +2433,7 @@ def _write_audit(
     active_name = "active_causal_summary" if "causal" in path.name else "active_primary_summary"
     active_path = path.parent / active_name
     active_path.mkdir(parents=True, exist_ok=True)
+    copied = []
     for source_name in [
         "audit_manifest.json",
         "human_audit_summary.json",
@@ -2383,9 +2441,18 @@ def _write_audit(
         "human_audit_summary_table.tex",
         "human_audit_deltas_table.tex",
     ]:
-        (active_path / source_name).write_bytes((path / source_name).read_bytes())
+        copied.append(_copy_for_active_manifest(path / source_name, active_path / source_name))
     (active_path / "active_audit_manifest.json").write_text(
-        json.dumps({"audit_dir": str(path), "active_dir": str(active_path)}),
+        json.dumps(
+            {
+                "schema_version": 2,
+                "kind": "causal_audit" if "causal" in path.name else "primary_audit",
+                "audit_dir": str(path),
+                "active_dir": str(active_path),
+                "copied": copied,
+                "missing": [],
+            }
+        ),
         encoding="utf-8",
     )
 
@@ -2478,6 +2545,9 @@ def _write_paper_generated_assets(
     primary_generated: Path,
     causal_generated: Path,
     claim_path: Path,
+    *,
+    primary_results: Path,
+    causal_results: Path,
 ) -> None:
     primary_generated.mkdir(parents=True)
     causal_generated.mkdir(parents=True)
@@ -2491,30 +2561,94 @@ def _write_paper_generated_assets(
         causal_generated / "artifact_manifest.json",
         causal_generated / "causal_restoration_table.tex",
         causal_generated / "result_macros.tex",
-        active_primary / "active_asset_manifest.json",
-        active_primary / "main_results_table.tex",
-        active_primary / "suite_level_effects_table.tex",
-        active_primary / "result_macros.tex",
-        active_causal / "active_asset_manifest.json",
-        active_causal / "causal_restoration_table.tex",
-        active_causal / "result_macros.tex",
         claim_path.parent / "abstract_status_sentence.tex",
         claim_path.parent / "claim_assessment_table.tex",
         claim_path.parent / "claim_interpretation.tex",
     ]:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(f"{path.name}\n", encoding="utf-8")
-    for path in [
-        active_primary / "figures" / "safety_capability_phase_portrait.pdf",
-        active_primary / "figures" / "selective_safety_erasure_heatmap.pdf",
-        active_primary / "figures" / "prompt_effect_constellation.pdf",
-        active_primary / "figures" / "cache_state_fingerprint.pdf",
-        active_primary / "figures" / "safety_state_atlas.pdf",
-        active_causal / "figures" / "causal_restoration_fraction.pdf",
-        active_causal / "figures" / "causal_restoration_flow.pdf",
-    ]:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_bytes(PDF_BYTES)
+    primary_copied = [
+        _copy_for_active_manifest(primary_generated / name, active_primary / name)
+        for name in [
+            "result_macros.tex",
+            "main_results_table.tex",
+            "suite_level_effects_table.tex",
+        ]
+    ]
+    primary_copied.extend(
+        _copy_for_active_manifest(
+            primary_results / "figures" / name,
+            active_primary / "figures" / name,
+        )
+        for name in [
+            "safety_capability_phase_portrait.pdf",
+            "selective_safety_erasure_heatmap.pdf",
+            "prompt_effect_constellation.pdf",
+            "cache_state_fingerprint.pdf",
+            "safety_state_atlas.pdf",
+        ]
+    )
+    causal_copied = [
+        _copy_for_active_manifest(causal_generated / name, active_causal / name)
+        for name in ["result_macros.tex", "causal_restoration_table.tex"]
+    ]
+    causal_copied.extend(
+        _copy_for_active_manifest(
+            causal_results / "figures" / name,
+            active_causal / "figures" / name,
+        )
+        for name in [
+            "causal_restoration_fraction.pdf",
+            "causal_restoration_flow.pdf",
+        ]
+    )
+    (active_primary / "active_asset_manifest.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 2,
+                "kind": "primary",
+                "active_dir": str(active_primary),
+                "generated_dir": str(primary_generated),
+                "results_dir": str(primary_results),
+                "copied": primary_copied,
+                "missing": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+    (active_causal / "active_asset_manifest.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 2,
+                "kind": "causal",
+                "active_dir": str(active_causal),
+                "generated_dir": str(causal_generated),
+                "results_dir": str(causal_results),
+                "copied": causal_copied,
+                "missing": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+
+def _copy_for_active_manifest(source: Path, target: Path) -> dict[str, object]:
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_bytes(source.read_bytes())
+    source_sha256 = _sha256(source)
+    target_sha256 = _sha256(target)
+    source_bytes = source.stat().st_size
+    target_bytes = target.stat().st_size
+    return {
+        "source": str(source),
+        "target": str(target),
+        "source_sha256": source_sha256,
+        "target_sha256": target_sha256,
+        "source_bytes": source_bytes,
+        "target_bytes": target_bytes,
+        "sha256": target_sha256,
+        "bytes": target_bytes,
+    }
 
 
 def _final_pdf_sources(

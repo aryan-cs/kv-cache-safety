@@ -15,6 +15,7 @@ from check_latex_placeholders import (
     _semantic_tex_failures,
     _strip_tex_comments,
 )
+from check_publication_readiness import _pdf_page_failure
 
 from cache_safety_erasure.utils.io import file_sha256, write_json
 
@@ -390,11 +391,13 @@ def _is_pdf(path: Path) -> bool:
         content = path.read_bytes()
     except OSError:
         return False
-    return (
+    if not (
         content.startswith(b"%PDF-")
         and len(content) >= 32
         and b"%%EOF" in content[-2048:]
-    )
+    ):
+        return False
+    return not _pdf_page_failure(path)
 
 
 def _copy_arxiv_support_tree(source_dir: Path, bundle_dir: Path) -> list[Path]:

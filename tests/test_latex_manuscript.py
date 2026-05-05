@@ -365,14 +365,29 @@ def test_active_paper_asset_sync_copies_selected_sources(tmp_path: Path) -> None
     manifest = json.loads(
         (active_primary / "active_asset_manifest.json").read_text(encoding="utf-8")
     )
+    copied_main = next(
+        row for row in manifest["copied"] if row["target"].endswith("main_results_table.tex")
+    )
+    assert manifest["schema_version"] == 2
     assert manifest["results_dir"] == str(primary_results)
+    assert copied_main["source_sha256"] == copied_main["target_sha256"]
+    assert copied_main["sha256"] == copied_main["target_sha256"]
+    assert copied_main["source_bytes"] == copied_main["target_bytes"]
+    assert copied_main["bytes"] == copied_main["target_bytes"]
     assert (
         active_primary_audit / "human_audit_summary_table.tex"
     ).read_text(encoding="utf-8") == "human_audit_summary_table.tex\n"
     audit_manifest = json.loads(
         (active_primary_audit / "active_audit_manifest.json").read_text(encoding="utf-8")
     )
+    audit_table = next(
+        row
+        for row in audit_manifest["copied"]
+        if row["target"].endswith("human_audit_summary_table.tex")
+    )
+    assert audit_manifest["schema_version"] == 2
     assert audit_manifest["audit_dir"] == str(primary_audit)
+    assert audit_table["source_sha256"] == audit_table["target_sha256"]
 
 
 def test_arxiv_packager_rejects_malformed_figure_pdfs(tmp_path: Path) -> None:
@@ -382,7 +397,7 @@ def test_arxiv_packager_rejects_malformed_figure_pdfs(tmp_path: Path) -> None:
     realish_pdf.write_bytes(b"%PDF-1.7\n1 0 obj\n<<>>\nendobj\ntrailer\n<<>>\n%%EOF\n")
 
     assert _is_pdf(fake_pdf) is False
-    assert _is_pdf(realish_pdf) is True
+    assert _is_pdf(realish_pdf) is False
 
 
 def test_arxiv_packager_records_file_provenance(tmp_path: Path) -> None:

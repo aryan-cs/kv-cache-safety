@@ -60,7 +60,8 @@ uv run python scripts/sync_active_paper_assets.py \
   --primary-generated-dir "$primary_generated_dir" \
   --causal-generated-dir "$causal_generated_dir" \
   --primary-audit-dir "$primary_audit_summary" \
-  --causal-audit-dir "$causal_audit_summary"
+  --causal-audit-dir "$causal_audit_summary" \
+  --strict
 
 uv run python scripts/check_latex_placeholders.py --tex paper/latex/main.tex
 uv run python scripts/check_paper_asset_freshness.py \

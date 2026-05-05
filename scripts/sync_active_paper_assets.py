@@ -167,7 +167,7 @@ def _sync_one(
         _copy_if_present(source, target, copied, missing)
 
     manifest = {
-        "schema_version": 1,
+        "schema_version": 2,
         "kind": kind,
         "active_dir": str(active_dir),
         "generated_dir": str(generated_dir),
@@ -194,7 +194,7 @@ def _sync_audit(
         write_json(
             active_dir / "active_audit_manifest.json",
             {
-                "schema_version": 1,
+                "schema_version": 2,
                 "kind": kind,
                 "active_dir": str(active_dir),
                 "audit_dir": None,
@@ -210,7 +210,7 @@ def _sync_audit(
     write_json(
         active_dir / "active_audit_manifest.json",
         {
-            "schema_version": 1,
+            "schema_version": 2,
             "kind": kind,
             "active_dir": str(active_dir),
             "audit_dir": str(audit_dir),
@@ -231,13 +231,21 @@ def _copy_if_present(
         missing.append(str(source))
         return
     target.parent.mkdir(parents=True, exist_ok=True)
+    source_sha256 = file_sha256(source)
+    source_bytes = source.stat().st_size
     shutil.copyfile(source, target)
+    target_sha256 = file_sha256(target)
+    target_bytes = target.stat().st_size
     copied.append(
         {
             "source": str(source),
             "target": str(target),
-            "sha256": file_sha256(target),
-            "bytes": target.stat().st_size,
+            "source_sha256": source_sha256,
+            "target_sha256": target_sha256,
+            "source_bytes": source_bytes,
+            "target_bytes": target_bytes,
+            "sha256": target_sha256,
+            "bytes": target_bytes,
         }
     )
 

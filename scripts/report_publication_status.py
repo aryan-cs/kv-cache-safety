@@ -32,7 +32,7 @@ from check_human_audit_readiness import (
     check_audit_summary_source_match,
     check_human_audit_readiness,
 )
-from check_publication_readiness import _check_figure_manifest
+from check_publication_readiness import _check_figure_manifest, _pdf_page_failure
 from package_arxiv_submission import (
     FIGURE_SOURCES,
     _final_source_failures,
@@ -1026,7 +1026,7 @@ def _pdf_failure(path: Path) -> str:
         return "PDF too small"
     if b"%%EOF" not in content[-2048:]:
         return "missing PDF EOF marker"
-    return ""
+    return _pdf_page_failure(path)
 
 
 def _pdf_text_failure(path: Path) -> str:
@@ -1084,6 +1084,7 @@ def _pdf_provenance_failure(
         for row in source_rows:
             if isinstance(row, dict):
                 provenance_by_kind.setdefault(str(row.get("kind") or ""), []).append(row)
+        active_manifest_paths: dict[str, Path] = {}
         for kind, expected_path in expected_sources:
             matching_rows = provenance_by_kind.get(kind, [])
             if not matching_rows:
@@ -1092,6 +1093,10 @@ def _pdf_provenance_failure(
             resolved_expected = expected_path.resolve()
             if not any(_manifest_path_matches(row, resolved_expected) for row in matching_rows):
                 failures.append(f"pdf_manifest_unexpected_source_path:{kind}")
+            if expected_path.name in {"active_asset_manifest.json", "active_audit_manifest.json"}:
+                active_manifest_paths[kind] = expected_path
+        for kind, manifest_path in sorted(active_manifest_paths.items()):
+            failures.extend(_active_copy_manifest_failures(kind, manifest_path))
     return "; ".join(failures)
 
 
@@ -1105,6 +1110,58 @@ def _manifest_path_matches(row: dict[str, Any], expected_path: Path) -> bool:
     except OSError:
         return False
     return observed == expected_path
+
+
+def _active_copy_manifest_failures(kind: str, manifest_path: Path) -> list[str]:
+    manifest = _read_json(manifest_path)
+    if not manifest:
+        return [f"{kind}:missing_or_invalid_active_manifest"]
+    failures: list[str] = []
+    if manifest.get("schema_version") != 2:
+        failures.append(f"{kind}:invalid_active_manifest_schema")
+    copied = manifest.get("copied")
+    if not isinstance(copied, list) or not copied:
+        failures.append(f"{kind}:active_manifest_no_copied_files")
+        copied = []
+    missing = manifest.get("missing")
+    if missing:
+        failures.append(f"{kind}:active_manifest_has_missing_sources")
+    active_dir = Path(str(manifest.get("active_dir") or ""))
+    for idx, row in enumerate(copied):
+        if not isinstance(row, dict):
+            failures.append(f"{kind}:malformed_active_manifest_row:{idx}")
+            continue
+        source = Path(str(row.get("source") or ""))
+        target = Path(str(row.get("target") or ""))
+        if not source.exists():
+            failures.append(f"{kind}:active_manifest_source_missing:{idx}")
+            continue
+        if not target.exists():
+            failures.append(f"{kind}:active_manifest_target_missing:{idx}")
+            continue
+        if active_dir:
+            try:
+                target.resolve().relative_to(active_dir.resolve())
+            except ValueError:
+                failures.append(f"{kind}:active_manifest_target_outside_active_dir:{idx}")
+        source_sha256 = file_sha256(source)
+        target_sha256 = file_sha256(target)
+        source_bytes = source.stat().st_size
+        target_bytes = target.stat().st_size
+        if source_sha256 != target_sha256:
+            failures.append(f"{kind}:active_manifest_source_target_hash_mismatch:{idx}")
+        expected_fields = {
+            "source_sha256": source_sha256,
+            "target_sha256": target_sha256,
+            "source_bytes": source_bytes,
+            "target_bytes": target_bytes,
+            "sha256": target_sha256,
+            "bytes": target_bytes,
+        }
+        for field, expected_value in expected_fields.items():
+            if row.get(field) != expected_value:
+                failures.append(f"{kind}:active_manifest_stale_{field}:{idx}")
+    return failures
 
 
 def _final_pdf_expected_sources(
@@ -1313,6 +1370,13 @@ def _arxiv_status(
             for member in ["main.tex", "references.bib", "manifest.json"]:
                 if member not in archive_hashes:
                     failures.append(f"archive_missing:{member}")
+                    continue
+                source_member = source_dir / member
+                if (
+                    source_member.exists()
+                    and archive_hashes[member] != file_sha256(source_member)
+                ):
+                    failures.append(f"archive_stale:{member}")
             if manifest:
                 copied_files = _manifest_provenance_files(source_dir, manifest, failures)
                 if not copied_files:
