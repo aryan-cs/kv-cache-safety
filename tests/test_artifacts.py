@@ -327,6 +327,20 @@ def test_resume_manifest_validation_requires_explicit_commit_mismatch(
     _validate_resume_manifest(run_dir, manifest, {"git_commit": "different"})
 
 
+def test_policy_manifest_uses_json_stable_defaults() -> None:
+    import sys
+
+    sys.path.insert(0, str(Path("scripts").resolve()))
+    from run_experiment import _policy_manifest
+
+    from cache_safety_erasure.config import CachePolicyConfig
+
+    manifest = _policy_manifest(CachePolicyConfig(name="none"))
+
+    assert manifest["protected_spans"] == ["system", "policy"]
+    assert isinstance(manifest["protected_spans"], list)
+
+
 def _minimal_resume_manifest() -> dict:
     return {
         "run_name": "run",

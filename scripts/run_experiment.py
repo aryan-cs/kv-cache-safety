@@ -293,7 +293,8 @@ def _write_run_start_artifacts(
 
 
 def _policy_manifest(policy: Any) -> dict[str, Any]:
-    return asdict(policy)
+    # Keep resume comparisons stable against the JSON form written to manifest.json.
+    return json.loads(json.dumps(asdict(policy), sort_keys=True))
 
 
 def _reconcile_resume_generations(run_dir: Path, rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
