@@ -512,6 +512,32 @@ def test_arxiv_packager_rejects_placeholder_generated_tex(tmp_path: Path) -> Non
     assert f"{placeholder}:placeholder_text:Results pending; no readiness-passing rows exported." in failures
 
 
+def test_arxiv_packager_rejects_internal_operational_generated_tex(tmp_path: Path) -> None:
+    generated = tmp_path / "generated"
+    generated.mkdir(parents=True)
+    artifact = generated / "claim_interpretation.tex"
+    artifact.write_text("The H200 finalizer generated this draft-only text.", encoding="utf-8")
+
+    failures = _invalid_arxiv_support_files([artifact])
+
+    assert f"{artifact}:forbidden_final_prose:H200" in failures
+    assert f"{artifact}:forbidden_final_prose:finalizer" in failures
+    assert f"{artifact}:forbidden_final_prose:draft-only" in failures
+
+
+def test_arxiv_packager_ignores_internal_operational_tex_comments(tmp_path: Path) -> None:
+    generated = tmp_path / "generated"
+    generated.mkdir(parents=True)
+    artifact = generated / "claim_interpretation.tex"
+    artifact.write_text(
+        "% H200 finalizer draft-only\n"
+        "The results support the registered causal restoration claim.",
+        encoding="utf-8",
+    )
+
+    assert _invalid_arxiv_support_files([artifact]) == []
+
+
 def test_arxiv_packager_rejects_semantically_incomplete_generated_tex(tmp_path: Path) -> None:
     generated = tmp_path / "generated" / "h200_qwen_full_sweep"
     generated.mkdir(parents=True)

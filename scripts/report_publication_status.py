@@ -22,15 +22,24 @@ from assess_claims import (
     render_interpretation_latex,
     render_latex_table,
 )
-from check_final_pdf_text import extract_pdf_text, placeholder_text_failures
+from check_final_pdf_text import (
+    extract_pdf_text,
+    forbidden_final_prose_failures,
+    placeholder_text_failures,
+)
 from check_human_audit_readiness import (
     DEFAULT_REQUIRED_LABELS,
     check_audit_input_source_match,
     check_audit_summary_source_match,
     check_human_audit_readiness,
 )
+from check_latex_placeholders import PLACEHOLDER_TEXT_MARKERS, _strip_tex_comments
 from check_publication_readiness import _check_figure_manifest
-from package_arxiv_submission import FIGURE_SOURCES, _final_source_failures, _rewrite_failures
+from package_arxiv_submission import (
+    FIGURE_SOURCES,
+    _final_source_failures,
+    _rewrite_failures,
+)
 
 from cache_safety_erasure.utils.io import file_sha256, write_json
 
@@ -1283,6 +1292,7 @@ def _arxiv_status(
         for required_file in [*required_bundle_files, *REQUIRED_ARXIV_FIGURE_FILES]:
             if not (source_dir / required_file).exists():
                 failures.append(f"missing_required_bundle_file:{required_file}")
+        failures.extend(_arxiv_support_content_failures(source_dir, required_bundle_files))
         provenance_members = _manifest_provenance_members(source_dir, manifest, failures)
         for required_file in [
             "main.tex",
@@ -1338,6 +1348,33 @@ def _arxiv_status(
         "archive_exists": archive.exists(),
         "archive_sha256": file_sha256(archive),
     }
+
+
+def _arxiv_support_content_failures(
+    source_dir: Path, required_bundle_files: list[str]
+) -> list[str]:
+    candidates = []
+    for required_file in required_bundle_files:
+        path = source_dir / required_file
+        if path.suffix == ".tex" and path.exists():
+            candidates.append(path)
+    for root in [source_dir / "generated", source_dir / "audit"]:
+        if root.exists():
+            candidates.extend(sorted(path for path in root.rglob("*.tex") if path.is_file()))
+    failures = []
+    for path in sorted(set(candidates)):
+        text = path.read_text(encoding="utf-8", errors="replace")
+        text_lower = text.lower()
+        for marker in PLACEHOLDER_TEXT_MARKERS:
+            if marker.lower() in text_lower:
+                failures.append(f"arxiv_support_content:{path}:placeholder_text:{marker}")
+                break
+        rendered_text = _strip_tex_comments(text)
+        failures.extend(
+            f"arxiv_support_content:{path}:{failure}"
+            for failure in forbidden_final_prose_failures(rendered_text)
+        )
+    return failures
 
 
 def _read_json(path: Path) -> dict[str, Any]:

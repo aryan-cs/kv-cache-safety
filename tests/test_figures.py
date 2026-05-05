@@ -533,6 +533,21 @@ def test_figure_artifact_signature_validator_accepts_real_headers(tmp_path: Path
     assert _figure_artifact_failure("data_csv", csv) == ""
 
 
+def test_figure_artifact_validator_rejects_blank_pdf_page(tmp_path: Path) -> None:
+    from pypdf import PdfWriter
+
+    pdf = tmp_path / "blank.pdf"
+    writer = PdfWriter()
+    writer.add_blank_page(width=300, height=144)
+    with pdf.open("wb") as f:
+        writer.write(f)
+
+    assert (
+        _figure_artifact_failure("pdf", pdf)
+        == "PDF page 1 has no rendered content stream"
+    )
+
+
 def test_figure_manifest_requires_named_figures(tmp_path: Path) -> None:
     from cache_safety_erasure.utils.io import file_sha256, write_json
 

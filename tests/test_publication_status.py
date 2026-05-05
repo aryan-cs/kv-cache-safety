@@ -1091,6 +1091,56 @@ def test_publication_status_rejects_invalid_generated_or_audit_arxiv_flags(
     assert "invalid_audit" in status["arxiv_bundle"]["failures"]
 
 
+def test_publication_status_rejects_internal_arxiv_support_text(
+    tmp_path: Path,
+) -> None:
+    primary = tmp_path / "primary"
+    causal = tmp_path / "causal"
+    primary_audit = tmp_path / "primary_audit"
+    causal_audit = tmp_path / "causal_audit"
+    arxiv_dir = tmp_path / "arxiv_source"
+    archive = tmp_path / "arxiv_source.tar.gz"
+    _write_run(primary)
+    _write_run(causal)
+    _write_audit(primary_audit, primary)
+    _write_audit(causal_audit, causal)
+    _write_arxiv_bundle(arxiv_dir, archive)
+    internal_support = (
+        arxiv_dir / "generated" / "claim_assessment" / "claim_interpretation.tex"
+    )
+    internal_support.write_text(
+        "The H200 finalizer generated this draft-only text.",
+        encoding="utf-8",
+    )
+    claim_path = tmp_path / "claim_assessment.json"
+    claim_path.write_text(
+        json.dumps(_passing_claim_assessment(primary, causal, primary_audit, causal_audit)),
+        encoding="utf-8",
+    )
+    pdf_path = tmp_path / "paper.pdf"
+    pdf_path.write_bytes(PDF_BYTES)
+
+    status = publication_status(
+        primary_results_dir=primary,
+        causal_results_dir=causal,
+        primary_audit_dir=primary_audit,
+        causal_audit_dir=causal_audit,
+        claim_assessment_path=claim_path,
+        paper_pdf=pdf_path,
+        arxiv_source_dir=arxiv_dir,
+        arxiv_archive=archive,
+        require_arxiv_bundle=True,
+    )
+
+    assert status["publication_ready"] is False
+    assert "arxiv_bundle_ready" in status["blockers"]
+    assert any(
+        "arxiv_support_content:" in failure
+        and "forbidden_final_prose:H200" in failure
+        for failure in status["arxiv_bundle"]["failures"]
+    )
+
+
 def test_publication_status_rejects_self_referential_arxiv_provenance(
     tmp_path: Path,
 ) -> None:

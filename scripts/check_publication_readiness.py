@@ -479,6 +479,20 @@ def _pdf_page_failure(path: Path) -> str:
         height = float(box.height)
         if width <= 32 or height <= 32:
             return f"PDF page {index} dimensions too small: {width}x{height}"
+        content = page.get_contents()
+        if content is None:
+            return f"PDF page {index} has no rendered content stream"
+        try:
+            stream_data = content.get_data()
+        except AttributeError:
+            try:
+                stream_data = b"".join(stream.get_data() for stream in content)
+            except Exception as exc:
+                return f"PDF page {index} content decode failed: {exc}"
+        except Exception as exc:
+            return f"PDF page {index} content decode failed: {exc}"
+        if len(stream_data.strip()) < 32:
+            return f"PDF page {index} rendered content stream is too small"
     return ""
 
 

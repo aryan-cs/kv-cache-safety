@@ -9,7 +9,12 @@ from _path import add_src_to_path
 
 add_src_to_path()
 
-from check_latex_placeholders import PLACEHOLDER_TEXT_MARKERS, _semantic_tex_failures
+from check_final_pdf_text import forbidden_final_prose_failures
+from check_latex_placeholders import (
+    PLACEHOLDER_TEXT_MARKERS,
+    _semantic_tex_failures,
+    _strip_tex_comments,
+)
 
 from cache_safety_erasure.utils.io import file_sha256, write_json
 
@@ -351,11 +356,13 @@ def _rewrite_final_publication_fallbacks(text: str) -> str:
 
 def _final_source_failures(text: str) -> list[str]:
     text_lower = text.lower()
-    return [
+    failures = [
         f"placeholder_text:{marker}"
         for marker in FINAL_SOURCE_TEXT_MARKERS
         if marker.lower() in text_lower
     ]
+    failures.extend(forbidden_final_prose_failures(_strip_tex_comments(text)))
+    return failures
 
 
 def _rewrite_failures(text: str) -> list[str]:
@@ -409,11 +416,15 @@ def _invalid_arxiv_support_files(paths: list[Path]) -> list[str]:
         if path.suffix != ".tex":
             continue
         text = path.read_text(encoding="utf-8", errors="replace")
+        rendered_text = _strip_tex_comments(text)
         text_lower = text.lower()
         for marker in PLACEHOLDER_TEXT_MARKERS:
             if marker.lower() in text_lower:
                 failures.append(f"{path}:placeholder_text:{marker}")
                 break
+        failures.extend(
+            f"{path}:{failure}" for failure in forbidden_final_prose_failures(rendered_text)
+        )
         failures.extend(
             f"{path}:{failure}"
             for failure in _semantic_tex_failures(str(path), path.name, text)
