@@ -71,10 +71,17 @@ uv run python scripts/preflight_h200.py \
 
 run_id="${CI_EXTENSION_RUN_ID:-h200_qwen14b_ci_extension_primary}"
 merged_run_id="${MERGED_PRIMARY_RUN_ID:-h200_qwen_full_sweep_plus_ci_extension}"
-uv run python scripts/run_experiment.py \
-  --config configs/experiments/h200_qwen14b_ci_extension.yaml \
-  --run-id "$run_id" \
-  --resume
+if [[ "${CI_EXTENSION_ALLOW_RESUME_GIT_MISMATCH:-0}" == "1" ]]; then
+  ALLOW_RESUME_GIT_MISMATCH=1 uv run python scripts/run_experiment.py \
+    --config configs/experiments/h200_qwen14b_ci_extension.yaml \
+    --run-id "$run_id" \
+    --resume
+else
+  uv run python scripts/run_experiment.py \
+    --config configs/experiments/h200_qwen14b_ci_extension.yaml \
+    --run-id "$run_id" \
+    --resume
+fi
 
 latest="results/$run_id"
 paper_dir="paper/generated/h200_qwen14b_ci_extension"

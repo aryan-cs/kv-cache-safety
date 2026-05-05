@@ -210,6 +210,8 @@ def test_h200_readiness_uses_paper_grade_prompt_thresholds() -> None:
     assert "scripts/check_prompt_disjointness.py" in extension
     assert "scripts/merge_ci_extension_results.py" in extension
     assert "--offset \"$ci_prompt_offset\"" in extension
+    assert "CI_EXTENSION_ALLOW_RESUME_GIT_MISMATCH" in extension
+    assert "ALLOW_RESUME_GIT_MISMATCH=1 uv run python scripts/run_experiment.py" in extension
 
 
 def test_h200_scripts_export_multi_annotator_audit_templates() -> None:
