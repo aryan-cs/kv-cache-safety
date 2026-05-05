@@ -107,6 +107,8 @@ def test_stream_cache_fingerprint_uses_prompt_roles_and_position_bins(tmp_path: 
         "policy": "sliding_window__budget2",
         "layer_bin": 0,
         "layer_label": "L00",
+        "layer_source": "unlayered_cache_rows",
+        "layer_source_label": "unlayered cache rows",
         "role": "system",
         "token_bin": 0,
         "retained_count": 0.0,
@@ -117,6 +119,8 @@ def test_stream_cache_fingerprint_uses_prompt_roles_and_position_bins(tmp_path: 
         "policy": "sliding_window__budget2",
         "layer_bin": 0,
         "layer_label": "L00",
+        "layer_source": "unlayered_cache_rows",
+        "layer_source_label": "unlayered cache rows",
         "role": "user",
         "token_bin": 2,
         "retained_count": 1.0,
@@ -167,6 +171,45 @@ def test_stream_cache_fingerprint_synthesizes_layer_bands_from_legacy_rows(
         (row["layer_bin"], row["layer_label"]) for row in rows if row["role"] == "system"
     }
     assert observed_layers == {(0, "L00-L01"), (1, "L02-L03")}
+    assert {row["layer_source"] for row in rows} == {"legacy_row_order"}
+    assert {row["layer_source_label"] for row in rows} == {
+        "legacy row-order layer inference"
+    }
+
+
+@pytest.mark.skipif(
+    __import__("importlib").util.find_spec("pyarrow") is None,
+    reason="pyarrow is not installed in the base interpreter",
+)
+def test_stream_cache_fingerprint_marks_explicit_layer_source(tmp_path: Path) -> None:
+    import pandas as pd
+
+    cache_path = tmp_path / "cache_stats.parquet"
+    prompts_path = tmp_path / "prompts.jsonl"
+    prompts_path.write_text(
+        '{"prompt_id":"p1","rendered_prompt":{"token_roles":["system","user"]}}\n',
+        encoding="utf-8",
+    )
+    pd.DataFrame(
+        [
+            {
+                "prompt_id": "p1",
+                "policy": "sliding_window__budget1",
+                "decode_step": 0,
+                "original_seq_len": 2,
+                "layer": 3,
+                "layer_count": 4,
+                "retained_indices": "1",
+                "evicted_indices": "0",
+            }
+        ]
+    ).to_parquet(cache_path, index=False)
+
+    rows = _stream_cache_fingerprint(cache_path, prompts_path, bin_count=2)
+
+    assert {row["layer_label"] for row in rows} == {"L03"}
+    assert {row["layer_source"] for row in rows} == {"explicit_layer"}
+    assert {row["layer_source_label"] for row in rows} == {"explicit layer column"}
 
 
 def test_phase_portrait_rows_parse_policy_budgets() -> None:
@@ -390,6 +433,7 @@ def test_safety_state_atlas_combines_ssei_and_role_retention() -> None:
             "selective_safety_erasure_index": 0.4,
             "safety_degradation": 0.5,
             "capability_degradation": 0.1,
+            "retention_scope": "policy_global",
             "system_retention_fraction": 0.25,
             "user_retention_fraction": 0.75,
             "template_retention_fraction": None,

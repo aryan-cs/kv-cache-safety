@@ -532,7 +532,7 @@ def main() -> None:
                 ax.text(
                     0.99,
                     -0.18,
-                    "circle area: token-role cache loss; black=system, white=user",
+                    "circle area: global policy-level token-role cache loss; black=system, white=user",
                     transform=ax.transAxes,
                     ha="right",
                     va="top",
@@ -554,8 +554,14 @@ def main() -> None:
         )
         if fingerprint_rows:
             fingerprint_df = pd.DataFrame(fingerprint_rows)
+            fingerprint_df["row_source_suffix"] = fingerprint_df["layer_source_label"].map(
+                lambda label: "" if label == "explicit layer column" else f" [{label}]"
+            )
             fingerprint_df["row_label"] = (
-                fingerprint_df["policy"] + " / " + fingerprint_df["layer_label"]
+                fingerprint_df["policy"]
+                + " / "
+                + fingerprint_df["layer_label"]
+                + fingerprint_df["row_source_suffix"]
             )
             fingerprint_df["column_label"] = (
                 fingerprint_df["role"] + ":" + fingerprint_df["token_bin"].astype(str)
@@ -594,7 +600,7 @@ def main() -> None:
                 ax.axvline(boundary, color="white", linewidth=0.5, alpha=0.6)
             ax.set_yticks(range(len(pivot.index)), labels=pivot.index, fontsize=7)
             ax.set_xlabel("Token-role bands across normalized prompt-cache position")
-            ax.set_ylabel("Cache policy / layer band")
+            ax.set_ylabel("Cache policy / layer band (source annotated)")
             ax.set_title("Cache-State Fingerprint By Policy, Layer, Role, And Token Position")
             fig.colorbar(im, ax=ax, label="retained fraction")
             fig.tight_layout()
@@ -888,6 +894,7 @@ def _safety_state_atlas_rows(
                 else row.get("selective_safety_erasure_index"),
                 "safety_degradation": row.get("safety_degradation"),
                 "capability_degradation": row.get("capability_degradation"),
+                "retention_scope": "policy_global",
                 "system_retention_fraction": role_lookup.get((policy, "system")),
                 "user_retention_fraction": role_lookup.get((policy, "user")),
                 "template_retention_fraction": role_lookup.get((policy, "template")),
@@ -1010,7 +1017,9 @@ def _stream_cache_fingerprint(
     if not required.issubset(schema_names):
         return []
     optional = {"seed", "layer", "layer_count"} & schema_names
-    counts: dict[tuple[str, int, str, str, int], list[float]] = defaultdict(lambda: [0.0, 0.0])
+    counts: dict[tuple[str, int, str, str, str, str, int], list[float]] = defaultdict(
+        lambda: [0.0, 0.0]
+    )
     synthetic_layer_counters: dict[tuple[Any, ...], int] = defaultdict(int)
     columns = sorted(required | optional)
     for batch in parquet_file.iter_batches(columns=columns, batch_size=50_000):
@@ -1024,25 +1033,40 @@ def _stream_cache_fingerprint(
             if seq_len <= 0:
                 continue
             layer_count = max(1, int(_float_at(table, "layer_count", idx) or 1))
-            layer = _cache_stat_layer(table, idx, synthetic_layer_counters, layer_count=layer_count)
+            layer, layer_source = _cache_stat_layer(
+                table, idx, synthetic_layer_counters, layer_count=layer_count
+            )
             layer_bin, layer_label = _layer_band(layer, layer_count, layer_bin_count)
+            layer_source_label = _layer_source_label(layer_source)
             roles = prompt_roles.get(prompt_id, [])
             for token_idx in _parse_indices(table["retained_indices"][idx]):
                 role = _role_at(roles, token_idx)
                 token_bin = min(bin_count - 1, int((token_idx / seq_len) * bin_count))
-                counts[(policy, layer_bin, layer_label, role, token_bin)][0] += 1.0
+                counts[
+                    (policy, layer_bin, layer_label, layer_source, layer_source_label, role, token_bin)
+                ][0] += 1.0
             for token_idx in _parse_indices(table["evicted_indices"][idx]):
                 role = _role_at(roles, token_idx)
                 token_bin = min(bin_count - 1, int((token_idx / seq_len) * bin_count))
-                counts[(policy, layer_bin, layer_label, role, token_bin)][1] += 1.0
+                counts[
+                    (policy, layer_bin, layer_label, layer_source, layer_source_label, role, token_bin)
+                ][1] += 1.0
     rows = []
-    for (policy, layer_bin, layer_label, role, token_bin), (retained, evicted) in sorted(
+    for (
+        policy,
+        layer_bin,
+        layer_label,
+        layer_source,
+        layer_source_label,
+        role,
+        token_bin,
+    ), (retained, evicted) in sorted(
         counts.items(),
         key=lambda item: (
             item[0][0],
             item[0][1],
-            ROLE_ORDER.get(item[0][3], 99),
-            item[0][4],
+            ROLE_ORDER.get(item[0][5], 99),
+            item[0][6],
         ),
     ):
         total = retained + evicted
@@ -1053,6 +1077,8 @@ def _stream_cache_fingerprint(
                 "policy": policy,
                 "layer_bin": layer_bin,
                 "layer_label": layer_label,
+                "layer_source": layer_source,
+                "layer_source_label": layer_source_label,
                 "role": role,
                 "token_bin": token_bin,
                 "retained_count": retained,
@@ -1069,9 +1095,9 @@ def _cache_stat_layer(
     synthetic_layer_counters: dict[tuple[Any, ...], int],
     *,
     layer_count: int,
-) -> int:
+) -> tuple[int, str]:
     if "layer" in table:
-        return max(0, int(_float_at(table, "layer", idx)))
+        return max(0, int(_float_at(table, "layer", idx))), "explicit_layer"
     key = (
         table.get("prompt_id", [None])[idx],
         table.get("seed", [None] * (idx + 1))[idx] if "seed" in table else None,
@@ -1083,7 +1109,16 @@ def _cache_stat_layer(
     )
     layer = synthetic_layer_counters[key] % max(1, layer_count)
     synthetic_layer_counters[key] += 1
-    return layer
+    source = "legacy_row_order" if layer_count > 1 else "unlayered_cache_rows"
+    return layer, source
+
+
+def _layer_source_label(layer_source: str) -> str:
+    return {
+        "explicit_layer": "explicit layer column",
+        "legacy_row_order": "legacy row-order layer inference",
+        "unlayered_cache_rows": "unlayered cache rows",
+    }.get(layer_source, layer_source.replace("_", " "))
 
 
 def _layer_band(layer: int, layer_count: int, layer_bin_count: int) -> tuple[int, str]:
