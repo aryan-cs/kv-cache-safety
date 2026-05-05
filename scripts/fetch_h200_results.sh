@@ -13,7 +13,6 @@ compare_report="${H200_ARTIFACT_COMPARE_REPORT:-logs/h200/h200_artifact_manifest
 default_paths=(
   "results/h200_qwen_full_sweep"
   "results/h200_causal_patch_qwen7b"
-  "results/h200_attention_diagnostic_qwen7b_primary"
   "paper/audit/h200_qwen_full_sweep_audit_blinded.csv"
   "paper/audit/h200_qwen_full_sweep_audit_blinded_annotator_01.csv"
   "paper/audit/h200_qwen_full_sweep_audit_blinded_annotator_02.csv"
@@ -29,7 +28,6 @@ default_paths=(
 remote_generated_paths=(
   "paper/generated/h200_qwen_full_sweep"
   "paper/generated/h200_causal_patch_qwen7b"
-  "paper/generated/h200_attention_diagnostic_qwen7b"
   "paper/generated/preliminary_claim_assessment"
   "paper/generated/preliminary_followup_plan"
   "paper/generated/post_h200_next_steps.json"
@@ -64,6 +62,14 @@ done
 
 mkdir -p "$local_log_dir"
 
+fetch_with_tar() {
+  local path="$1"
+  local local_path="$2"
+  rm -rf "$local_path"
+  mkdir -p "$(dirname "$local_path")"
+  ssh -n "$host" "cd '$remote_dir' && tar -cf - '$path'" | tar -xf -
+}
+
 remote_manifest_cmd=(uv run python scripts/write_artifact_manifest.py)
 local_manifest_cmd=(uv run python scripts/write_artifact_manifest.py)
 for path in "${paths[@]}"; do
@@ -81,11 +87,19 @@ for path in "${paths[@]}"; do
   remote_path="${remote_dir}/${path}"
   local_path="$path"
   if ssh -n "$host" "test -d '$remote_path'"; then
-    mkdir -p "$local_path"
-    rsync -az --checksum --delete "${host}:${remote_path}/" "${local_path}/"
+    if command -v rsync >/dev/null 2>&1; then
+      mkdir -p "$local_path"
+      rsync -az --checksum --delete "${host}:${remote_path}/" "${local_path}/"
+    else
+      fetch_with_tar "$path" "$local_path"
+    fi
   elif ssh -n "$host" "test -f '$remote_path'"; then
-    mkdir -p "$(dirname "$local_path")"
-    rsync -az --checksum "${host}:${remote_path}" "$local_path"
+    if command -v rsync >/dev/null 2>&1; then
+      mkdir -p "$(dirname "$local_path")"
+      rsync -az --checksum "${host}:${remote_path}" "$local_path"
+    else
+      fetch_with_tar "$path" "$local_path"
+    fi
   else
     echo "Missing requested remote artifact path: $remote_path" >&2
     exit 1

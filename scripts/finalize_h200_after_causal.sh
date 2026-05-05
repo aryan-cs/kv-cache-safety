@@ -3,6 +3,14 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
+repo_dir="$(pwd -P)"
+expected_h200_dir="${H200_WORKDIR:-/home/aryang9/sandbox/llm-safety}"
+if [[ "${ALLOW_LOCAL_H200_FINALIZER:-0}" != "1" && "$repo_dir" != "$expected_h200_dir" ]]; then
+  echo "Refusing to run H200 post-causal finalization outside ${expected_h200_dir}: ${repo_dir}" >&2
+  echo "On a local checkout, fetch H200 artifacts and run scripts/build_publication_artifacts.sh instead." >&2
+  exit 1
+fi
+
 export TOKENIZERS_PARALLELISM=false
 export PYTORCH_CUDA_ALLOC_CONF="${PYTORCH_CUDA_ALLOC_CONF:-expandable_segments:True}"
 export HF_HOME="${HF_HOME:-$(pwd)/.cache/huggingface}"
@@ -90,7 +98,7 @@ require_completed_generation_matrix() {
       exit 1
     fi
   done
-  expected="$(python3 - "$results_dir/manifest.json" <<'PY'
+  expected="$(uv run python - "$results_dir/manifest.json" <<'PY'
 import json, sys
 with open(sys.argv[1], encoding="utf-8") as f:
     print(json.load(f).get("expected_generation_count", ""))
@@ -238,8 +246,8 @@ write_audit_supported_claims() {
   local primary_audit="$primary_audit_summary/human_audit_summary.json"
   local causal_audit="$causal_audit_summary/human_audit_summary.json"
   if [[ ! -f "$primary_audit" || ! -f "$causal_audit" ]]; then
-    echo "Audit summaries are not present; skipping audit-supported claim assessment."
-    return
+    echo "Audit summaries are not present after aggregation; cannot assess publication claims." >&2
+    exit 1
   fi
   if ! uv run python scripts/assess_claims.py \
     --primary-results-dir "$primary_results" \
@@ -265,6 +273,22 @@ write_audit_supported_claims() {
     --output-dir paper/generated/registered_followup_plan
 }
 
+aggregate_existing_audits_if_needed() {
+  local primary_audit="$primary_audit_summary/human_audit_summary.json"
+  local causal_audit="$causal_audit_summary/human_audit_summary.json"
+  if [[ -f "$primary_audit" && -f "$causal_audit" ]]; then
+    return
+  fi
+  PRIMARY_RUN_ID="$primary_run_id" \
+  CAUSAL_RUN_ID="$causal_run_id" \
+  PRIMARY_RESULTS_DIR="$primary_results" \
+  CAUSAL_RESULTS_DIR="$causal_results" \
+  PRIMARY_AUDIT_SUMMARY_DIR="$primary_audit_summary" \
+  CAUSAL_AUDIT_SUMMARY_DIR="$causal_audit_summary" \
+  AUDIT_SOURCE="${AUDIT_SOURCE:-auto}" \
+  bash scripts/aggregate_publication_human_audits.sh
+}
+
 run_publication_artifact_build() {
   PRIMARY_RESULTS_DIR="$primary_results" \
   CAUSAL_RESULTS_DIR="$causal_results" \
@@ -273,6 +297,7 @@ run_publication_artifact_build() {
   PRIMARY_AUDIT_SUMMARY_DIR="$primary_audit_summary" \
   CAUSAL_AUDIT_SUMMARY_DIR="$causal_audit_summary" \
   CLAIM_GENERATED_DIR="$claim_generated" \
+  REQUIRE_H200_FETCH_MANIFEST=0 \
   bash scripts/build_publication_artifacts.sh
 }
 
@@ -308,6 +333,7 @@ if [[ "$run_open_judge_audit" == "1" ]]; then
   bash scripts/aggregate_publication_human_audits.sh
 fi
 
+aggregate_existing_audits_if_needed
 write_audit_supported_claims
 
 uv run python scripts/post_h200_next_steps.py \

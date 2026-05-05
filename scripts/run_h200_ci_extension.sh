@@ -9,12 +9,28 @@ export HF_HOME="${HF_HOME:-$(pwd)/.cache/huggingface}"
 export HF_HUB_CACHE="${HF_HUB_CACHE:-$HF_HOME/hub}"
 export TRANSFORMERS_CACHE="${TRANSFORMERS_CACHE:-$HF_HOME/transformers}"
 export TORCH_HOME="${TORCH_HOME:-$(pwd)/.cache/torch}"
+branch="${BRANCH:-master}"
 
 if [[ -n "$(git status --short)" ]]; then
   echo "Refusing to run H200 CI extension from a dirty git working tree." >&2
   echo "Commit or stash local changes so generated artifacts point to an exact commit." >&2
   exit 1
 fi
+
+require_current_origin_head() {
+  git fetch origin "$branch"
+  local head
+  local origin_head
+  head="$(git rev-parse HEAD)"
+  origin_head="$(git rev-parse "origin/$branch")"
+  if [[ "$head" != "$origin_head" ]]; then
+    echo "Refusing to run H200 CI extension from a stale checkout: HEAD=${head}, origin/${branch}=${origin_head}." >&2
+    echo "Use scripts/wait_and_run_h200_sweep.sh or fast-forward to origin/${branch} first." >&2
+    exit 1
+  fi
+}
+
+require_current_origin_head
 
 uv sync --frozen --extra dev
 

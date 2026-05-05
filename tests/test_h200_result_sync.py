@@ -58,6 +58,7 @@ def test_fetch_h200_results_script_is_guarded_and_checksum_verified() -> None:
     assert "results/*|paper/generated/*|paper/audit/*" in script
     default_block = script.split("remote_generated_paths=", maxsplit=1)[0]
     assert "paper/generated/h200_qwen_full_sweep" not in default_block
+    assert "h200_attention_diagnostic_qwen7b" not in default_block
     assert "FETCH_H200_REMOTE_GENERATED" in script
     assert "paper/generated/preliminary_claim_assessment" in script
     assert "paper/generated/claim_assessment" not in script
@@ -69,6 +70,8 @@ def test_fetch_h200_results_script_is_guarded_and_checksum_verified() -> None:
     assert "h200_causal_patch_qwen7b_audit_blinded_annotator_01.csv" in script
     assert "h200_causal_patch_qwen7b_audit_blinded_annotator_02.csv" in script
     assert "rsync -az --checksum" in script
+    assert "fetch_with_tar" in script
+    assert "tar -cf -" in script
     assert "scripts/write_artifact_manifest.py" in script
     assert "scripts/compare_artifact_manifests.py" in script
     assert "git pull" not in script

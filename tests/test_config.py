@@ -322,6 +322,8 @@ def test_publication_artifact_builder_fails_without_real_results() -> None:
     assert 'H200_FETCH_MANIFEST:-logs/h200/h200_artifact_manifest_local.json' in script
     assert 'H200_FETCH_REMOTE_MANIFEST:-logs/h200/h200_artifact_manifest_remote.json' in script
     assert 'H200_FETCH_COMPARE_REPORT:-logs/h200/h200_artifact_manifest_compare.json' in script
+    assert 'REQUIRE_H200_FETCH_MANIFEST:-1' in script
+    assert "Skipping H200 fetch-manifest check because artifacts are being built on the H200 source checkout." in script
     assert '--required-path "$primary_results"' in script
     assert '--required-path "$causal_results"' in script
     assert "require_result_artifacts" in script
@@ -443,7 +445,13 @@ def test_evidence_gated_paper_builder_allows_nonpassing_claim_pdf() -> None:
     assert "--require-arxiv-bundle" in script
     assert "--require-recomputed-output" in script
     assert "build_evidence_gated_paper_artifacts.sh" in finalizer
+    assert "ALLOW_LOCAL_H200_FINALIZER:-0" in finalizer
+    assert "Refusing to run H200 post-causal finalization outside" in finalizer
+    assert 'expected="$(uv run python - "$results_dir/manifest.json"' in finalizer
+    assert "aggregate_existing_audits_if_needed" in finalizer
+    assert "Audit summaries are not present after aggregation; cannot assess publication claims." in finalizer
     assert "AUDIT_SOURCE=open_judge \\" in finalizer
+    assert 'AUDIT_SOURCE="${AUDIT_SOURCE:-auto}" \\' in finalizer
     assert "PRIMARY_RUN_ID=\"$primary_run_id\"" in finalizer
     assert "PRIMARY_AUDIT_SUMMARY_DIR=\"$primary_audit_summary\"" in finalizer
     assert "FINALIZER_ALLOW_WIDE_CI:-0" in finalizer
@@ -452,6 +460,7 @@ def test_evidence_gated_paper_builder_allows_nonpassing_claim_pdf() -> None:
     assert "scripts/wait_and_run_h200_sweep.sh" in finalizer
     assert "use_merged_primary_evidence" in finalizer
     assert "MERGED_PRIMARY_RUN_ID=\"$merged_primary_run_id\"" in finalizer
+    assert "REQUIRE_H200_FETCH_MANIFEST=0" in finalizer
     assert '--primary-generated-dir "$primary_generated"' in finalizer
     assert '--causal-generated-dir "$causal_generated"' in finalizer
     assert "ALLOW_EVIDENCE_GATED_FALLBACK:-0" in finalizer
@@ -473,6 +482,8 @@ def test_h200_scripts_use_composite_public_refusal_suite() -> None:
     assert "--suite public_refusal_ci_extension" in extension
     assert "--suite public_refusal_combo" not in extension
     assert "--suite advbench" not in extension
+    assert "require_current_origin_head" in extension
+    assert "Refusing to run H200 CI extension from a stale checkout" in extension
 
 
 def test_patch_policy_label_includes_components() -> None:

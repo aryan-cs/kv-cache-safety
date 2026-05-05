@@ -23,6 +23,7 @@ fetch_manifest="${H200_FETCH_MANIFEST:-logs/h200/h200_artifact_manifest_local.js
 fetch_remote_manifest="${H200_FETCH_REMOTE_MANIFEST:-logs/h200/h200_artifact_manifest_remote.json}"
 fetch_compare_report="${H200_FETCH_COMPARE_REPORT:-logs/h200/h200_artifact_manifest_compare.json}"
 branch="${BRANCH:-master}"
+require_h200_fetch_manifest="${REQUIRE_H200_FETCH_MANIFEST:-1}"
 qwen32_package_args=()
 
 if [[ -n "$(git status --short)" ]]; then
@@ -47,12 +48,19 @@ require_current_origin_head() {
 
 require_current_origin_head
 
-uv run python scripts/check_h200_fetch_manifest.py \
-  --remote-manifest "$fetch_remote_manifest" \
-  --local-manifest "$fetch_manifest" \
-  --compare-report "$fetch_compare_report" \
-  --required-path "$primary_results" \
-  --required-path "$causal_results"
+if [[ "$require_h200_fetch_manifest" == "1" ]]; then
+  uv run python scripts/check_h200_fetch_manifest.py \
+    --remote-manifest "$fetch_remote_manifest" \
+    --local-manifest "$fetch_manifest" \
+    --compare-report "$fetch_compare_report" \
+    --required-path "$primary_results" \
+    --required-path "$causal_results"
+elif [[ "$require_h200_fetch_manifest" != "0" ]]; then
+  echo "Invalid REQUIRE_H200_FETCH_MANIFEST=${require_h200_fetch_manifest}; expected 0 or 1." >&2
+  exit 1
+else
+  echo "Skipping H200 fetch-manifest check because artifacts are being built on the H200 source checkout."
+fi
 
 clear_stale_publication_pdfs() {
   rm -f \
