@@ -46,7 +46,7 @@ def test_latex_manuscript_is_formal_registered_protocol() -> None:
     assert "../generated/active_primary/result_macros.tex" in tex
     assert "../generated/active_causal/result_macros.tex" in tex
     assert "../generated/claim_assessment/abstract_status_sentence.tex" in tex
-    assert "Empirical result not yet reported" in tex
+    assert "Evidence gate not satisfied" in tex
     assert r"\maybeinputtable{../generated/active_primary/main_results_table.tex}" in tex
     assert r"\maybeinputtable{../generated/claim_assessment/claim_assessment_table.tex}" in tex
     assert r"\maybeinputtable{../generated/claim_assessment/claim_interpretation.tex}" in tex
