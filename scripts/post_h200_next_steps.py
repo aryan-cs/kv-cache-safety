@@ -222,12 +222,14 @@ def post_h200_next_steps(status: dict[str, Any]) -> dict[str, Any]:
             ready=fetched_evidence_prepared and ci_width_blocked,
             command=(
                 f"PRIMARY_RESULTS_DIR={_q(primary_results_path)} "
-                "bash scripts/run_h200_ci_extension.sh"
+                "SWEEP_SCRIPT=scripts/run_h200_ci_extension.sh "
+                "bash scripts/wait_and_run_h200_sweep.sh"
             ),
             detail=(
-                "Run the registered CI extension before publication if completed result artifacts "
-                "are otherwise valid but confidence intervals exceed the configured width gate. "
-                "Do not change thresholds or claim wording to bypass this gate."
+                "Run the registered CI extension through the guarded H200 launcher before "
+                "publication if completed result artifacts are otherwise valid but confidence "
+                "intervals exceed the configured width gate. Do not change thresholds or "
+                "claim wording to bypass this gate."
             ),
         ),
         _step(

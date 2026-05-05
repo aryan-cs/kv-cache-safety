@@ -280,6 +280,7 @@ def test_post_h200_next_steps_routes_wide_ci_to_registered_extension() -> None:
     assert report["steps"][2]["state"] == "ready"
     assert report["steps"][3]["state"] == "blocked"
     assert "run_h200_ci_extension.sh" in rendered
+    assert "wait_and_run_h200_sweep.sh" in rendered
 
 
 def test_post_h200_next_steps_surfaces_artifact_specific_blockers() -> None:

@@ -139,10 +139,11 @@ uv run python scripts/package_h200_support_bundle.py \
 Run the prompt-count extension for narrower confidence intervals after the primary pilot identifies viable effects:
 
 ```bash
-bash scripts/run_h200_ci_extension.sh
+SWEEP_SCRIPT=scripts/run_h200_ci_extension.sh \
+bash scripts/wait_and_run_h200_sweep.sh
 ```
 
-The CI extension uses `CI_PROMPT_LIMIT=650` by default and focuses on fewer policies so prompt-cluster counts, not repeated deterministic seeds, do the statistical work. Override with `CI_PROMPT_LIMIT=<n>` or `TARGET_CI_WIDTH=<width>` if needed.
+The CI extension uses `CI_PROMPT_LIMIT=650` by default and focuses on fewer policies so prompt-cluster counts, not repeated deterministic seeds, do the statistical work. Run it through the guarded launcher so the H200 checkout syncs `master`, revalidates after the GPU gate, and holds the launcher lock. Override with `CI_PROMPT_LIMIT=<n>` or `TARGET_CI_WIDTH=<width>` if needed.
 
 Initialize or update the H200 checkout under the authorized notebook folder:
 

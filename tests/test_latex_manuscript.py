@@ -9,6 +9,7 @@ sys.path.insert(0, str(Path("scripts").resolve()))
 
 from check_final_pdf_text import forbidden_final_prose_failures, placeholder_text_failures
 from check_latex_placeholders import missing_placeholder_artifacts, placeholder_artifact_failures
+from export_paper_assets import export_paper_assets
 from package_arxiv_submission import (
     GENERATED_DIRS,
     OPTIONAL_GENERATED_DIRS,
@@ -461,6 +462,63 @@ def test_active_paper_asset_sync_strict_rejects_stale_generated_sources(
     )
 
 
+def test_active_paper_asset_sync_strict_recomputes_generated_tables(
+    tmp_path: Path,
+) -> None:
+    primary_results = tmp_path / "results" / "merged_primary"
+    causal_results = tmp_path / "results" / "causal"
+    primary_generated = tmp_path / "generated" / "merged_primary"
+    causal_generated = tmp_path / "generated" / "causal"
+    active_primary = tmp_path / "generated" / "active_primary"
+    active_causal = tmp_path / "generated" / "active_causal"
+    _write_active_sync_fixture(
+        primary_results,
+        primary_generated,
+        generated_names=[
+            "result_macros.tex",
+            "main_results_table.tex",
+            "suite_level_effects_table.tex",
+        ],
+        figure_names=[
+            "safety_capability_phase_portrait.pdf",
+            "selective_safety_erasure_heatmap.pdf",
+            "prompt_effect_constellation.pdf",
+            "cache_state_fingerprint.pdf",
+            "safety_state_atlas.pdf",
+            "policy_uncertainty_braid.pdf",
+        ],
+    )
+    _write_active_sync_fixture(
+        causal_results,
+        causal_generated,
+        generated_names=["result_macros.tex", "causal_restoration_table.tex"],
+        figure_names=["causal_restoration_fraction.pdf", "causal_restoration_flow.pdf"],
+    )
+    stale_table = primary_generated / "main_results_table.tex"
+    stale_table.write_text("internally hash-consistent but stale table\n", encoding="utf-8")
+    manifest_path = primary_generated / "artifact_manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["tables"]["main_results_table.tex"]["sha256"] = _sha256(stale_table)
+    manifest["tables"]["main_results_table.tex"]["bytes"] = stale_table.stat().st_size
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    failures = sync_active_paper_assets(
+        primary_results_dir=primary_results,
+        causal_results_dir=causal_results,
+        primary_generated_dir=primary_generated,
+        causal_generated_dir=causal_generated,
+        active_primary_dir=active_primary,
+        active_causal_dir=active_causal,
+        validate_sources=True,
+    )
+
+    assert (
+        "primary:paper artifact generated output `main_results_table.tex` differs from metrics export"
+        in failures
+    )
+    assert not active_primary.exists()
+
+
 def test_active_paper_asset_sync_strict_requires_manifest_pinned_tables_and_figures(
     tmp_path: Path,
 ) -> None:
@@ -546,9 +604,8 @@ def _write_active_sync_fixture(
         '{"git_commit": "run-commit", "git_dirty": false}\n',
         encoding="utf-8",
     )
-    (results_dir / "metrics.json").write_text('{"ok": true}\n', encoding="utf-8")
-    for name in generated_names:
-        (generated_dir / name).write_text(f"{name}\n", encoding="utf-8")
+    metrics = _active_sync_metrics(causal="causal" in generated_dir.name)
+    (results_dir / "metrics.json").write_text(json.dumps(metrics), encoding="utf-8")
     for name in figure_names:
         (results_dir / "figures" / name).write_bytes(
             b"%PDF-1.7\n1 0 obj\n<<>>\nendobj\ntrailer\n<<>>\n%%EOF\n"
@@ -567,34 +624,73 @@ def _write_active_sync_fixture(
         json.dumps(figure_manifest),
         encoding="utf-8",
     )
-    artifact_manifest = {
-        "schema_version": 1,
-        "results_dir": str(results_dir),
-        "source_run_git_commit": "run-commit",
-        "source_run_git_dirty": False,
-        "analysis_git_commit": "analysis-commit",
-        "analysis_git_dirty": False,
-        "tables": {
-            name: {
-                "path": str(generated_dir / name),
-                "sha256": _sha256(generated_dir / name),
-                "bytes": (generated_dir / name).stat().st_size,
-            }
-            for name in generated_names
-        },
-        "source_artifacts": {
-            name: {
-                "path": str(results_dir / name),
-                "sha256": _sha256(results_dir / name),
-                "bytes": (results_dir / name).stat().st_size,
-            }
-            for name in ["manifest.json", "metrics.json", "figures/manifest.json"]
-        },
-    }
+    export_paper_assets(
+        results_dir,
+        generated_dir,
+        macro_prefix="Causal" if "causal" in generated_dir.name else "Primary",
+    )
+    artifact_manifest = json.loads(
+        (generated_dir / "artifact_manifest.json").read_text(encoding="utf-8")
+    )
+    artifact_manifest["analysis_git_commit"] = "analysis-commit"
+    artifact_manifest["analysis_git_dirty"] = False
+    artifact_manifest["analysis_git_status_short"] = ""
     (generated_dir / "artifact_manifest.json").write_text(
         json.dumps(artifact_manifest),
         encoding="utf-8",
     )
+
+
+def _active_sync_metrics(*, causal: bool) -> dict:
+    if causal:
+        return {
+            "causal_restoration": {
+                "public_refusal_safety::kv_int4_sim__patchkey-value__rolesystem": {
+                    "compressed_policy": "kv_int4_sim",
+                    "safety_restoration_fraction": 0.62,
+                    "safety_restoration_fraction_ci": {"ci_low": 0.56, "ci_high": 0.67},
+                    "refusal_restoration_fraction": 0.55,
+                    "refusal_restoration_fraction_ci": {"ci_low": 0.50, "ci_high": 0.60},
+                }
+            }
+        }
+    return {
+        "publication_summary": {
+            "policies": {
+                "kv_int4_sim": {
+                    "mean_safety_score": 0.72,
+                    "mean_capability_score": 0.88,
+                    "global_safety_degradation": 0.14,
+                    "global_capability_degradation": 0.03,
+                    "global_selective_safety_erasure_index": 0.11,
+                }
+            }
+        },
+        "policy_level_contrasts": {
+            "kv_int4_sim": {
+                "selective_safety_erasure_index": 0.11,
+                "selective_safety_erasure_index_ci": {
+                    "ci_low": 0.08,
+                    "ci_high": 0.14,
+                    "n_safety": 650,
+                    "n_capability": 650,
+                },
+            }
+        },
+        "selective_safety_erasure": {
+            "public_refusal_safety::kv_int4_sim": {
+                "safety_degradation": 0.14,
+                "capability_degradation": 0.03,
+                "selective_safety_erasure_index": 0.11,
+                "paired_safety_degradation_ci": {
+                    "paired_n": 650,
+                    "cluster_n": 650,
+                    "ci_low": 0.08,
+                    "ci_high": 0.14,
+                },
+            }
+        },
+    }
 
 
 def _write_active_sync_audit_fixture(audit_dir: Path) -> None:

@@ -135,7 +135,8 @@ maybe_run_ci_extension_for_primary() {
   MERGED_PRIMARY_RUN_ID="$merged_primary_run_id" \
   TARGET_CI_WIDTH="$target_ci_width" \
   AUDIT_ANNOTATOR_TEMPLATE_COUNT="$audit_annotator_template_count" \
-  bash scripts/run_h200_ci_extension.sh
+  SWEEP_SCRIPT=scripts/run_h200_ci_extension.sh \
+  bash scripts/wait_and_run_h200_sweep.sh
   use_merged_primary_evidence
   return 0
 }

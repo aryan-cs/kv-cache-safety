@@ -415,6 +415,7 @@ def test_evidence_gated_paper_builder_allows_nonpassing_claim_pdf() -> None:
     assert "FINALIZER_ALLOW_WIDE_CI:-0" in finalizer
     assert "RUN_CI_EXTENSION_IF_NEEDED:-1" in finalizer
     assert "scripts/run_h200_ci_extension.sh" in finalizer
+    assert "scripts/wait_and_run_h200_sweep.sh" in finalizer
     assert "use_merged_primary_evidence" in finalizer
     assert "MERGED_PRIMARY_RUN_ID=\"$merged_primary_run_id\"" in finalizer
     assert '--primary-generated-dir "$primary_generated"' in finalizer

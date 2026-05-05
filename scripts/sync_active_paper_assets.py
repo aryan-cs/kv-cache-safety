@@ -220,6 +220,7 @@ def _active_source_failures(
             generated_dir,
             results_dir,
             required_tables=generated_files,
+            require_recomputed_output=True,
         )
     ]
     artifact_manifest = _read_json(generated_dir / "artifact_manifest.json")
