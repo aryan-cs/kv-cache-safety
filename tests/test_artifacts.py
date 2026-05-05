@@ -458,6 +458,36 @@ def test_paper_asset_freshness_recompute_infers_causal_macro_prefix(tmp_path: Pa
     )
 
 
+def test_paper_asset_freshness_recompute_fails_without_parseable_macro_prefix(
+    tmp_path: Path,
+) -> None:
+    import sys
+
+    sys.path.insert(0, str(Path("scripts").resolve()))
+    from check_paper_asset_freshness import check_paper_asset_freshness
+    from export_paper_assets import TABLE_FILES, export_paper_assets
+
+    results_dir = tmp_path / "results" / "legacy_generated_run"
+    paper_dir = tmp_path / "paper" / "generated" / "legacy_generated_run"
+    _write_paper_asset_export_fixture(results_dir)
+    export_paper_assets(results_dir, paper_dir, "Primary")
+    _mark_clean_export_manifest(paper_dir, drop_macro_prefix=True)
+    (paper_dir / "result_macros.tex").write_text(
+        "% legacy malformed macros without a RunId declaration\n",
+        encoding="utf-8",
+    )
+    _refresh_manifest_table_hash(paper_dir, "result_macros.tex")
+
+    failures = check_paper_asset_freshness(
+        paper_dir,
+        results_dir,
+        required_tables=TABLE_FILES,
+        require_recomputed_output=True,
+    )
+
+    assert any("cannot infer macro prefix from result_macros.tex" in failure for failure in failures)
+
+
 def test_paper_asset_freshness_recompute_catches_metrics_after_source_refresh(
     tmp_path: Path,
 ) -> None:

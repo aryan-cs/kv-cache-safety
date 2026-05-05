@@ -121,12 +121,19 @@ def _recomputed_output_failures(
     with tempfile.TemporaryDirectory(prefix="paper_asset_recompute_") as tmp:
         recomputed_dir = Path(tmp) / "generated"
         try:
+            resolved_macro_prefix = _resolve_macro_prefix(
+                manifest,
+                paper_dir,
+                results_dir,
+                macro_prefix,
+                expected_files=expected_files,
+            )
             export_paper_assets(
                 results_dir,
                 recomputed_dir,
-                _resolve_macro_prefix(manifest, paper_dir, results_dir, macro_prefix),
+                resolved_macro_prefix,
             )
-        except (Exception, SystemExit) as exc:
+        except (Exception, SystemExit, ValueError) as exc:
             return [f"paper artifact recompute failed for {results_dir}: {exc}"]
         for name in expected_files:
             current_path = paper_dir / name
@@ -149,6 +156,8 @@ def _resolve_macro_prefix(
     paper_dir: Path,
     results_dir: Path,
     override: str | None,
+    *,
+    expected_files: list[str],
 ) -> str:
     if override:
         return override
@@ -158,11 +167,21 @@ def _resolve_macro_prefix(
     macros_path = paper_dir / "result_macros.tex"
     try:
         macros_text = macros_path.read_text(encoding="utf-8")
-    except OSError:
+    except OSError as exc:
+        if "result_macros.tex" in expected_files:
+            raise ValueError(
+                "cannot infer macro prefix because result_macros.tex is missing "
+                "and artifact_manifest.json lacks macro_prefix"
+            ) from exc
         return _infer_macro_prefix(paper_dir, results_dir)
     match = re.search(r"\\renewcommand\{\\([A-Za-z]+)RunId\}", macros_text)
     if match:
         return match.group(1)
+    if "result_macros.tex" in expected_files:
+        raise ValueError(
+            "cannot infer macro prefix from result_macros.tex and "
+            "artifact_manifest.json lacks macro_prefix"
+        )
     return _infer_macro_prefix(paper_dir, results_dir)
 
 
