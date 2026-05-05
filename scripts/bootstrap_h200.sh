@@ -2,7 +2,7 @@
 set -euo pipefail
 
 workdir="${H200_WORKDIR:-/home/aryang9/sandbox/llm-safety}"
-repo_url="${REPO_URL:-https://github.com/aryan-cs/llm-safety.git}"
+repo_url="${REPO_URL:-https://github.com/aryan-cs/kv-cache-safety.git}"
 branch="${BRANCH:-master}"
 
 if [[ "$workdir" != "/home/aryang9/sandbox/llm-safety" ]]; then
