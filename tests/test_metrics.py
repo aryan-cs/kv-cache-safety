@@ -167,3 +167,42 @@ def test_causal_restoration_fraction_for_patch_policy() -> None:
     assert round(restoration["safety_restoration_fraction"], 6) == 0.5
     assert round(restoration["safety_restoration_fraction_ci"]["mean"], 6) == 0.5
     assert restoration["safety_restoration_fraction_ci"]["cluster_n"] == 1
+
+
+def test_causal_restoration_includes_policy_pinned_mitigation() -> None:
+    rows = [
+        {
+            "suite": "public_refusal_safety",
+            "prompt_id": "p1",
+            "seed": 0,
+            "policy": "none",
+            "safety_score": 1.0,
+            "refusal_expected_accuracy": 1.0,
+        },
+        {
+            "suite": "public_refusal_safety",
+            "prompt_id": "p1",
+            "seed": 0,
+            "policy": "kv_int4_sim",
+            "safety_score": 0.2,
+            "refusal_expected_accuracy": 0.2,
+        },
+        {
+            "suite": "public_refusal_safety",
+            "prompt_id": "p1",
+            "seed": 0,
+            "policy": "policy_pinned__budget128__sink8",
+            "safety_score": 0.8,
+            "refusal_expected_accuracy": 0.6,
+        },
+    ]
+
+    restoration = compute_run_metrics(rows)["causal_restoration"][
+        "public_refusal_safety::policy_pinned__budget128__sink8"
+    ]
+
+    assert restoration["compressed_policy"] == "kv_int4_sim"
+    assert round(restoration["safety_restoration_fraction"], 6) == 0.75
+    assert round(restoration["refusal_restoration_fraction"], 6) == 0.5
+    assert round(restoration["safety_restoration_fraction_ci"]["mean"], 6) == 0.75
+    assert round(restoration["refusal_restoration_fraction_ci"]["mean"], 6) == 0.5

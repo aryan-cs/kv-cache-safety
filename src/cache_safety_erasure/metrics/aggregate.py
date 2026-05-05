@@ -286,38 +286,80 @@ def _causal_restoration(
         if "__patch" not in policy:
             continue
         compressed_policy = policy.split("__patch", 1)[0]
-        baseline_values = by_suite_policy.get(f"{suite}::none")
-        compressed_values = by_suite_policy.get(f"{suite}::{compressed_policy}")
-        if not baseline_values or not compressed_values:
+        row = _causal_restoration_row(
+            by_suite_policy, rows, suite, compressed_policy, policy, patched_values
+        )
+        if row is not None:
+            restoration[key] = row
+    for key, pinned_values in by_suite_policy.items():
+        suite, policy = key.split("::", 1)
+        if not policy.startswith("policy_pinned"):
             continue
-        restoration[key] = {
-            "compressed_policy": compressed_policy,
-            "safety_restoration_fraction": _restoration_fraction(
-                baseline_values.get("safety_score"),
-                compressed_values.get("safety_score"),
-                patched_values.get("safety_score"),
-            ),
-            "safety_restoration_fraction_ci": _restoration_fraction_ci(
-                rows, suite, compressed_policy, policy, "safety_score"
-            ),
-            "refusal_restoration_fraction": _restoration_fraction(
-                baseline_values.get("refusal_expected_accuracy"),
-                compressed_values.get("refusal_expected_accuracy"),
-                patched_values.get("refusal_expected_accuracy"),
-            ),
-            "refusal_restoration_fraction_ci": _restoration_fraction_ci(
-                rows, suite, compressed_policy, policy, "refusal_expected_accuracy"
-            ),
-            "leakage_avoidance_restoration_fraction": _restoration_fraction(
-                baseline_values.get("leakage_avoidance_score"),
-                compressed_values.get("leakage_avoidance_score"),
-                patched_values.get("leakage_avoidance_score"),
-            ),
-            "leakage_avoidance_restoration_fraction_ci": _restoration_fraction_ci(
-                rows, suite, compressed_policy, policy, "leakage_avoidance_score"
-            ),
-        }
+        compressed_policy = _default_compressed_policy_for_mitigation(by_suite_policy, suite)
+        if compressed_policy is None:
+            continue
+        row = _causal_restoration_row(
+            by_suite_policy, rows, suite, compressed_policy, policy, pinned_values
+        )
+        if row is not None:
+            restoration[key] = row
     return restoration
+
+
+def _causal_restoration_row(
+    by_suite_policy: dict[str, dict[str, Any]],
+    rows: list[dict[str, Any]],
+    suite: str,
+    compressed_policy: str,
+    restored_policy: str,
+    restored_values: dict[str, Any],
+) -> dict[str, Any] | None:
+    baseline_values = by_suite_policy.get(f"{suite}::none")
+    compressed_values = by_suite_policy.get(f"{suite}::{compressed_policy}")
+    if not baseline_values or not compressed_values:
+        return None
+    return {
+        "compressed_policy": compressed_policy,
+        "safety_restoration_fraction": _restoration_fraction(
+            baseline_values.get("safety_score"),
+            compressed_values.get("safety_score"),
+            restored_values.get("safety_score"),
+        ),
+        "safety_restoration_fraction_ci": _restoration_fraction_ci(
+            rows, suite, compressed_policy, restored_policy, "safety_score"
+        ),
+        "refusal_restoration_fraction": _restoration_fraction(
+            baseline_values.get("refusal_expected_accuracy"),
+            compressed_values.get("refusal_expected_accuracy"),
+            restored_values.get("refusal_expected_accuracy"),
+        ),
+        "refusal_restoration_fraction_ci": _restoration_fraction_ci(
+            rows, suite, compressed_policy, restored_policy, "refusal_expected_accuracy"
+        ),
+        "leakage_avoidance_restoration_fraction": _restoration_fraction(
+            baseline_values.get("leakage_avoidance_score"),
+            compressed_values.get("leakage_avoidance_score"),
+            restored_values.get("leakage_avoidance_score"),
+        ),
+        "leakage_avoidance_restoration_fraction_ci": _restoration_fraction_ci(
+            rows, suite, compressed_policy, restored_policy, "leakage_avoidance_score"
+        ),
+    }
+
+
+def _default_compressed_policy_for_mitigation(
+    by_suite_policy: dict[str, dict[str, Any]], suite: str
+) -> str | None:
+    if f"{suite}::kv_int4_sim" in by_suite_policy:
+        return "kv_int4_sim"
+    compressed_candidates = []
+    for key in by_suite_policy:
+        key_suite, policy = key.split("::", 1)
+        if key_suite != suite or policy == "none" or policy.startswith("policy_pinned"):
+            continue
+        compressed_candidates.append(policy)
+    compressed_candidates.sort()
+    return compressed_candidates[0] if compressed_candidates else None
 
 
 def _restoration_fraction(
