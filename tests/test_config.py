@@ -439,6 +439,7 @@ def test_complete_paper_build_checks_publication_status_before_latex() -> None:
     assert script.rindex("scripts/report_publication_status.py") < script.index(copy_cmd)
     assert "require_valid_pdf paper/cache_mediated_safety_erasure.pdf" in script
     assert "cd \"$src_dir\"\n    latexmk" in script
+    assert "cd \"$build_dir\"\n    bibtex main" in script
 
 
 def test_evidence_gated_paper_builder_allows_nonpassing_claim_pdf() -> None:
