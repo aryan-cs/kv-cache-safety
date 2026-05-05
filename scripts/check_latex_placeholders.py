@@ -5,6 +5,7 @@ import re
 from pathlib import Path
 
 from check_final_pdf_text import forbidden_final_prose_failures
+from check_publication_readiness import _pdf_stream_visual_failure
 
 PLACEHOLDER_PATTERNS = [
     re.compile(r"\\maybeincludegraphic\{([^{}]+)\}"),
@@ -161,6 +162,8 @@ def _is_pdf(path: Path) -> bool:
             except AttributeError:
                 stream_data = b"".join(stream.get_data() for stream in content_stream)
             if len(stream_data.strip()) < 32:
+                return False
+            if _pdf_stream_visual_failure(stream_data, 1):
                 return False
     except Exception:
         return False

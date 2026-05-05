@@ -548,6 +548,15 @@ def test_figure_artifact_validator_rejects_blank_pdf_page(tmp_path: Path) -> Non
     )
 
 
+def test_figure_artifact_validator_rejects_all_white_pdf_content(tmp_path: Path) -> None:
+    pdf = tmp_path / "white.pdf"
+    pdf.write_bytes(
+        _test_pdf_bytes(b"q 1 1 1 rg 1 1 1 RG 0 0 300 144 re f 0 0 m 1 1 l S Q")
+    )
+
+    assert _figure_artifact_failure("pdf", pdf) == "PDF page 1 appears visually blank"
+
+
 def test_figure_manifest_requires_named_figures(tmp_path: Path) -> None:
     from cache_safety_erasure.utils.io import file_sha256, write_json
 
@@ -640,8 +649,9 @@ def test_figure_manifest_rejects_blank_png(tmp_path: Path) -> None:
     assert "figure `figure` has invalid png: PNG appears visually blank" in failures
 
 
-def _test_pdf_bytes() -> bytes:
-    stream = b"BT /F1 12 Tf 72 72 Td (Figure evidence) Tj ET"
+def _test_pdf_bytes(stream: bytes | None = None) -> bytes:
+    if stream is None:
+        stream = b"BT /F1 12 Tf 72 72 Td (Figure evidence) Tj ET"
     objects = [
         b"<< /Type /Catalog /Pages 2 0 R >>",
         b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",

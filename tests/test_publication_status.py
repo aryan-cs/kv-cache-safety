@@ -1141,6 +1141,50 @@ def test_publication_status_rejects_internal_arxiv_support_text(
     )
 
 
+def test_publication_status_rejects_semantically_incomplete_arxiv_support_text(
+    tmp_path: Path,
+) -> None:
+    primary = tmp_path / "primary"
+    causal = tmp_path / "causal"
+    primary_audit = tmp_path / "primary_audit"
+    causal_audit = tmp_path / "causal_audit"
+    arxiv_dir = tmp_path / "arxiv_source"
+    archive = tmp_path / "arxiv_source.tar.gz"
+    _write_run(primary)
+    _write_run(causal)
+    _write_audit(primary_audit, primary)
+    _write_audit(causal_audit, causal)
+    _write_arxiv_bundle(arxiv_dir, archive)
+    incomplete_support = arxiv_dir / "generated" / "active_primary" / "result_macros.tex"
+    incomplete_support.write_text(r"\renewcommand{\PrimaryRunId}{missing}", encoding="utf-8")
+    claim_path = tmp_path / "claim_assessment.json"
+    claim_path.write_text(
+        json.dumps(_passing_claim_assessment(primary, causal, primary_audit, causal_audit)),
+        encoding="utf-8",
+    )
+    pdf_path = tmp_path / "paper.pdf"
+    pdf_path.write_bytes(PDF_BYTES)
+
+    status = publication_status(
+        primary_results_dir=primary,
+        causal_results_dir=causal,
+        primary_audit_dir=primary_audit,
+        causal_audit_dir=causal_audit,
+        claim_assessment_path=claim_path,
+        paper_pdf=pdf_path,
+        arxiv_source_dir=arxiv_dir,
+        arxiv_archive=archive,
+        require_arxiv_bundle=True,
+    )
+
+    assert status["publication_ready"] is False
+    assert any(
+        "arxiv_support_content:" in failure
+        and "PrimaryTopSSEIPolicy" in failure
+        for failure in status["arxiv_bundle"]["failures"]
+    )
+
+
 def test_publication_status_rejects_self_referential_arxiv_provenance(
     tmp_path: Path,
 ) -> None:
@@ -2741,7 +2785,7 @@ def _write_arxiv_bundle(
         source_dir / "audit" / "active_causal_summary" / "human_audit_deltas_table.tex",
     ]
     for path in [*generated_files, *audit_files]:
-        path.write_text(f"{path.name}\n", encoding="utf-8")
+        path.write_text(_arxiv_support_text(path), encoding="utf-8")
     manifest = {
         "schema_version": 1,
         "allow_missing": False,
@@ -2788,6 +2832,57 @@ def _write_arxiv_bundle(
                 tar.add(figure, arcname=figure.relative_to(source_dir))
             for path in [*generated_files, *audit_files]:
                 tar.add(path, arcname=path.relative_to(source_dir))
+
+
+def _arxiv_support_text(path: Path) -> str:
+    if path.name == "main_results_table.tex":
+        return (
+            "% policy level ssei\n"
+            "% policy level ssei ci low\n"
+            "% policy level ssei ci high\n"
+            "policy & estimate \\\\\n"
+        )
+    if path.name == "suite_level_effects_table.tex":
+        return (
+            "% paired n\n"
+            "% cluster n\n"
+            "% safety ci low\n"
+            "% safety ci high\n"
+            "suite & estimate \\\\\n"
+        )
+    if path.name == "causal_restoration_table.tex":
+        return (
+            "% safety ci low\n"
+            "% safety ci high\n"
+            "% refusal ci low\n"
+            "% refusal ci high\n"
+            "rolesystem & 0.62 \\\\\n"
+            "roleuser & 0.20 \\\\\n"
+            "policy_pinned & 0.58 \\\\\n"
+        )
+    if path.name == "result_macros.tex" and path.parent.name in {
+        "h200_qwen_full_sweep",
+        "active_primary",
+    }:
+        return (
+            r"\renewcommand{\PrimaryRunId}{primary public sweep}" "\n"
+            r"\renewcommand{\PrimaryPolicyCount}{7}" "\n"
+            r"\renewcommand{\PrimaryTopSSEIPolicy}{kv_int4_sim}" "\n"
+            r"\renewcommand{\PrimaryTopSSEI}{0.10}" "\n"
+            r"\renewcommand{\PrimaryTopSSEICILow}{0.05}" "\n"
+            r"\renewcommand{\PrimaryTopSSEICIHigh}{0.15}" "\n"
+            r"\renewcommand{\PrimarySafetyClusterCount}{100}" "\n"
+            r"\renewcommand{\PrimaryCapabilityClusterCount}{100}" "\n"
+        )
+    if path.name == "result_macros.tex" and path.parent.name in {
+        "h200_causal_patch_qwen7b",
+        "active_causal",
+    }:
+        return (
+            r"\renewcommand{\CausalRunId}{causal restoration diagnostic}" "\n"
+            r"\renewcommand{\CausalPolicyCount}{3}" "\n"
+        )
+    return f"{path.name}\n"
 
 
 def _rewrite_arxiv_archive(source_dir: Path, archive: Path) -> None:

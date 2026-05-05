@@ -24,7 +24,6 @@ from assess_claims import (
 )
 from check_final_pdf_text import (
     extract_pdf_text,
-    forbidden_final_prose_failures,
     placeholder_text_failures,
 )
 from check_human_audit_readiness import (
@@ -33,11 +32,11 @@ from check_human_audit_readiness import (
     check_audit_summary_source_match,
     check_human_audit_readiness,
 )
-from check_latex_placeholders import PLACEHOLDER_TEXT_MARKERS, _strip_tex_comments
 from check_publication_readiness import _check_figure_manifest
 from package_arxiv_submission import (
     FIGURE_SOURCES,
     _final_source_failures,
+    _invalid_arxiv_support_files,
     _rewrite_failures,
 )
 
@@ -1361,20 +1360,10 @@ def _arxiv_support_content_failures(
     for root in [source_dir / "generated", source_dir / "audit"]:
         if root.exists():
             candidates.extend(sorted(path for path in root.rglob("*.tex") if path.is_file()))
-    failures = []
-    for path in sorted(set(candidates)):
-        text = path.read_text(encoding="utf-8", errors="replace")
-        text_lower = text.lower()
-        for marker in PLACEHOLDER_TEXT_MARKERS:
-            if marker.lower() in text_lower:
-                failures.append(f"arxiv_support_content:{path}:placeholder_text:{marker}")
-                break
-        rendered_text = _strip_tex_comments(text)
-        failures.extend(
-            f"arxiv_support_content:{path}:{failure}"
-            for failure in forbidden_final_prose_failures(rendered_text)
-        )
-    return failures
+    return [
+        f"arxiv_support_content:{failure}"
+        for failure in _invalid_arxiv_support_files(sorted(set(candidates)))
+    ]
 
 
 def _read_json(path: Path) -> dict[str, Any]:

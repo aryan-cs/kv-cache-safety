@@ -493,7 +493,61 @@ def _pdf_page_failure(path: Path) -> str:
             return f"PDF page {index} content decode failed: {exc}"
         if len(stream_data.strip()) < 32:
             return f"PDF page {index} rendered content stream is too small"
+        visual_failure = _pdf_stream_visual_failure(stream_data, index)
+        if visual_failure:
+            return visual_failure
     return ""
+
+
+def _pdf_stream_visual_failure(stream_data: bytes, page_index: int) -> str:
+    text = stream_data.decode("latin-1", errors="ignore")
+    if re.search(r"\b(?:Tj|TJ|Do|BI)\b", text):
+        return ""
+    if _has_nonwhite_pdf_color(text):
+        return ""
+    if _has_pdf_paint_operator(text) and not _has_only_white_pdf_color(text):
+        return ""
+    return f"PDF page {page_index} appears visually blank"
+
+
+def _has_pdf_paint_operator(text: str) -> bool:
+    return bool(re.search(r"\b(?:S|s|f|F|B|B\*|b|b\*|f\*)\b", text))
+
+
+def _has_only_white_pdf_color(text: str) -> bool:
+    color_commands = _pdf_color_commands(text)
+    return bool(color_commands) and all(_is_white_pdf_color(command) for command in color_commands)
+
+
+def _has_nonwhite_pdf_color(text: str) -> bool:
+    return any(not _is_white_pdf_color(command) for command in _pdf_color_commands(text))
+
+
+def _pdf_color_commands(text: str) -> list[tuple[str, tuple[float, ...]]]:
+    commands: list[tuple[str, tuple[float, ...]]] = []
+    number = r"[-+]?(?:\d+(?:\.\d*)?|\.\d+)"
+    patterns = [
+        (r"(?P<a>{n})\s+(?P<op>[gG])\b", 1),
+        (r"(?P<a>{n})\s+(?P<b>{n})\s+(?P<c>{n})\s+(?P<op>rg|RG)\b", 3),
+        (r"(?P<a>{n})\s+(?P<b>{n})\s+(?P<c>{n})\s+(?P<d>{n})\s+(?P<op>k|K)\b", 4),
+    ]
+    for raw_pattern, arity in patterns:
+        pattern = raw_pattern.format(n=number)
+        for match in re.finditer(pattern, text):
+            values = tuple(float(match.group(group)) for group in ["a", "b", "c", "d"][:arity])
+            commands.append((match.group("op"), values))
+    return commands
+
+
+def _is_white_pdf_color(command: tuple[str, tuple[float, ...]]) -> bool:
+    operator, values = command
+    if operator in {"g", "G"}:
+        return values[0] >= 0.999
+    if operator in {"rg", "RG"}:
+        return all(value >= 0.999 for value in values)
+    if operator in {"k", "K"}:
+        return all(abs(value) <= 0.001 for value in values)
+    return False
 
 
 def _figure_data_schema_failure(figure: dict, path: Path) -> str:
