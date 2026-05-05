@@ -15,6 +15,7 @@ causal_output_dir="${CAUSAL_AUDIT_SUMMARY_DIR:-paper/audit/${causal_run_id}_summ
 audit_source="${AUDIT_SOURCE:-auto}"
 arxiv_source_dir="${ARXIV_SOURCE_DIR:-paper/build/arxiv_source}"
 arxiv_archive="${ARXIV_ARCHIVE:-paper/build/arxiv_source.tar.gz}"
+allow_incomplete_human_audit="${ALLOW_INCOMPLETE_HUMAN_AUDIT:-0}"
 
 require_file() {
   local path="$1"
@@ -88,12 +89,18 @@ aggregate_run_audit() {
     --results-dir "$results_dir" \
     --export-manifest "$export_manifest" \
     --output-dir "$output_dir"
-  uv run python scripts/check_human_audit_readiness.py \
-    --summary-json "$output_dir/human_audit_summary.json" \
-    --audit-manifest "$output_dir/audit_manifest.json" \
-    --results-dir "$results_dir" \
-    --require-result-source-match \
-    --require-baseline-deltas
+  if ! uv run python scripts/check_human_audit_readiness.py \
+      --summary-json "$output_dir/human_audit_summary.json" \
+      --audit-manifest "$output_dir/audit_manifest.json" \
+      --results-dir "$results_dir" \
+      --require-result-source-match \
+      --require-baseline-deltas; then
+    if [[ "$allow_incomplete_human_audit" == "1" ]]; then
+      echo "Human audit for ${run_id} is incomplete; continuing because ALLOW_INCOMPLETE_HUMAN_AUDIT=1." >&2
+    else
+      return 1
+    fi
+  fi
 }
 
 uv sync --frozen --extra dev

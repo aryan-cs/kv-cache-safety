@@ -255,6 +255,9 @@ def test_publication_human_audit_aggregation_has_fail_closed_wrapper() -> None:
     assert "scripts/aggregate_human_audit.py" in script
     assert "--require-result-source-match" in script
     assert "--require-baseline-deltas" in script
+    assert 'allow_incomplete_human_audit="${ALLOW_INCOMPLETE_HUMAN_AUDIT:-0}"' in script
+    assert "ALLOW_INCOMPLETE_HUMAN_AUDIT=1" in script
+    assert "Human audit for ${run_id} is incomplete" in script
     assert 'primary_generated_dir="${PRIMARY_GENERATED_DIR:-paper/generated/$primary_run_id}"' in script
     assert 'causal_generated_dir="${CAUSAL_GENERATED_DIR:-paper/generated/$causal_run_id}"' in script
     assert '--primary-results-dir "$primary_results"' in script
@@ -456,6 +459,12 @@ def test_evidence_gated_paper_builder_allows_nonpassing_claim_pdf() -> None:
     assert 'expected="$(uv run python - "$results_dir/manifest.json"' in finalizer
     assert "aggregate_existing_audits_if_needed" in finalizer
     assert "Audit summaries are not present after aggregation; cannot assess publication claims." in finalizer
+    assert 'allow_incomplete_human_audit="${ALLOW_INCOMPLETE_HUMAN_AUDIT:-0}"' in finalizer
+    assert "write_automated_claims" in finalizer
+    assert "write_final_claims" in finalizer
+    assert "check_human_audit_readiness.py" in finalizer
+    assert "Human audit support is incomplete; writing automated evidence-gated claim assessment." in finalizer
+    assert 'ALLOW_INCOMPLETE_HUMAN_AUDIT="$allow_incomplete_human_audit"' in finalizer
     assert "AUDIT_SOURCE=open_judge \\" in finalizer
     assert 'AUDIT_SOURCE="${AUDIT_SOURCE:-auto}" \\' in finalizer
     assert "PRIMARY_RUN_ID=\"$primary_run_id\"" in finalizer

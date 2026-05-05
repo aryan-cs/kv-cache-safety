@@ -34,6 +34,7 @@ run_open_judge_audit="${RUN_OPEN_JUDGE_AUDIT:-0}"
 attempt_publication_build="${ATTEMPT_PUBLICATION_BUILD:-1}"
 staging_allow_wide_ci="${FINALIZER_ALLOW_WIDE_CI:-0}"
 allow_evidence_gated_fallback="${ALLOW_EVIDENCE_GATED_FALLBACK:-0}"
+allow_incomplete_human_audit="${ALLOW_INCOMPLETE_HUMAN_AUDIT:-0}"
 run_ci_extension_if_needed="${RUN_CI_EXTENSION_IF_NEEDED:-1}"
 primary_audit_summary_override="${PRIMARY_AUDIT_SUMMARY_DIR:-}"
 causal_audit_summary_override="${CAUSAL_AUDIT_SUMMARY_DIR:-}"
@@ -249,7 +250,7 @@ write_audit_supported_claims() {
   local causal_audit="$causal_audit_summary/human_audit_summary.json"
   if [[ ! -f "$primary_audit" || ! -f "$causal_audit" ]]; then
     echo "Audit summaries are not present after aggregation; cannot assess publication claims." >&2
-    exit 1
+    return 1
   fi
   if ! uv run python scripts/assess_claims.py \
     --primary-results-dir "$primary_results" \
@@ -275,6 +276,57 @@ write_audit_supported_claims() {
     --output-dir paper/generated/registered_followup_plan
 }
 
+write_automated_claims() {
+  local primary_audit="$primary_audit_summary/human_audit_summary.json"
+  local causal_audit="$causal_audit_summary/human_audit_summary.json"
+  local audit_args=()
+  if [[ -f "$primary_audit" && -f "$causal_audit" ]]; then
+    audit_args+=(
+      --primary-audit-summary "$primary_audit"
+      --causal-audit-summary "$causal_audit"
+    )
+  fi
+  uv run python scripts/assess_claims.py \
+    --primary-results-dir "$primary_results" \
+    --causal-results-dir "$causal_results" \
+    "${audit_args[@]}" \
+    --output-dir "$claim_generated"
+  uv run python scripts/plan_registered_followups.py \
+    --claim-assessment "$claim_generated/claim_assessment.json" \
+    --primary-ci-power "$primary_results/ci_power.json" \
+    --causal-ci-power "$causal_results/ci_power.json" \
+    --output-dir paper/generated/registered_followup_plan
+}
+
+check_audit_readiness() {
+  local audit_dir="$1"
+  local results_dir="$2"
+  if [[ ! -f "$audit_dir/human_audit_summary.json" || ! -f "$audit_dir/audit_manifest.json" ]]; then
+    return 1
+  fi
+  uv run python scripts/check_human_audit_readiness.py \
+    --summary-json "$audit_dir/human_audit_summary.json" \
+    --audit-manifest "$audit_dir/audit_manifest.json" \
+    --results-dir "$results_dir" \
+    --require-result-source-match \
+    --require-baseline-deltas
+}
+
+write_final_claims() {
+  if check_audit_readiness "$primary_audit_summary" "$primary_results" &&
+     check_audit_readiness "$causal_audit_summary" "$causal_results"; then
+    write_audit_supported_claims
+    return
+  fi
+  if [[ "$allow_incomplete_human_audit" == "1" ]]; then
+    echo "Human audit support is incomplete; writing automated evidence-gated claim assessment."
+    write_automated_claims
+    return
+  fi
+  echo "Human audit support is incomplete; set ALLOW_INCOMPLETE_HUMAN_AUDIT=1 only for an evidence-gated non-publication build." >&2
+  return 1
+}
+
 aggregate_existing_audits_if_needed() {
   local primary_audit="$primary_audit_summary/human_audit_summary.json"
   local causal_audit="$causal_audit_summary/human_audit_summary.json"
@@ -287,6 +339,7 @@ aggregate_existing_audits_if_needed() {
   CAUSAL_RESULTS_DIR="$causal_results" \
   PRIMARY_AUDIT_SUMMARY_DIR="$primary_audit_summary" \
   CAUSAL_AUDIT_SUMMARY_DIR="$causal_audit_summary" \
+  ALLOW_INCOMPLETE_HUMAN_AUDIT="$allow_incomplete_human_audit" \
   AUDIT_SOURCE="${AUDIT_SOURCE:-auto}" \
   bash scripts/aggregate_publication_human_audits.sh
 }
@@ -335,8 +388,13 @@ if [[ "$run_open_judge_audit" == "1" ]]; then
   bash scripts/aggregate_publication_human_audits.sh
 fi
 
-aggregate_existing_audits_if_needed
-write_audit_supported_claims
+if ! aggregate_existing_audits_if_needed; then
+  if [[ "$allow_incomplete_human_audit" != "1" ]]; then
+    exit 1
+  fi
+  echo "Audit aggregation/readiness is incomplete; continuing because ALLOW_INCOMPLETE_HUMAN_AUDIT=1."
+fi
+write_final_claims
 
 uv run python scripts/post_h200_next_steps.py \
   --primary-results-dir "$primary_results" \
