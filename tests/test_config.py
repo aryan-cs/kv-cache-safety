@@ -369,6 +369,7 @@ def test_complete_paper_build_checks_publication_status_before_latex() -> None:
     assert "scripts/sync_active_paper_assets.py" in script
     assert "scripts/check_paper_asset_freshness.py" in script
     assert "--require-exported-table-set" in script
+    assert "--require-recomputed-output" in script
     assert "ALLOW_NONPASSING_CLAIM_PAPER" in script
     assert "publication_status_fail_args" in script
     assert "scripts/report_publication_status.py" in script
@@ -405,6 +406,7 @@ def test_evidence_gated_paper_builder_allows_nonpassing_claim_pdf() -> None:
     assert "scripts/package_arxiv_submission.py" in script
     assert "--strict" in script
     assert "--require-arxiv-bundle" in script
+    assert "--require-recomputed-output" in script
     assert "build_evidence_gated_paper_artifacts.sh" in finalizer
     assert "AUDIT_SOURCE=open_judge \\" in finalizer
     assert "PRIMARY_RUN_ID=\"$primary_run_id\"" in finalizer

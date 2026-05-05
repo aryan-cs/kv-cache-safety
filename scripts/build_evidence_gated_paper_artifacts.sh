@@ -67,7 +67,8 @@ uv run python scripts/check_latex_placeholders.py --tex paper/latex/main.tex
 uv run python scripts/check_paper_asset_freshness.py \
   --pair "$primary_generated_dir=$primary_results" \
   --pair "$causal_generated_dir=$causal_results" \
-  --require-exported-table-set
+  --require-exported-table-set \
+  --require-recomputed-output
 
 PRIMARY_RESULTS_DIR="$primary_results" \
 CAUSAL_RESULTS_DIR="$causal_results" \

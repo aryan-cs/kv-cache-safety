@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -10,6 +12,7 @@ from _path import add_src_to_path
 add_src_to_path()
 
 from export_paper_assets import TABLE_FILES as EXPORTED_TABLE_FILES
+from export_paper_assets import export_paper_assets
 
 from cache_safety_erasure.utils.io import file_sha256
 
@@ -37,6 +40,16 @@ def main() -> None:
         action="store_true",
         help="Require the full table/macro set written by export_paper_assets.py.",
     )
+    parser.add_argument(
+        "--require-recomputed-output",
+        action="store_true",
+        help="Re-run export_paper_assets.py into a temp dir and compare generated outputs.",
+    )
+    parser.add_argument(
+        "--macro-prefix",
+        default=None,
+        help="Override the inferred LaTeX macro prefix used for recomputed output.",
+    )
     args = parser.parse_args()
 
     required_tables = list(args.required_table)
@@ -51,6 +64,8 @@ def main() -> None:
                 paper_dir,
                 results_dir,
                 required_tables=required_tables or None,
+                require_recomputed_output=args.require_recomputed_output,
+                macro_prefix=args.macro_prefix,
             )
         )
     if failures:
@@ -66,6 +81,8 @@ def check_paper_asset_freshness(
     results_dir: Path,
     *,
     required_tables: list[str] | None = None,
+    require_recomputed_output: bool = False,
+    macro_prefix: str | None = None,
 ) -> list[str]:
     failures: list[str] = []
     manifest_path = paper_dir / "artifact_manifest.json"
@@ -78,7 +95,84 @@ def check_paper_asset_freshness(
     failures.extend(_table_failures(manifest, paper_dir, required_tables=required_tables))
     failures.extend(_source_failures(manifest, results_dir))
     failures.extend(_provenance_failures(manifest, results_dir))
+    if require_recomputed_output:
+        failures.extend(
+            _recomputed_output_failures(
+                manifest,
+                paper_dir,
+                results_dir,
+                required_tables=required_tables,
+                macro_prefix=macro_prefix,
+            )
+        )
     return failures
+
+
+def _recomputed_output_failures(
+    manifest: dict[str, Any],
+    paper_dir: Path,
+    results_dir: Path,
+    *,
+    required_tables: list[str] | None,
+    macro_prefix: str | None,
+) -> list[str]:
+    failures: list[str] = []
+    expected_files = sorted(set(required_tables or EXPORTED_TABLE_FILES))
+    with tempfile.TemporaryDirectory(prefix="paper_asset_recompute_") as tmp:
+        recomputed_dir = Path(tmp) / "generated"
+        try:
+            export_paper_assets(
+                results_dir,
+                recomputed_dir,
+                _resolve_macro_prefix(manifest, paper_dir, results_dir, macro_prefix),
+            )
+        except (Exception, SystemExit) as exc:
+            return [f"paper artifact recompute failed for {results_dir}: {exc}"]
+        for name in expected_files:
+            current_path = paper_dir / name
+            recomputed_path = recomputed_dir / name
+            if not current_path.exists():
+                failures.append(f"paper artifact generated output `{name}` is missing")
+                continue
+            if not recomputed_path.exists():
+                failures.append(f"paper artifact recompute did not write `{name}`")
+                continue
+            if current_path.read_bytes() != recomputed_path.read_bytes():
+                failures.append(
+                    f"paper artifact generated output `{name}` differs from metrics export"
+                )
+    return failures
+
+
+def _resolve_macro_prefix(
+    manifest: dict[str, Any],
+    paper_dir: Path,
+    results_dir: Path,
+    override: str | None,
+) -> str:
+    if override:
+        return override
+    manifest_prefix = manifest.get("macro_prefix")
+    if isinstance(manifest_prefix, str) and manifest_prefix.strip():
+        return manifest_prefix
+    macros_path = paper_dir / "result_macros.tex"
+    try:
+        macros_text = macros_path.read_text(encoding="utf-8")
+    except OSError:
+        return _infer_macro_prefix(paper_dir, results_dir)
+    match = re.search(r"\\renewcommand\{\\([A-Za-z]+)RunId\}", macros_text)
+    if match:
+        return match.group(1)
+    return _infer_macro_prefix(paper_dir, results_dir)
+
+
+def _infer_macro_prefix(paper_dir: Path, results_dir: Path) -> str:
+    label = f"{paper_dir.name} {results_dir.name}".lower()
+    if "causal" in label:
+        return "Causal"
+    if "qwen32" in label or "32b" in label or "thirty" in label:
+        return "QwenThirtyTwo"
+    return "Primary"
 
 
 def _table_failures(

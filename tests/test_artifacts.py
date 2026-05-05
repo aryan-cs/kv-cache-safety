@@ -389,7 +389,105 @@ def test_export_paper_assets_writes_ci_bearing_tables(tmp_path: Path) -> None:
         (paper_dir / "artifact_manifest.json").read_text(encoding="utf-8")
     )
     assert artifact_manifest["source_run_git_commit"] == "run-commit"
+    assert artifact_manifest["macro_prefix"] == "Primary"
     assert artifact_manifest["analysis_git_commit"]
+
+
+def test_paper_asset_freshness_recomputes_generated_outputs(tmp_path: Path) -> None:
+    import sys
+
+    sys.path.insert(0, str(Path("scripts").resolve()))
+    from check_paper_asset_freshness import check_paper_asset_freshness
+    from export_paper_assets import TABLE_FILES, export_paper_assets
+
+    results_dir = tmp_path / "results" / "h200_qwen_full_sweep"
+    paper_dir = tmp_path / "paper" / "generated" / "h200_qwen_full_sweep"
+    _write_paper_asset_export_fixture(results_dir)
+    export_paper_assets(results_dir, paper_dir, "Primary")
+    _mark_clean_export_manifest(paper_dir)
+
+    assert (
+        check_paper_asset_freshness(
+            paper_dir,
+            results_dir,
+            required_tables=TABLE_FILES,
+            require_recomputed_output=True,
+        )
+        == []
+    )
+
+    table = paper_dir / "main_results_table.tex"
+    table.write_text(
+        table.read_text(encoding="utf-8").replace("0.250", "0.251", 1),
+        encoding="utf-8",
+    )
+    _refresh_manifest_table_hash(paper_dir, "main_results_table.tex")
+
+    failures = check_paper_asset_freshness(
+        paper_dir,
+        results_dir,
+        required_tables=TABLE_FILES,
+        require_recomputed_output=True,
+    )
+
+    assert "paper artifact table `main_results_table.tex` hash is stale" not in failures
+    assert "paper artifact generated output `main_results_table.tex` differs from metrics export" in failures
+
+
+def test_paper_asset_freshness_recompute_infers_causal_macro_prefix(tmp_path: Path) -> None:
+    import sys
+
+    sys.path.insert(0, str(Path("scripts").resolve()))
+    from check_paper_asset_freshness import check_paper_asset_freshness
+    from export_paper_assets import TABLE_FILES, export_paper_assets
+
+    results_dir = tmp_path / "results" / "h200_causal_patch_qwen7b"
+    paper_dir = tmp_path / "paper" / "generated" / "h200_causal_patch_qwen7b"
+    _write_paper_asset_export_fixture(results_dir)
+    export_paper_assets(results_dir, paper_dir, "Causal")
+    _mark_clean_export_manifest(paper_dir, drop_macro_prefix=True)
+
+    assert (
+        check_paper_asset_freshness(
+            paper_dir,
+            results_dir,
+            required_tables=TABLE_FILES,
+            require_recomputed_output=True,
+        )
+        == []
+    )
+
+
+def test_paper_asset_freshness_recompute_catches_metrics_after_source_refresh(
+    tmp_path: Path,
+) -> None:
+    import sys
+
+    sys.path.insert(0, str(Path("scripts").resolve()))
+    from check_paper_asset_freshness import check_paper_asset_freshness
+    from export_paper_assets import TABLE_FILES, export_paper_assets
+
+    results_dir = tmp_path / "results" / "h200_qwen_full_sweep"
+    paper_dir = tmp_path / "paper" / "generated" / "h200_qwen_full_sweep"
+    _write_paper_asset_export_fixture(results_dir)
+    export_paper_assets(results_dir, paper_dir, "Primary")
+    _mark_clean_export_manifest(paper_dir)
+
+    metrics_path = results_dir / "metrics.json"
+    metrics = json.loads(metrics_path.read_text(encoding="utf-8"))
+    metrics["policy_level_contrasts"]["kv_int4_sim"]["selective_safety_erasure_index"] = 0.33
+    write_json(metrics_path, metrics)
+    _refresh_manifest_source_hash(paper_dir, results_dir, "metrics.json")
+
+    failures = check_paper_asset_freshness(
+        paper_dir,
+        results_dir,
+        required_tables=TABLE_FILES,
+        require_recomputed_output=True,
+    )
+
+    assert "paper artifact source `metrics.json` hash is stale" not in failures
+    assert any("differs from metrics export" in failure for failure in failures)
 
 
 def test_paper_asset_freshness_detects_stale_tables_and_sources(tmp_path: Path) -> None:
@@ -529,3 +627,86 @@ def test_paper_asset_freshness_requires_selected_tables_under_paper_dir(
     assert "paper artifact table `main_results_table.tex` path is outside paper dir" in failures
     assert "paper artifact required table `result_macros.tex` path is unexpected" in failures
     assert "paper artifact table `result_macros.tex` byte count is stale" in failures
+
+
+def _write_paper_asset_export_fixture(results_dir: Path) -> None:
+    (results_dir / "figures").mkdir(parents=True)
+    write_json(
+        results_dir / "manifest.json",
+        {"run_name": results_dir.name, "git_commit": "run-commit", "git_dirty": False},
+    )
+    write_json(results_dir / "figures" / "manifest.json", {"figures": {}})
+    write_json(
+        results_dir / "metrics.json",
+        {
+            "publication_summary": {
+                "policies": {
+                    "kv_int4_sim": {
+                        "mean_safety_score": 0.500,
+                        "mean_capability_score": 0.900,
+                    }
+                }
+            },
+            "policy_level_contrasts": {
+                "kv_int4_sim": {
+                    "selective_safety_erasure_index": 0.25,
+                    "selective_safety_erasure_index_ci": {
+                        "ci_low": 0.10,
+                        "ci_high": 0.40,
+                        "n_safety": 12,
+                        "n_capability": 8,
+                    },
+                }
+            },
+            "selective_safety_erasure": {
+                "public_refusal_safety::kv_int4_sim": {
+                    "safety_degradation": 0.12,
+                    "capability_degradation": 0.02,
+                    "selective_safety_erasure_index": 0.10,
+                    "paired_safety_degradation_ci": {
+                        "paired_n": 100,
+                        "cluster_n": 95,
+                        "ci_low": 0.05,
+                        "ci_high": 0.18,
+                    },
+                }
+            },
+            "causal_restoration": {
+                "public_refusal_safety::kv_int4_sim__patchkey-value__rolesystem": {
+                    "compressed_policy": "kv_int4_sim",
+                    "safety_restoration_fraction": 0.62,
+                    "safety_restoration_fraction_ci": {"ci_low": 0.50, "ci_high": 0.72},
+                    "refusal_restoration_fraction": 0.55,
+                    "refusal_restoration_fraction_ci": {"ci_low": 0.44, "ci_high": 0.66},
+                }
+            },
+        },
+    )
+
+
+def _mark_clean_export_manifest(paper_dir: Path, *, drop_macro_prefix: bool = False) -> None:
+    manifest_path = paper_dir / "artifact_manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["analysis_git_dirty"] = False
+    manifest["source_run_git_dirty"] = False
+    if drop_macro_prefix:
+        manifest.pop("macro_prefix", None)
+    write_json(manifest_path, manifest)
+
+
+def _refresh_manifest_table_hash(paper_dir: Path, table_name: str) -> None:
+    manifest_path = paper_dir / "artifact_manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    table = paper_dir / table_name
+    manifest["tables"][table_name]["sha256"] = file_sha256(table)
+    manifest["tables"][table_name]["bytes"] = table.stat().st_size
+    write_json(manifest_path, manifest)
+
+
+def _refresh_manifest_source_hash(paper_dir: Path, results_dir: Path, source_name: str) -> None:
+    manifest_path = paper_dir / "artifact_manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    source = results_dir / source_name
+    manifest["source_artifacts"][source_name]["sha256"] = file_sha256(source)
+    manifest["source_artifacts"][source_name]["bytes"] = source.stat().st_size
+    write_json(manifest_path, manifest)

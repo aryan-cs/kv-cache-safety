@@ -27,20 +27,14 @@ TABLE_FILES = [
 ]
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(description="Export paper-ready result tables from a run.")
-    parser.add_argument("--results-dir", required=True, type=Path)
-    parser.add_argument("--paper-dir", type=Path, default=Path("paper/generated"))
-    parser.add_argument("--macro-prefix", default="Primary")
-    args = parser.parse_args()
-
-    metrics_path = args.results_dir / "metrics.json"
+def export_paper_assets(results_dir: Path, paper_dir: Path, macro_prefix: str = "Primary") -> None:
+    metrics_path = results_dir / "metrics.json"
     if not metrics_path.exists():
         raise SystemExit(f"Missing metrics file: {metrics_path}")
     with metrics_path.open("r", encoding="utf-8") as f:
         metrics = json.load(f)
 
-    args.paper_dir.mkdir(parents=True, exist_ok=True)
+    paper_dir.mkdir(parents=True, exist_ok=True)
     summary_rows = []
     for policy, values in metrics.get("publication_summary", {}).get("policies", {}).items():
         contrast = metrics.get("policy_level_contrasts", {}).get(policy, {})
@@ -63,7 +57,7 @@ def main() -> None:
             }
         )
     write_markdown_table(
-        args.paper_dir / "main_results_table.md",
+        paper_dir / "main_results_table.md",
         [
             "policy",
             "mean_safety_score",
@@ -77,7 +71,7 @@ def main() -> None:
         summary_rows,
     )
     write_latex_table(
-        args.paper_dir / "main_results_table.tex",
+        paper_dir / "main_results_table.tex",
         [
             "policy",
             "mean_safety_score",
@@ -110,7 +104,7 @@ def main() -> None:
             }
         )
     write_markdown_table(
-        args.paper_dir / "suite_level_effects_table.md",
+        paper_dir / "suite_level_effects_table.md",
         [
             "suite",
             "policy",
@@ -125,7 +119,7 @@ def main() -> None:
         selective_rows,
     )
     write_latex_table(
-        args.paper_dir / "suite_level_effects_table.tex",
+        paper_dir / "suite_level_effects_table.tex",
         [
             "suite",
             "policy",
@@ -171,7 +165,7 @@ def main() -> None:
             }
         )
     write_markdown_table(
-        args.paper_dir / "causal_restoration_table.md",
+        paper_dir / "causal_restoration_table.md",
         [
             "suite",
             "policy",
@@ -189,7 +183,7 @@ def main() -> None:
         restoration_rows,
     )
     write_latex_table(
-        args.paper_dir / "causal_restoration_table.tex",
+        paper_dir / "causal_restoration_table.tex",
         [
             "suite",
             "policy",
@@ -208,12 +202,22 @@ def main() -> None:
         caption="Causal restoration effects for patched and mitigation conditions.",
         label="tab:causal-restoration",
     )
-    write_latex_macros(args.paper_dir / "result_macros.tex", metrics, args.results_dir, args.macro_prefix)
-    _write_artifact_manifest(args.results_dir, args.paper_dir)
+    write_latex_macros(paper_dir / "result_macros.tex", metrics, results_dir, macro_prefix)
+    _write_artifact_manifest(results_dir, paper_dir, macro_prefix)
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Export paper-ready result tables from a run.")
+    parser.add_argument("--results-dir", required=True, type=Path)
+    parser.add_argument("--paper-dir", type=Path, default=Path("paper/generated"))
+    parser.add_argument("--macro-prefix", default="Primary")
+    args = parser.parse_args()
+
+    export_paper_assets(args.results_dir, args.paper_dir, args.macro_prefix)
     print(f"Wrote paper tables to {args.paper_dir}")
 
 
-def _write_artifact_manifest(results_dir: Path, paper_dir: Path) -> None:
+def _write_artifact_manifest(results_dir: Path, paper_dir: Path, macro_prefix: str) -> None:
     run_manifest = _read_json(results_dir / "manifest.json")
     tables = {
         name: {
@@ -240,6 +244,7 @@ def _write_artifact_manifest(results_dir: Path, paper_dir: Path) -> None:
             "source_run_git_dirty": run_manifest.get("git_dirty"),
             "source_run_name": run_manifest.get("run_name"),
             "source_run_model_id": run_manifest.get("model_id"),
+            "macro_prefix": macro_prefix,
             "analysis_git_commit": git_commit(),
             "analysis_git_dirty": git_dirty(),
             "analysis_git_status_short": git_status_short(),
