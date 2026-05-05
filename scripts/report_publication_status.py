@@ -1095,8 +1095,15 @@ def _pdf_provenance_failure(
                 failures.append(f"pdf_manifest_unexpected_source_path:{kind}")
             if expected_path.name in {"active_asset_manifest.json", "active_audit_manifest.json"}:
                 active_manifest_paths[kind] = expected_path
+        expected_active_context = _expected_active_manifest_contexts(expected_sources)
         for kind, manifest_path in sorted(active_manifest_paths.items()):
-            failures.extend(_active_copy_manifest_failures(kind, manifest_path))
+            failures.extend(
+                _active_copy_manifest_failures(
+                    kind,
+                    manifest_path,
+                    expected_active_context.get(kind, {}),
+                )
+            )
     return "; ".join(failures)
 
 
@@ -1112,13 +1119,22 @@ def _manifest_path_matches(row: dict[str, Any], expected_path: Path) -> bool:
     return observed == expected_path
 
 
-def _active_copy_manifest_failures(kind: str, manifest_path: Path) -> list[str]:
+def _active_copy_manifest_failures(
+    kind: str,
+    manifest_path: Path,
+    expected_context: dict[str, Any] | None = None,
+) -> list[str]:
+    expected_context = expected_context or {}
     manifest = _read_json(manifest_path)
     if not manifest:
         return [f"{kind}:missing_or_invalid_active_manifest"]
     failures: list[str] = []
     if manifest.get("schema_version") != 2:
         failures.append(f"{kind}:invalid_active_manifest_schema")
+    for manifest_field, expected_path in expected_context.get("top_level_paths", {}).items():
+        observed = Path(str(manifest.get(manifest_field) or ""))
+        if observed.resolve() != expected_path.resolve():
+            failures.append(f"{kind}:active_manifest_unexpected_{manifest_field}")
     copied = manifest.get("copied")
     if not isinstance(copied, list) or not copied:
         failures.append(f"{kind}:active_manifest_no_copied_files")
@@ -1133,6 +1149,9 @@ def _active_copy_manifest_failures(kind: str, manifest_path: Path) -> list[str]:
             continue
         source = Path(str(row.get("source") or ""))
         target = Path(str(row.get("target") or ""))
+        expected_source = expected_context.get("source_by_target", {}).get(target.resolve())
+        if expected_source is not None and source.resolve() != expected_source.resolve():
+            failures.append(f"{kind}:active_manifest_unexpected_source_for_target:{idx}")
         if not source.exists():
             failures.append(f"{kind}:active_manifest_source_missing:{idx}")
             continue
@@ -1162,6 +1181,140 @@ def _active_copy_manifest_failures(kind: str, manifest_path: Path) -> list[str]:
             if row.get(field) != expected_value:
                 failures.append(f"{kind}:active_manifest_stale_{field}:{idx}")
     return failures
+
+
+def _expected_active_manifest_contexts(
+    expected_sources: list[tuple[str, Path]]
+) -> dict[str, dict[str, Any]]:
+    by_kind: dict[str, list[Path]] = {}
+    for kind, path in expected_sources:
+        by_kind.setdefault(kind, []).append(path)
+
+    def one(kind: str) -> Path | None:
+        values = by_kind.get(kind, [])
+        return values[0] if values else None
+
+    contexts: dict[str, dict[str, Any]] = {}
+    active_primary_manifest = one("active_primary_manifest")
+    if active_primary_manifest is not None:
+        source_by_target: dict[Path, Path] = _source_by_target(
+            [
+                ("active_primary_main_table", "primary_generated_main_table"),
+                ("active_primary_suite_table", "primary_generated_suite_table"),
+                ("active_primary_macros", "primary_generated_macros"),
+            ],
+            by_kind,
+        )
+        source_by_target.update(
+            _figure_source_by_target(
+                by_kind.get("active_primary_figure", []),
+                by_kind.get("primary_figure", []),
+            )
+        )
+        contexts["active_primary_manifest"] = {
+            "top_level_paths": {
+                "generated_dir": one("primary_generated_manifest").parent
+                if one("primary_generated_manifest")
+                else Path(),
+                "results_dir": one("primary_results_manifest").parent
+                if one("primary_results_manifest")
+                else Path(),
+                "active_dir": active_primary_manifest.parent,
+            },
+            "source_by_target": source_by_target,
+        }
+
+    active_causal_manifest = one("active_causal_manifest")
+    if active_causal_manifest is not None:
+        source_by_target = _source_by_target(
+            [
+                ("active_causal_table", "causal_generated_table"),
+                ("active_causal_macros", "causal_generated_macros"),
+            ],
+            by_kind,
+        )
+        source_by_target.update(
+            _figure_source_by_target(
+                by_kind.get("active_causal_figure", []),
+                by_kind.get("causal_figure", []),
+            )
+        )
+        contexts["active_causal_manifest"] = {
+            "top_level_paths": {
+                "generated_dir": one("causal_generated_manifest").parent
+                if one("causal_generated_manifest")
+                else Path(),
+                "results_dir": one("causal_results_manifest").parent
+                if one("causal_results_manifest")
+                else Path(),
+                "active_dir": active_causal_manifest.parent,
+            },
+            "source_by_target": source_by_target,
+        }
+
+    active_primary_audit_manifest = one("active_primary_audit_manifest")
+    if active_primary_audit_manifest is not None:
+        audit_dir = one("primary_audit_manifest").parent if one("primary_audit_manifest") else Path()
+        contexts["active_primary_audit_manifest"] = {
+            "top_level_paths": {
+                "audit_dir": audit_dir,
+                "active_dir": active_primary_audit_manifest.parent,
+            },
+            "source_by_target": _audit_source_by_target(
+                active_primary_audit_manifest.parent,
+                audit_dir,
+            ),
+        }
+
+    active_causal_audit_manifest = one("active_causal_audit_manifest")
+    if active_causal_audit_manifest is not None:
+        audit_dir = one("causal_audit_manifest").parent if one("causal_audit_manifest") else Path()
+        contexts["active_causal_audit_manifest"] = {
+            "top_level_paths": {
+                "audit_dir": audit_dir,
+                "active_dir": active_causal_audit_manifest.parent,
+            },
+            "source_by_target": _audit_source_by_target(
+                active_causal_audit_manifest.parent,
+                audit_dir,
+            ),
+        }
+
+    return contexts
+
+
+def _source_by_target(
+    pairs: list[tuple[str, str]], by_kind: dict[str, list[Path]]
+) -> dict[Path, Path]:
+    mapping = {}
+    for target_kind, source_kind in pairs:
+        targets = by_kind.get(target_kind, [])
+        sources = by_kind.get(source_kind, [])
+        if targets and sources:
+            mapping[targets[0].resolve()] = sources[0]
+    return mapping
+
+
+def _figure_source_by_target(active_paths: list[Path], source_paths: list[Path]) -> dict[Path, Path]:
+    sources_by_name = {path.name: path for path in source_paths}
+    return {
+        active_path.resolve(): sources_by_name[active_path.name]
+        for active_path in active_paths
+        if active_path.name in sources_by_name
+    }
+
+
+def _audit_source_by_target(active_dir: Path, audit_dir: Path) -> dict[Path, Path]:
+    return {
+        (active_dir / name).resolve(): audit_dir / name
+        for name in [
+            "audit_manifest.json",
+            "human_audit_summary.json",
+            "human_audit_summary.md",
+            "human_audit_summary_table.tex",
+            "human_audit_deltas_table.tex",
+        ]
+    }
 
 
 def _final_pdf_expected_sources(

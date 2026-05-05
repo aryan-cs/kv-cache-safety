@@ -1,3 +1,4 @@
+import hashlib
 import json
 import re
 import subprocess
@@ -390,6 +391,121 @@ def test_active_paper_asset_sync_copies_selected_sources(tmp_path: Path) -> None
     assert audit_table["source_sha256"] == audit_table["target_sha256"]
 
 
+def test_active_paper_asset_sync_strict_rejects_stale_generated_sources(
+    tmp_path: Path,
+) -> None:
+    primary_results = tmp_path / "results" / "merged_primary"
+    causal_results = tmp_path / "results" / "causal"
+    primary_generated = tmp_path / "generated" / "merged_primary"
+    causal_generated = tmp_path / "generated" / "causal"
+    active_primary = tmp_path / "generated" / "active_primary"
+    active_causal = tmp_path / "generated" / "active_causal"
+    _write_active_sync_fixture(
+        primary_results,
+        primary_generated,
+        generated_names=[
+            "result_macros.tex",
+            "main_results_table.tex",
+            "suite_level_effects_table.tex",
+        ],
+        figure_names=[
+            "safety_capability_phase_portrait.pdf",
+            "selective_safety_erasure_heatmap.pdf",
+            "prompt_effect_constellation.pdf",
+            "cache_state_fingerprint.pdf",
+            "safety_state_atlas.pdf",
+        ],
+    )
+    _write_active_sync_fixture(
+        causal_results,
+        causal_generated,
+        generated_names=["result_macros.tex", "causal_restoration_table.tex"],
+        figure_names=["causal_restoration_fraction.pdf", "causal_restoration_flow.pdf"],
+    )
+    (primary_results / "metrics.json").write_text('{"changed": true}\n', encoding="utf-8")
+    active_primary.mkdir(parents=True)
+    (active_primary / "old_table.tex").write_text("stale active artifact\n", encoding="utf-8")
+
+    failures = sync_active_paper_assets(
+        primary_results_dir=primary_results,
+        causal_results_dir=causal_results,
+        primary_generated_dir=primary_generated,
+        causal_generated_dir=causal_generated,
+        active_primary_dir=active_primary,
+        active_causal_dir=active_causal,
+        validate_sources=True,
+    )
+
+    assert any(
+        "primary:paper artifact source `metrics.json` hash is stale" in failure
+        for failure in failures
+    )
+    assert (active_primary / "old_table.tex").read_text(encoding="utf-8") == (
+        "stale active artifact\n"
+    )
+
+
+def test_active_paper_asset_sync_strict_requires_manifest_pinned_tables_and_figures(
+    tmp_path: Path,
+) -> None:
+    primary_results = tmp_path / "results" / "merged_primary"
+    causal_results = tmp_path / "results" / "causal"
+    primary_generated = tmp_path / "generated" / "merged_primary"
+    causal_generated = tmp_path / "generated" / "causal"
+    primary_audit = tmp_path / "audit" / "merged_primary_summary"
+    causal_audit = tmp_path / "audit" / "causal_summary"
+    active_primary = tmp_path / "generated" / "active_primary"
+    active_causal = tmp_path / "generated" / "active_causal"
+    _write_active_sync_fixture(
+        primary_results,
+        primary_generated,
+        generated_names=[
+            "result_macros.tex",
+            "main_results_table.tex",
+            "suite_level_effects_table.tex",
+        ],
+        figure_names=[
+            "safety_capability_phase_portrait.pdf",
+            "selective_safety_erasure_heatmap.pdf",
+            "prompt_effect_constellation.pdf",
+            "cache_state_fingerprint.pdf",
+            "safety_state_atlas.pdf",
+        ],
+    )
+    _write_active_sync_fixture(
+        causal_results,
+        causal_generated,
+        generated_names=["result_macros.tex", "causal_restoration_table.tex"],
+        figure_names=["causal_restoration_fraction.pdf", "causal_restoration_flow.pdf"],
+    )
+    _write_active_sync_audit_fixture(primary_audit)
+    _write_active_sync_audit_fixture(causal_audit)
+    manifest_path = primary_generated / "artifact_manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    del manifest["tables"]["main_results_table.tex"]
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    (primary_results / "figures" / "safety_state_atlas.pdf").write_bytes(
+        b"%PDF-1.7\nchanged\n%%EOF\n"
+    )
+
+    failures = sync_active_paper_assets(
+        primary_results_dir=primary_results,
+        causal_results_dir=causal_results,
+        primary_generated_dir=primary_generated,
+        causal_generated_dir=causal_generated,
+        primary_audit_dir=primary_audit,
+        causal_audit_dir=causal_audit,
+        active_primary_dir=active_primary,
+        active_causal_dir=active_causal,
+        validate_sources=True,
+    )
+
+    assert "primary:paper artifact manifest lacks synced table:main_results_table.tex" in failures
+    assert "primary:figures manifest synced PDF hash stale:safety_state_atlas.pdf" in failures
+    assert not active_primary.exists()
+    assert not active_causal.exists()
+
+
 def test_arxiv_packager_rejects_malformed_figure_pdfs(tmp_path: Path) -> None:
     fake_pdf = tmp_path / "figure.pdf"
     realish_pdf = tmp_path / "realish.pdf"
@@ -398,6 +514,86 @@ def test_arxiv_packager_rejects_malformed_figure_pdfs(tmp_path: Path) -> None:
 
     assert _is_pdf(fake_pdf) is False
     assert _is_pdf(realish_pdf) is False
+
+
+def _write_active_sync_fixture(
+    results_dir: Path,
+    generated_dir: Path,
+    *,
+    generated_names: list[str],
+    figure_names: list[str],
+) -> None:
+    (results_dir / "figures").mkdir(parents=True)
+    generated_dir.mkdir(parents=True)
+    (results_dir / "manifest.json").write_text(
+        '{"git_commit": "run-commit", "git_dirty": false}\n',
+        encoding="utf-8",
+    )
+    (results_dir / "metrics.json").write_text('{"ok": true}\n', encoding="utf-8")
+    for name in generated_names:
+        (generated_dir / name).write_text(f"{name}\n", encoding="utf-8")
+    for name in figure_names:
+        (results_dir / "figures" / name).write_bytes(
+            b"%PDF-1.7\n1 0 obj\n<<>>\nendobj\ntrailer\n<<>>\n%%EOF\n"
+        )
+    figure_manifest = {
+        "figures": [
+            {
+                "name": Path(name).stem,
+                "pdf": str(results_dir / "figures" / name),
+                "pdf_sha256": _sha256(results_dir / "figures" / name),
+            }
+            for name in figure_names
+        ]
+    }
+    (results_dir / "figures" / "manifest.json").write_text(
+        json.dumps(figure_manifest),
+        encoding="utf-8",
+    )
+    artifact_manifest = {
+        "schema_version": 1,
+        "results_dir": str(results_dir),
+        "source_run_git_commit": "run-commit",
+        "source_run_git_dirty": False,
+        "analysis_git_commit": "analysis-commit",
+        "analysis_git_dirty": False,
+        "tables": {
+            name: {
+                "path": str(generated_dir / name),
+                "sha256": _sha256(generated_dir / name),
+                "bytes": (generated_dir / name).stat().st_size,
+            }
+            for name in generated_names
+        },
+        "source_artifacts": {
+            name: {
+                "path": str(results_dir / name),
+                "sha256": _sha256(results_dir / name),
+                "bytes": (results_dir / name).stat().st_size,
+            }
+            for name in ["manifest.json", "metrics.json", "figures/manifest.json"]
+        },
+    }
+    (generated_dir / "artifact_manifest.json").write_text(
+        json.dumps(artifact_manifest),
+        encoding="utf-8",
+    )
+
+
+def _write_active_sync_audit_fixture(audit_dir: Path) -> None:
+    audit_dir.mkdir(parents=True)
+    for name in [
+        "audit_manifest.json",
+        "human_audit_summary.json",
+        "human_audit_summary.md",
+        "human_audit_summary_table.tex",
+        "human_audit_deltas_table.tex",
+    ]:
+        (audit_dir / name).write_text(f"{name}\n", encoding="utf-8")
+
+
+def _sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 def test_arxiv_packager_records_file_provenance(tmp_path: Path) -> None:

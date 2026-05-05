@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import shutil
 from pathlib import Path
 from typing import Any
@@ -8,6 +9,8 @@ from typing import Any
 from _path import add_src_to_path
 
 add_src_to_path()
+
+from check_paper_asset_freshness import check_paper_asset_freshness
 
 from cache_safety_erasure.utils.io import file_sha256, write_json
 
@@ -88,10 +91,11 @@ def main() -> None:
         active_causal_dir=args.active_causal_dir,
         active_primary_audit_dir=args.active_primary_audit_dir,
         active_causal_audit_dir=args.active_causal_audit_dir,
+        validate_sources=args.strict,
     )
     if missing and args.strict:
-        for path in missing:
-            print(f"Missing active paper asset source: {path}")
+        for failure in missing:
+            print(f"Active paper asset sync failure: {failure}")
         raise SystemExit(1)
     print(
         "Synced active paper assets: "
@@ -112,7 +116,30 @@ def sync_active_paper_assets(
     active_causal_dir: Path = ACTIVE_CAUSAL_DIR,
     active_primary_audit_dir: Path = ACTIVE_PRIMARY_AUDIT_DIR,
     active_causal_audit_dir: Path = ACTIVE_CAUSAL_AUDIT_DIR,
+    validate_sources: bool = False,
 ) -> list[str]:
+    if validate_sources:
+        validation_failures = [
+            *_active_source_failures(
+                "primary",
+                primary_generated_dir,
+                primary_results_dir,
+                PRIMARY_GENERATED_FILES,
+                PRIMARY_FIGURES,
+            ),
+            *_active_source_failures(
+                "causal",
+                causal_generated_dir,
+                causal_results_dir,
+                CAUSAL_GENERATED_FILES,
+                CAUSAL_FIGURES,
+            ),
+            *_audit_source_failures("primary_audit", primary_audit_dir),
+            *_audit_source_failures("causal_audit", causal_audit_dir),
+        ]
+        if validation_failures:
+            return validation_failures
+
     primary_missing = _sync_one(
         kind="primary",
         generated_dir=primary_generated_dir,
@@ -177,6 +204,124 @@ def _sync_one(
     }
     write_json(active_dir / "active_asset_manifest.json", manifest)
     return missing
+
+
+def _active_source_failures(
+    kind: str,
+    generated_dir: Path,
+    results_dir: Path,
+    generated_files: list[str],
+    figure_files: list[str],
+) -> list[str]:
+    failures = [
+        f"{kind}:{failure}"
+        for failure in check_paper_asset_freshness(generated_dir, results_dir)
+    ]
+    artifact_manifest = _read_json(generated_dir / "artifact_manifest.json")
+    failures.extend(
+        _required_table_manifest_failures(
+            kind,
+            artifact_manifest,
+            generated_dir,
+            generated_files,
+        )
+    )
+    figure_manifest = _read_json(results_dir / "figures" / "manifest.json")
+    failures.extend(
+        _required_figure_manifest_failures(
+            kind,
+            figure_manifest,
+            results_dir,
+            figure_files,
+        )
+    )
+    return failures
+
+
+def _required_table_manifest_failures(
+    kind: str,
+    artifact_manifest: dict[str, Any],
+    generated_dir: Path,
+    generated_files: list[str],
+) -> list[str]:
+    failures: list[str] = []
+    tables = artifact_manifest.get("tables")
+    if not isinstance(tables, dict):
+        return [f"{kind}:paper artifact manifest lacks table entries"]
+    for name in generated_files:
+        source = generated_dir / name
+        table = tables.get(name)
+        if not source.exists():
+            failures.append(f"{kind}:missing synced generated table:{source}")
+            continue
+        if not isinstance(table, dict):
+            failures.append(f"{kind}:paper artifact manifest lacks synced table:{name}")
+            continue
+        table_path = Path(str(table.get("path") or ""))
+        if table_path.resolve() != source.resolve():
+            failures.append(f"{kind}:paper artifact synced table path mismatch:{name}")
+        expected = {
+            "sha256": file_sha256(source),
+            "bytes": source.stat().st_size,
+        }
+        for field, expected_value in expected.items():
+            if table.get(field) != expected_value:
+                failures.append(f"{kind}:paper artifact synced table stale {field}:{name}")
+    return failures
+
+
+def _required_figure_manifest_failures(
+    kind: str,
+    figure_manifest: dict[str, Any],
+    results_dir: Path,
+    figure_files: list[str],
+) -> list[str]:
+    figures = figure_manifest.get("figures")
+    if not isinstance(figures, list):
+        return [f"{kind}:figures manifest lacks figure entries"]
+    by_name = {
+        str(row.get("name") or Path(str(row.get("pdf") or "")).stem): row
+        for row in figures
+        if isinstance(row, dict)
+    }
+    failures: list[str] = []
+    for name in figure_files:
+        source = results_dir / "figures" / name
+        stem = Path(name).stem
+        figure = by_name.get(stem)
+        if not source.exists():
+            failures.append(f"{kind}:missing synced figure:{source}")
+            continue
+        if not isinstance(figure, dict):
+            failures.append(f"{kind}:figures manifest lacks synced figure:{name}")
+            continue
+        figure_path = Path(str(figure.get("pdf") or ""))
+        if figure_path.resolve() != source.resolve():
+            failures.append(f"{kind}:figures manifest synced PDF path mismatch:{name}")
+        if figure.get("pdf_sha256") != file_sha256(source):
+            failures.append(f"{kind}:figures manifest synced PDF hash stale:{name}")
+    return failures
+
+
+def _audit_source_failures(kind: str, audit_dir: Path | None) -> list[str]:
+    if audit_dir is None:
+        return [f"{kind}:missing audit source directory"]
+    return [
+        f"{kind}:missing audit source:{audit_dir / name}"
+        for name in AUDIT_FILES
+        if not (audit_dir / name).exists()
+    ]
+
+
+def _read_json(path: Path) -> dict[str, Any]:
+    if not path.exists():
+        return {}
+    try:
+        with path.open("r", encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, ValueError):
+        return {}
+    return data if isinstance(data, dict) else {}
 
 
 def _sync_audit(

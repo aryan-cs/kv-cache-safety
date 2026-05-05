@@ -349,6 +349,68 @@ def test_publication_status_rejects_stale_final_pdf_provenance(tmp_path: Path) -
     )
 
 
+def test_publication_status_rejects_active_manifest_from_wrong_selected_run(
+    tmp_path: Path,
+) -> None:
+    primary = tmp_path / "primary"
+    causal = tmp_path / "causal"
+    primary_audit = tmp_path / "primary_audit"
+    causal_audit = tmp_path / "causal_audit"
+    primary_generated = tmp_path / "generated" / "h200_qwen_full_sweep"
+    causal_generated = tmp_path / "generated" / "h200_causal_patch_qwen7b"
+    _write_run(primary)
+    _write_run(causal)
+    _write_audit(primary_audit, primary)
+    _write_audit(causal_audit, causal)
+    claim_path = tmp_path / "claim_assessment.json"
+    claim_path.write_text(
+        json.dumps(_passing_claim_assessment(primary, causal, primary_audit, causal_audit)),
+        encoding="utf-8",
+    )
+    _write_paper_generated_assets(
+        primary_generated,
+        causal_generated,
+        claim_path,
+        primary_results=primary,
+        causal_results=causal,
+    )
+    pdf_path = tmp_path / "cache_mediated_safety_erasure.pdf"
+    pdf_path.write_bytes(PDF_BYTES)
+    _write_final_pdf_manifest(
+        pdf_path,
+        _final_pdf_sources(
+            primary=primary,
+            causal=causal,
+            primary_audit=primary_audit,
+            causal_audit=causal_audit,
+            primary_generated=primary_generated,
+            causal_generated=causal_generated,
+            claim_path=claim_path,
+        ),
+    )
+    active_manifest_path = primary_generated.parent / "active_primary" / "active_asset_manifest.json"
+    active_manifest = json.loads(active_manifest_path.read_text(encoding="utf-8"))
+    active_manifest["generated_dir"] = str(tmp_path / "generated" / "old_primary")
+    active_manifest_path.write_text(json.dumps(active_manifest), encoding="utf-8")
+
+    status = publication_status(
+        primary_results_dir=primary,
+        causal_results_dir=causal,
+        primary_audit_dir=primary_audit,
+        causal_audit_dir=causal_audit,
+        claim_assessment_path=claim_path,
+        primary_generated_dir=primary_generated,
+        causal_generated_dir=causal_generated,
+        paper_pdf=pdf_path,
+    )
+
+    assert status["publication_ready"] is False
+    assert (
+        "active_primary_manifest:active_manifest_unexpected_generated_dir"
+        in status["paper_pdf"]["failure"]
+    )
+
+
 def test_publication_status_rejects_non_pdf_final_paper(tmp_path: Path) -> None:
     primary = tmp_path / "primary"
     causal = tmp_path / "causal"
