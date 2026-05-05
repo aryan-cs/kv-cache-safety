@@ -44,16 +44,36 @@ UV_CACHE_DIR="${UV_CACHE_DIR:-.cache/uv}" uv run python - <<PY
 from __future__ import annotations
 
 import platform
-import subprocess
 import sys
 
 min_gb = float("${min_unified_memory_gb}")
 if platform.system() != "Darwin":
     raise SystemExit("Mac fallback is only intended for macOS/M-series local runs.")
-try:
-    mem_bytes = int(subprocess.check_output(["sysctl", "-n", "hw.memsize"], text=True).strip())
-except Exception as exc:
-    raise SystemExit(f"Could not read unified memory with sysctl: {exc}") from exc
+
+
+def read_unified_memory_bytes() -> int:
+    """Read physical memory without requiring macOS sysctl access."""
+    try:
+        import os
+
+        page_size = int(os.sysconf("SC_PAGE_SIZE"))
+        page_count = int(os.sysconf("SC_PHYS_PAGES"))
+        if page_size > 0 and page_count > 0:
+            return page_size * page_count
+    except Exception:
+        pass
+    try:
+        import psutil
+
+        total = int(psutil.virtual_memory().total)
+        if total > 0:
+            return total
+    except Exception:
+        pass
+    raise SystemExit("Could not read unified memory with os.sysconf or psutil.")
+
+
+mem_bytes = read_unified_memory_bytes()
 mem_gb = mem_bytes / 1024**3
 if mem_gb < min_gb:
     raise SystemExit(
