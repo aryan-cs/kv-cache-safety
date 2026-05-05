@@ -195,7 +195,9 @@ def main() -> None:
             )
         )
         exclude_suites = args.exclude_suite or [suite_name]
-        exclude_user_hashes = load_excluded_user_hashes(args.exclude_results_dir, exclude_suites)
+        exclude_prompt_ids, exclude_user_hashes = load_excluded_prompts(
+            args.exclude_results_dir, exclude_suites
+        )
         if args.suite in HF_COMPOSITE_PRESETS:
             records = load_hf_composite(
                 args.suite,
@@ -203,6 +205,7 @@ def main() -> None:
                 args.output_suite,
                 args.revision,
                 args.offset,
+                exclude_prompt_ids,
                 exclude_user_hashes,
             )
             source_args = {
@@ -223,6 +226,7 @@ def main() -> None:
                 args.output_suite,
                 args.revision,
                 args.offset,
+                exclude_prompt_ids,
                 exclude_user_hashes,
             )
             source_args = {
@@ -273,6 +277,7 @@ def load_hf_preset(
     output_suite: str | None,
     revision: str | None = None,
     offset: int = 0,
+    exclude_prompt_ids: set[str] | None = None,
     exclude_user_hashes: set[str] | None = None,
 ) -> list[PromptRecord]:
     if name not in OPEN_DATASET_PRESETS:
@@ -296,6 +301,7 @@ def load_hf_preset(
     dataset_metadata = _dataset_metadata(dataset, preset, resolved_revision)
     rows: list[PromptRecord] = []
     usable_seen = 0
+    exclude_prompt_ids = exclude_prompt_ids or set()
     exclude_user_hashes = exclude_user_hashes or set()
     for idx, item in enumerate(dataset):
         row_metadata = _row_metadata(dataset_metadata, preset, idx, item)
@@ -324,7 +330,7 @@ def load_hf_preset(
                 should_refuse=bool(preset["should_refuse"]),
                 metadata=row_metadata,
             )
-        if _normalized_user_hash(record.user) in exclude_user_hashes:
+        if record.id in exclude_prompt_ids or _normalized_user_hash(record.user) in exclude_user_hashes:
             continue
         if usable_seen < offset:
             usable_seen += 1
@@ -344,6 +350,7 @@ def load_hf_composite(
     output_suite: str | None,
     revision: str | None = None,
     offset: int = 0,
+    exclude_prompt_ids: set[str] | None = None,
     exclude_user_hashes: set[str] | None = None,
 ) -> list[PromptRecord]:
     if revision is not None:
@@ -356,6 +363,7 @@ def load_hf_composite(
     composite = HF_COMPOSITE_PRESETS[name]
     suite_name = str(output_suite or composite["suite"])
     records: list[PromptRecord] = []
+    exclude_prompt_ids = exclude_prompt_ids or set()
     seen_users: set[str] = set(exclude_user_hashes or set())
     target_count = None if limit is None else offset + limit
     for component in composite["presets"]:
@@ -368,9 +376,12 @@ def load_hf_composite(
             suite_name,
             OPEN_DATASET_PRESETS[str(component)].get("revision"),
             0,
+            exclude_prompt_ids,
             exclude_user_hashes,
         )
         for record in component_records:
+            if record.id in exclude_prompt_ids:
+                continue
             normalized_user = _normalized_user_hash(record.user)
             if normalized_user in seen_users:
                 continue
@@ -384,22 +395,26 @@ def load_hf_composite(
     return records
 
 
-def load_excluded_user_hashes(
+def load_excluded_prompts(
     exclude_results_dir: Path | None,
     suites: list[str],
-) -> set[str]:
+) -> tuple[set[str], set[str]]:
     if exclude_results_dir is None:
-        return set()
+        return set(), set()
     rows = _load_reference_prompt_rows(exclude_results_dir)
     suite_set = set(suites)
+    prompt_ids: set[str] = set()
     hashes: set[str] = set()
     for row in rows:
         if str(row.get("suite") or "") not in suite_set:
             continue
+        prompt_id = row.get("prompt_id", row.get("id"))
+        if prompt_id not in {None, ""}:
+            prompt_ids.add(str(prompt_id))
         user = row.get("user")
         if isinstance(user, str) and user.strip():
             hashes.add(_normalized_user_hash(user))
-    return hashes
+    return prompt_ids, hashes
 
 
 def _load_reference_prompt_rows(results_dir: Path) -> list[dict[str, Any]]:

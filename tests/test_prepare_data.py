@@ -40,6 +40,7 @@ def test_load_hf_composite_fills_limit_from_multiple_sources(monkeypatch: pytest
         output_suite: str | None,
         revision: str | None = None,
         offset: int = 0,
+        exclude_prompt_ids: set[str] | None = None,
         exclude_user_hashes: set[str] | None = None,
     ) -> list[PromptRecord]:
         calls.append((name, limit, output_suite, revision, offset, exclude_user_hashes))
@@ -75,6 +76,7 @@ def test_load_hf_composite_applies_offset_after_deduplication(
         output_suite: str | None,
         revision: str | None = None,
         offset: int = 0,
+        exclude_prompt_ids: set[str] | None = None,
         exclude_user_hashes: set[str] | None = None,
     ) -> list[PromptRecord]:
         assert offset == 0
@@ -100,12 +102,15 @@ def test_load_hf_composite_skips_excluded_reference_prompt_text(
         output_suite: str | None,
         revision: str | None = None,
         offset: int = 0,
+        exclude_prompt_ids: set[str] | None = None,
         exclude_user_hashes: set[str] | None = None,
     ) -> list[PromptRecord]:
         assert offset == 0
         prompts = ["reference duplicate", "fresh one", "fresh two", "fresh three"]
         records = []
         for idx, prompt in enumerate(prompts):
+            if f"{name}_{idx}" in (exclude_prompt_ids or set()):
+                continue
             if prepare_data._normalized_user_hash(prompt) in (exclude_user_hashes or set()):
                 continue
             records.append(PromptRecord(id=f"{name}_{idx}", suite=str(output_suite), user=prompt))
