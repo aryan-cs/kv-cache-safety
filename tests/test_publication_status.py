@@ -1617,6 +1617,41 @@ def test_publication_status_rejects_claim_inconsistent_with_source_metrics(
     )
 
 
+def test_publication_status_rejects_claim_without_interval_width_evidence(
+    tmp_path: Path,
+) -> None:
+    primary = tmp_path / "primary"
+    causal = tmp_path / "causal"
+    primary_audit = tmp_path / "primary_audit"
+    causal_audit = tmp_path / "causal_audit"
+    _write_run(primary)
+    _write_run(causal)
+    _write_audit(primary_audit, primary)
+    _write_audit(causal_audit, causal)
+    claim = _passing_claim_assessment(primary, causal, primary_audit, causal_audit)
+    del claim["claims"]["H2_selective_safety_degradation"]["best_evidence"]["ci_width"]
+    claim_path = tmp_path / "claim_assessment.json"
+    claim_path.write_text(json.dumps(claim), encoding="utf-8")
+    pdf_path = tmp_path / "paper.pdf"
+    pdf_path.write_bytes(PDF_BYTES)
+
+    status = publication_status(
+        primary_results_dir=primary,
+        causal_results_dir=causal,
+        primary_audit_dir=primary_audit,
+        causal_audit_dir=causal_audit,
+        claim_assessment_path=claim_path,
+        paper_pdf=pdf_path,
+    )
+
+    assert status["publication_ready"] is False
+    assert "claim_assessment_passed" in status["blockers"]
+    assert (
+        "claim_lacks_best_evidence_ci_width:H2_selective_safety_degradation"
+        in status["claim_assessment"]["failures"]
+    )
+
+
 def test_publication_status_rejects_preliminary_claim_assessment_without_audit_gate(
     tmp_path: Path,
 ) -> None:
@@ -2186,6 +2221,100 @@ def test_publication_status_rejects_wide_causal_restoration_ci(tmp_path: Path) -
             "safety_restoration_fraction_ci_width="
         )
         for failure in status["causal_results"]["readiness_failures"]
+    )
+
+
+def test_publication_status_rejects_missing_causal_restoration_ci(tmp_path: Path) -> None:
+    primary = tmp_path / "primary"
+    causal = tmp_path / "causal"
+    primary_audit = tmp_path / "primary_audit"
+    causal_audit = tmp_path / "causal_audit"
+    _write_run(primary)
+    _write_run(causal)
+    metrics_path = causal / "metrics.json"
+    metrics = json.loads(metrics_path.read_text(encoding="utf-8"))
+    del metrics["causal_restoration"][
+        "public_refusal_safety::kv_int4_sim__patchkey-value__rolesystem"
+    ]["safety_restoration_fraction_ci"]
+    metrics_path.write_text(json.dumps(metrics), encoding="utf-8")
+    _refresh_figure_manifest_source_hashes(causal)
+    _write_audit(primary_audit, primary)
+    _write_audit(causal_audit, causal)
+    claim_path = tmp_path / "claim_assessment.json"
+    claim_path.write_text(
+        json.dumps(_passing_claim_assessment(primary, causal, primary_audit, causal_audit)),
+        encoding="utf-8",
+    )
+    pdf_path = tmp_path / "paper.pdf"
+    pdf_path.write_bytes(PDF_BYTES)
+
+    status = publication_status(
+        primary_results_dir=primary,
+        causal_results_dir=causal,
+        primary_audit_dir=primary_audit,
+        causal_audit_dir=causal_audit,
+        claim_assessment_path=claim_path,
+        paper_pdf=pdf_path,
+    )
+
+    assert status["publication_ready"] is False
+    assert "causal_results_complete" in status["blockers"]
+    assert (
+        "public_refusal_safety::kv_int4_sim__patchkey-value__rolesystem:"
+        "safety_restoration_fraction_ci:missing_ci"
+        in status["causal_results"]["readiness_failures"]
+    )
+
+
+def test_publication_status_rejects_reversed_and_nonfinite_ci(tmp_path: Path) -> None:
+    primary = tmp_path / "primary"
+    causal = tmp_path / "causal"
+    primary_audit = tmp_path / "primary_audit"
+    causal_audit = tmp_path / "causal_audit"
+    _write_run(primary)
+    _write_run(causal)
+    metrics_path = primary / "metrics.json"
+    metrics = json.loads(metrics_path.read_text(encoding="utf-8"))
+    metrics["selective_safety_erasure"]["public_refusal_safety::kv_int4_sim"][
+        "paired_safety_degradation_ci"
+    ] = {"mean": 0.12, "ci_low": 0.20, "ci_high": 0.10, "paired_n": 100, "cluster_n": 100}
+    metrics["policy_level_contrasts"]["kv_int4_sim"]["selective_safety_erasure_index_ci"] = {
+        "mean": 0.10,
+        "ci_low": 0.06,
+        "ci_high": float("nan"),
+        "n_safety": 100,
+        "n_capability": 100,
+    }
+    metrics_path.write_text(json.dumps(metrics), encoding="utf-8")
+    _refresh_figure_manifest_source_hashes(primary)
+    _write_audit(primary_audit, primary)
+    _write_audit(causal_audit, causal)
+    claim_path = tmp_path / "claim_assessment.json"
+    claim_path.write_text(
+        json.dumps(_passing_claim_assessment(primary, causal, primary_audit, causal_audit)),
+        encoding="utf-8",
+    )
+    pdf_path = tmp_path / "paper.pdf"
+    pdf_path.write_bytes(PDF_BYTES)
+
+    status = publication_status(
+        primary_results_dir=primary,
+        causal_results_dir=causal,
+        primary_audit_dir=primary_audit,
+        causal_audit_dir=causal_audit,
+        claim_assessment_path=claim_path,
+        paper_pdf=pdf_path,
+    )
+
+    assert status["publication_ready"] is False
+    assert "primary_results_complete" in status["blockers"]
+    assert (
+        "public_refusal_safety::kv_int4_sim:paired_safety_ci:reversed_ci"
+        in status["primary_results"]["readiness_failures"]
+    )
+    assert (
+        "kv_int4_sim:policy_level_ssei_ci:nonfinite_ci"
+        in status["primary_results"]["readiness_failures"]
     )
 
 
@@ -3196,30 +3325,58 @@ def _passing_claim_assessment(
             "min_restoration_fraction": 0.2,
             "min_restoration_margin_over_user_control": 0.1,
             "min_human_audit_delta": 0.0,
+            "max_primary_ci_width": 0.08,
+            "max_causal_ci_width": 0.12,
         },
         "claims": {
             "H1_behavioral_cache_sensitivity": {
                 "passed": True,
                 "eligible_evidence_count": 1,
-                "best_evidence": {"key": "public_refusal_safety::kv_int4_sim"},
+                "best_evidence": {
+                    "key": "public_refusal_safety::kv_int4_sim",
+                    "estimate": 0.12,
+                    "ci_low": 0.08,
+                    "ci_high": 0.15,
+                    "ci_width": 0.07,
+                    "passed": True,
+                },
                 "summary": "Safety degradation clears the registered interval gate.",
             },
             "H2_selective_safety_degradation": {
                 "passed": True,
                 "eligible_evidence_count": 1,
-                "best_evidence": {"key": "kv_int4_sim"},
+                "best_evidence": {
+                    "key": "kv_int4_sim",
+                    "estimate": 0.10,
+                    "ci_low": 0.06,
+                    "ci_high": 0.13,
+                    "ci_width": 0.07,
+                    "passed": True,
+                },
                 "summary": "SSEI clears the registered interval gate.",
             },
             "H3_causal_safety_state_erasure": {
                 "passed": True,
                 "eligible_comparison_count": 1,
                 "best_comparison": {
-                    "system_patch": {"key": "public_refusal_safety::rolesystem"},
+                    "system_patch": {
+                        "key": "public_refusal_safety::rolesystem",
+                        "metric": "safety_restoration_fraction",
+                        "value": 0.62,
+                        "ci_low": 0.56,
+                        "ci_high": 0.67,
+                    },
                     "matched_user_control": {
-                        "key": "public_refusal_safety::roleuser__matchsystem"
+                        "key": "public_refusal_safety::roleuser__matchsystem",
+                        "metric": "safety_restoration_fraction",
+                        "value": 0.20,
+                        "ci_low": 0.16,
+                        "ci_high": 0.25,
                     },
                     "margin": 0.3,
                     "margin_ci_low": 0.1,
+                    "system_ci_width": 0.11,
+                    "control_ci_width": 0.09,
                     "passed": True,
                 },
                 "summary": "System-role patching beats matched user-token controls.",

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import re
 import tarfile
 from pathlib import Path
@@ -671,8 +672,9 @@ def _ci_width_failures(metrics: dict[str, Any], *, profile: str) -> list[str]:
                 "refusal_restoration_fraction_ci",
                 "leakage_avoidance_restoration_fraction_ci",
             ]:
-                ci = value.get(metric)
-                if ci:
+                point_metric = metric.removesuffix("_ci")
+                if point_metric in value or metric in value:
+                    ci = value.get(metric) or {}
                     failures.extend(
                         _ci_interval_failures(f"{key}:{metric}", ci, max_width=max_width)
                     )
@@ -680,14 +682,22 @@ def _ci_width_failures(metrics: dict[str, Any], *, profile: str) -> list[str]:
 
 
 def _ci_interval_failures(label: str, ci: dict[str, Any], *, max_width: float) -> list[str]:
+    if not isinstance(ci, dict):
+        return [f"{label}:invalid_ci"]
     ci_low = ci.get("ci_low")
     ci_high = ci.get("ci_high")
     if ci_low is None or ci_high is None:
         return [f"{label}:missing_ci"]
     try:
-        width = float(ci_high) - float(ci_low)
+        low = float(ci_low)
+        high = float(ci_high)
     except (TypeError, ValueError):
         return [f"{label}:invalid_ci"]
+    if not math.isfinite(low) or not math.isfinite(high):
+        return [f"{label}:nonfinite_ci"]
+    width = high - low
+    if width < 0:
+        return [f"{label}:reversed_ci"]
     if width > max_width:
         return [f"{label}_width={width:.3f}; target<={max_width:.3f}"]
     return []
@@ -1852,13 +1862,28 @@ def _claim_best_evidence_failures(claim_id: str, claim: dict[str, Any]) -> list[
         if not isinstance(comparison, dict):
             return [f"claim_lacks_best_comparison:{claim_id}"]
         failures = []
-        for key in ["system_patch", "matched_user_control"]:
-            if not isinstance(comparison.get(key), dict):
+        for key in ["margin", "margin_ci_low", "system_ci_width", "control_ci_width", "passed"]:
+            if key not in comparison:
                 failures.append(f"claim_lacks_best_comparison_{key}:{claim_id}")
+        for key in ["system_patch", "matched_user_control"]:
+            evidence = comparison.get(key)
+            if not isinstance(evidence, dict):
+                failures.append(f"claim_lacks_best_comparison_{key}:{claim_id}")
+                continue
+            for evidence_key in ["key", "metric", "value", "ci_low", "ci_high"]:
+                if evidence_key not in evidence:
+                    failures.append(
+                        f"claim_lacks_best_comparison_{key}_{evidence_key}:{claim_id}"
+                    )
         return failures
-    if not isinstance(claim.get("best_evidence"), dict):
+    evidence = claim.get("best_evidence")
+    if not isinstance(evidence, dict):
         return [f"claim_lacks_best_evidence:{claim_id}"]
-    return []
+    return [
+        f"claim_lacks_best_evidence_{key}:{claim_id}"
+        for key in ["key", "estimate", "ci_low", "ci_high", "ci_width", "passed"]
+        if key not in evidence
+    ]
 
 
 def _claim_recompute_failures(
@@ -1888,6 +1913,8 @@ def _claim_recompute_failures(
             thresholds.get("min_restoration_margin_over_user_control", 0.10)
         ),
         min_human_audit_delta=float(thresholds.get("min_human_audit_delta", 0.0)),
+        max_primary_ci_width=float(thresholds.get("max_primary_ci_width", PRIMARY_MAX_CI_WIDTH)),
+        max_causal_ci_width=float(thresholds.get("max_causal_ci_width", CAUSAL_MAX_CI_WIDTH)),
         require_human_audit_support=True,
     )
     failures = []

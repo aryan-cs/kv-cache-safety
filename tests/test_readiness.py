@@ -9,6 +9,7 @@ from check_publication_readiness import (
     _check_active_compression,
     _check_causal_patch_config,
     _check_causal_restoration_metric_readiness,
+    _check_ci_width,
     _check_generation_matrix,
     _check_paper_assets,
     _check_policy_level_contrast_readiness,
@@ -352,6 +353,28 @@ def test_policy_level_contrast_readiness_rejects_wide_ssei_ci() -> None:
     )
 
     assert "kv_int4_sim: policy-level SSEI CI width 0.170; target <= 0.080" in failures
+
+
+def test_ci_width_readiness_rejects_reversed_and_nonfinite_intervals() -> None:
+    failures: list[str] = []
+
+    _check_ci_width(
+        failures,
+        "reversed",
+        {"ci_low": 0.4, "ci_high": 0.2},
+        max_ci_width=0.08,
+        allow_wide_ci=True,
+    )
+    _check_ci_width(
+        failures,
+        "nan",
+        {"ci_low": 0.1, "ci_high": float("nan")},
+        max_ci_width=0.08,
+        allow_wide_ci=True,
+    )
+
+    assert "reversed: reversed CI endpoints" in failures
+    assert "nan: non-finite CI endpoints" in failures
 
 
 def test_paper_artifact_manifest_checks_tables_and_sources(tmp_path: Path) -> None:

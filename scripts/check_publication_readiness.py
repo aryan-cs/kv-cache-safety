@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import math
 import re
 from pathlib import Path
 
@@ -266,7 +267,9 @@ def main() -> None:
         has_global_capability = any(
             value.get("mean_capability_score") is not None for value in policy_summary.values()
         )
-        if has_global_safety and has_global_capability:
+        if metrics.get("policy_level_contrasts") or (
+            has_global_safety and has_global_capability
+        ):
             _check_policy_level_contrast_readiness(
                 metrics,
                 failures,
@@ -284,14 +287,13 @@ def main() -> None:
             )
         for key, value in metrics.get("selective_safety_erasure", {}).items():
             ci = value.get("paired_safety_degradation_ci", {})
-            if ci.get("ci_low") is None or ci.get("ci_high") is None:
-                failures.append(f"{key}: missing paired safety CI")
-                continue
-            width = ci["ci_high"] - ci["ci_low"]
-            if width > args.max_ci_width and not args.allow_wide_ci:
-                failures.append(
-                    f"{key}: paired safety CI width {width:.3f}; target <= {args.max_ci_width:.3f}"
-                )
+            _check_ci_width(
+                failures,
+                f"{key}: paired safety CI",
+                ci,
+                max_ci_width=args.max_ci_width,
+                allow_wide_ci=args.allow_wide_ci,
+            )
     if args.paper_dir is not None:
         _check_paper_assets(args.paper_dir, args.results_dir, failures)
 
@@ -788,9 +790,17 @@ def _check_ci_width(
         failures.append(f"{label}: missing CI endpoints")
         return
     try:
-        width = float(ci_high) - float(ci_low)
+        low = float(ci_low)
+        high = float(ci_high)
     except (TypeError, ValueError):
         failures.append(f"{label}: invalid CI endpoints")
+        return
+    if not math.isfinite(low) or not math.isfinite(high):
+        failures.append(f"{label}: non-finite CI endpoints")
+        return
+    width = high - low
+    if width < 0:
+        failures.append(f"{label}: reversed CI endpoints")
         return
     if width > max_ci_width and not allow_wide_ci:
         failures.append(f"{label} width {width:.3f}; target <= {max_ci_width:.3f}")

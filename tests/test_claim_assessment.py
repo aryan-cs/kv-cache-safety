@@ -205,6 +205,49 @@ def test_claim_assessment_rejects_missing_intervals() -> None:
     assert "no eligible interval" in assessment["claims"]["H1_behavioral_cache_sensitivity"]["summary"]
 
 
+def test_claim_assessment_rejects_wide_primary_intervals() -> None:
+    primary = _primary_positive_metrics()
+    primary["selective_safety_erasure"]["public_refusal_safety::kv_int4_sim"][
+        "paired_safety_degradation_ci"
+    ] = {"ci_low": 0.05, "ci_high": 0.30, "paired_n": 100, "cluster_n": 100}
+    primary["policy_level_contrasts"]["kv_int4_sim"][
+        "selective_safety_erasure_index_ci"
+    ] = {"mean": 0.08, "ci_low": 0.03, "ci_high": 0.20, "n_safety": 100, "n_capability": 100}
+
+    assessment = assess_claims(primary, _causal_positive_metrics())
+
+    assert assessment["claims"]["H1_behavioral_cache_sensitivity"]["passed"] is False
+    assert assessment["claims"]["H2_selective_safety_degradation"]["passed"] is False
+    assert "width 0.250" in assessment["claims"]["H1_behavioral_cache_sensitivity"]["summary"]
+    assert assessment["publication_gate"]["passed"] is False
+
+
+def test_claim_assessment_rejects_wide_causal_intervals() -> None:
+    causal = _causal_positive_metrics()
+    causal["causal_restoration"][
+        "public_refusal_safety::kv_int4_sim__patchkey-value__rolesystem"
+    ]["safety_restoration_fraction_ci"] = {
+        "mean": 0.62,
+        "ci_low": 0.50,
+        "ci_high": 0.75,
+        "cluster_n": 100,
+    }
+    causal["causal_restoration"][
+        "public_refusal_safety::kv_int4_sim__patchkey-value__rolesystem"
+    ]["refusal_restoration_fraction_ci"] = {
+        "mean": 0.55,
+        "ci_low": 0.44,
+        "ci_high": 0.70,
+        "cluster_n": 100,
+    }
+
+    assessment = assess_claims(_primary_positive_metrics(), causal)
+
+    assert assessment["claims"]["H3_causal_safety_state_erasure"]["passed"] is False
+    assert "system/control CI widths 0.250/0.080" in assessment["claims"]["H3_causal_safety_state_erasure"]["summary"]
+    assert assessment["publication_gate"]["passed"] is False
+
+
 def test_claim_assessment_rejects_causal_point_estimates_without_intervals() -> None:
     causal = _causal_positive_metrics()
     for values in causal["causal_restoration"].values():
@@ -352,7 +395,7 @@ def _primary_positive_metrics() -> dict:
                 "safety_degradation": 0.12,
                 "paired_safety_degradation_ci": {
                     "ci_low": 0.05,
-                    "ci_high": 0.18,
+                    "ci_high": 0.11,
                     "paired_n": 100,
                     "cluster_n": 100,
                 },
@@ -364,7 +407,7 @@ def _primary_positive_metrics() -> dict:
                 "selective_safety_erasure_index_ci": {
                     "mean": 0.08,
                     "ci_low": 0.03,
-                    "ci_high": 0.14,
+                    "ci_high": 0.09,
                     "n_safety": 100,
                     "n_capability": 100,
                 },
@@ -382,14 +425,14 @@ def _causal_positive_metrics() -> dict:
                 "safety_restoration_fraction_ci": {
                     "mean": 0.62,
                     "ci_low": 0.50,
-                    "ci_high": 0.72,
+                    "ci_high": 0.60,
                     "cluster_n": 100,
                 },
                 "refusal_restoration_fraction": 0.55,
                 "refusal_restoration_fraction_ci": {
                     "mean": 0.55,
                     "ci_low": 0.44,
-                    "ci_high": 0.66,
+                    "ci_high": 0.54,
                     "cluster_n": 100,
                 },
             },
@@ -398,15 +441,15 @@ def _causal_positive_metrics() -> dict:
                 "safety_restoration_fraction": 0.20,
                 "safety_restoration_fraction_ci": {
                     "mean": 0.20,
-                    "ci_low": 0.12,
-                    "ci_high": 0.30,
+                    "ci_low": 0.16,
+                    "ci_high": 0.24,
                     "cluster_n": 100,
                 },
                 "refusal_restoration_fraction": 0.18,
                 "refusal_restoration_fraction_ci": {
                     "mean": 0.18,
-                    "ci_low": 0.10,
-                    "ci_high": 0.25,
+                    "ci_low": 0.14,
+                    "ci_high": 0.22,
                     "cluster_n": 100,
                 },
             },
