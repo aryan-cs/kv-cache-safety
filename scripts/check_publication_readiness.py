@@ -135,6 +135,13 @@ FIGURE_DATA_NONNEGATIVE_COLUMNS = {
     "safety_restoration_ci_width",
     "effect_magnitude",
 }
+CAUSAL_ONLY_FIGURES = {
+    "causal_restoration_fraction",
+    "causal_restoration_flow",
+}
+PRIMARY_FIGURE_NAMES = set(REQUIRED_FIGURE_DATA_COLUMNS) - CAUSAL_ONLY_FIGURES
+CAUSAL_FIGURE_NAMES = CAUSAL_ONLY_FIGURES
+
 FIGURE_DATA_COLUMN_ALIASES = {
     "selective_safety_erasure_heatmap": [
         {"selective_safety_erasure_index", "index"},
@@ -298,6 +305,9 @@ def main() -> None:
         failures,
         args.require_causal_patch,
         required_figures=args.required_figure,
+        allowed_figures=CAUSAL_FIGURE_NAMES
+        if args.require_causal_patch
+        else PRIMARY_FIGURE_NAMES,
     )
     if not args.allow_inactive_compression and (args.results_dir / "cache_stats.parquet").exists():
         _check_active_compression(args.results_dir / "cache_stats.parquet", manifest, failures)
