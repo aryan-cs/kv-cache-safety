@@ -108,13 +108,14 @@ def test_resume_reconciliation_keeps_only_generations_with_cache_stats(
 
 
 def test_resume_reconciliation_refuses_corrupt_cache_stats_by_default(
-    tmp_path: Path,
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     import sys
 
     sys.path.insert(0, str(Path("scripts").resolve()))
     from run_experiment import _reconcile_resume_generations
 
+    monkeypatch.delenv("ALLOW_CORRUPT_CACHE_STATS_RESET", raising=False)
     run_dir = tmp_path / "run"
     run_dir.mkdir()
     rows = [{"prompt_id": "p1", "suite": "suite", "policy": "none", "seed": 0}]
