@@ -1,6 +1,8 @@
 import json
 from pathlib import Path
 
+import pytest
+
 from cache_safety_erasure.utils.io import (
     append_jsonl,
     file_sha256,
@@ -103,6 +105,57 @@ def test_resume_reconciliation_keeps_only_generations_with_cache_stats(
     orphaned = list(run_dir.glob("generations.orphaned_without_cache_stats.*.jsonl"))
     assert len(orphaned) == 1
     assert read_jsonl(orphaned[0]) == rows
+
+
+def test_resume_reconciliation_refuses_corrupt_cache_stats_by_default(
+    tmp_path: Path,
+) -> None:
+    import sys
+
+    sys.path.insert(0, str(Path("scripts").resolve()))
+    from run_experiment import _reconcile_resume_generations
+
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    rows = [{"prompt_id": "p1", "suite": "suite", "policy": "none", "seed": 0}]
+    append_jsonl(run_dir / "generations.jsonl", rows)
+    (run_dir / "cache_stats.parquet").write_bytes(b"not a parquet file")
+
+    with pytest.raises(RuntimeError, match="cache_stats.parquet is unreadable"):
+        _reconcile_resume_generations(run_dir, rows)
+
+    assert read_jsonl(run_dir / "generations.jsonl") == rows
+    assert (run_dir / "cache_stats.parquet").exists()
+    assert not list(run_dir.glob("generations.orphaned_without_cache_stats.*.jsonl"))
+    assert not list(run_dir.glob("generations.corrupt_cache_stats_reset.*.jsonl"))
+
+
+def test_resume_reconciliation_can_explicitly_archive_corrupt_cache_stats(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import sys
+
+    sys.path.insert(0, str(Path("scripts").resolve()))
+    from run_experiment import _reconcile_resume_generations
+
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    rows = [{"prompt_id": "p1", "suite": "suite", "policy": "none", "seed": 0}]
+    append_jsonl(run_dir / "generations.jsonl", rows)
+    (run_dir / "cache_stats.parquet").write_bytes(b"not a parquet file")
+    monkeypatch.setenv("ALLOW_CORRUPT_CACHE_STATS_RESET", "1")
+
+    kept = _reconcile_resume_generations(run_dir, rows)
+
+    assert kept == []
+    assert read_jsonl(run_dir / "generations.jsonl") == []
+    generation_archives = list(run_dir.glob("generations.corrupt_cache_stats_reset.*.jsonl"))
+    cache_archives = list(run_dir.glob("cache_stats.parquet.corrupt.*"))
+    assert len(generation_archives) == 1
+    assert len(cache_archives) == 1
+    assert read_jsonl(generation_archives[0]) == rows
+    assert cache_archives[0].read_bytes() == b"not a parquet file"
+    assert not (run_dir / "cache_stats.parquet").exists()
 
 
 def test_cache_stats_sink_uses_stable_schema_for_sparse_batches(tmp_path: Path) -> None:

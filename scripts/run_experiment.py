@@ -300,7 +300,12 @@ def _policy_manifest(policy: Any) -> dict[str, Any]:
 def _reconcile_resume_generations(run_dir: Path, rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     if not rows:
         return rows
-    cache_keys = _cache_stats_generation_keys(run_dir / "cache_stats.parquet")
+    try:
+        cache_keys = _cache_stats_generation_keys(run_dir / "cache_stats.parquet")
+    except RuntimeError as exc:
+        if os.environ.get("ALLOW_CORRUPT_CACHE_STATS_RESET") == "1":
+            return _archive_corrupt_cache_stats_resume(run_dir, rows, exc)
+        raise
     kept = [
         row
         for row in rows
@@ -324,6 +329,27 @@ def _reconcile_resume_generations(run_dir: Path, rows: list[dict[str, Any]]) -> 
     return kept
 
 
+def _archive_corrupt_cache_stats_resume(
+    run_dir: Path, rows: list[dict[str, Any]], error: Exception
+) -> list[dict[str, Any]]:
+    stamp = utc_timestamp()
+    generations_archive = run_dir / f"generations.corrupt_cache_stats_reset.{stamp}.jsonl"
+    cache_stats_path = run_dir / "cache_stats.parquet"
+    write_jsonl(generations_archive, rows)
+    write_jsonl(run_dir / "generations.jsonl", [])
+    cache_archive = None
+    if cache_stats_path.exists():
+        cache_archive = run_dir / f"cache_stats.parquet.corrupt.{stamp}"
+        cache_stats_path.replace(cache_archive)
+    print(
+        "ALLOW_CORRUPT_CACHE_STATS_RESET=1: starting this resume from zero because "
+        f"cache_stats.parquet is unreadable ({error}). Archived generations at "
+        f"{generations_archive}"
+        + (f" and corrupt cache stats at {cache_archive}." if cache_archive else ".")
+    )
+    return []
+
+
 def _cache_stats_generation_keys(cache_stats_path: Path) -> set[tuple[str, str, int]]:
     cache_stats_path = _promote_recoverable_cache_stats_temp(cache_stats_path)
     if not cache_stats_path.exists():
@@ -334,8 +360,12 @@ def _cache_stats_generation_keys(cache_stats_path: Path) -> set[tuple[str, str, 
         raise RuntimeError("pyarrow is required for cache stats resume reconciliation.") from exc
     try:
         table = pq.read_table(cache_stats_path, columns=["prompt_id", "policy", "seed"])
-    except Exception:
-        return set()
+    except Exception as exc:
+        raise RuntimeError(
+            "Cannot resume safely because cache_stats.parquet is unreadable. "
+            "Restore a valid snapshot, or intentionally archive/reset the corrupt partial "
+            "run with ALLOW_CORRUPT_CACHE_STATS_RESET=1."
+        ) from exc
     prompt_ids = table.column("prompt_id").to_pylist()
     policies = table.column("policy").to_pylist()
     seeds = table.column("seed").to_pylist()
