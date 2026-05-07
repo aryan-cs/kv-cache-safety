@@ -11,6 +11,7 @@ from cache_safety_erasure.cache_policies.cache_utils import (
     evicted_from_retained,
     maybe_from_legacy_cache,
     slice_legacy_cache,
+    to_legacy_cache,
 )
 from cache_safety_erasure.config import GenerationConfig
 from cache_safety_erasure.evals.prompt_record import PromptRecord
@@ -93,6 +94,7 @@ def hf_generate(
                     token_roles=token_roles[:-1],
                 )
                 decision.metadata.update(patch_metadata)
+            past = _restore_model_cache_type(past, model)
             cache_decisions.append(decision)
             past, native_decision = _enforce_native_cache_limit(
                 past,
@@ -101,6 +103,7 @@ def hf_generate(
                 token_roles=token_roles[:-1],
             )
             if native_decision is not None:
+                past = _restore_model_cache_type(past, model)
                 cache_decisions.append(native_decision)
             outputs = _forward_one_token(
                 model=model,
@@ -127,6 +130,7 @@ def hf_generate(
                     token_roles=token_roles,
                 )
                 decision.metadata.update(patch_metadata)
+            past = _restore_model_cache_type(past, model)
             cache_decisions.append(decision)
             past, native_decision = _enforce_native_cache_limit(
                 past,
@@ -135,6 +139,7 @@ def hf_generate(
                 token_roles=token_roles,
             )
             if native_decision is not None:
+                past = _restore_model_cache_type(past, model)
                 cache_decisions.append(native_decision)
             absolute_position = int(input_ids.shape[-1])
             decode_step_start = 2
@@ -164,6 +169,7 @@ def hf_generate(
                     token_roles=token_roles,
                 )
                 decision.metadata.update(patch_metadata)
+            past = _restore_model_cache_type(past, model)
             cache_decisions.append(decision)
             past, native_decision = _enforce_native_cache_limit(
                 past,
@@ -172,6 +178,7 @@ def hf_generate(
                 token_roles=token_roles,
             )
             if native_decision is not None:
+                past = _restore_model_cache_type(past, model)
                 cache_decisions.append(native_decision)
             absolute_position = int(input_ids.shape[-1])
             decode_step_start = 1
@@ -210,6 +217,7 @@ def hf_generate(
                     token_roles=token_roles,
                 )
                 decision.metadata.update(patch_metadata)
+            past = _restore_model_cache_type(past, model)
             past, native_decision = _enforce_native_cache_limit(
                 past,
                 max_cache_len=native_cache_limit,
@@ -217,6 +225,7 @@ def hf_generate(
                 token_roles=extended_roles,
             )
             if native_decision is not None:
+                past = _restore_model_cache_type(past, model)
                 cache_decisions.append(native_decision)
             next_token = _sample_next_token(outputs.logits[:, -1, :], generation_config)
 
@@ -226,6 +235,19 @@ def hf_generate(
     decoded = tokenizer.decode(generated_ids, skip_special_tokens=True).strip()
     _ = cache_layer_count  # imported for downstream callers and import validation.
     return GenerationResult(text=decoded, cache_decisions=cache_decisions)
+
+
+def _restore_model_cache_type(past: Any, model: Any) -> Any:
+    config = getattr(model, "config", None)
+    if getattr(config, "sliding_window", None) is None:
+        return past
+    try:
+        from transformers.cache_utils import DynamicCache
+    except Exception:
+        return past
+    if not isinstance(past, DynamicCache):
+        return past
+    return DynamicCache(ddp_cache_data=to_legacy_cache(past), config=config)
 
 
 def _native_cache_limit(model: Any, cache_position_mode: str) -> int | None:
