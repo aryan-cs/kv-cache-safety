@@ -42,10 +42,12 @@ if [[ -n "$(git status --short)" ]]; then
   exit 1
 fi
 
-export HF_HOME="${HF_HOME:-$workdir/.cache/huggingface}"
-export HF_HUB_CACHE="${HF_HUB_CACHE:-$HF_HOME/hub}"
-export TRANSFORMERS_CACHE="${TRANSFORMERS_CACHE:-$HF_HOME/transformers}"
 export TORCH_HOME="${TORCH_HOME:-$workdir/.cache/torch}"
+
+if [[ -n "${HF_HOME:-}" ]]; then
+  export HF_HUB_CACHE="${HF_HUB_CACHE:-$HF_HOME/hub}"
+  export TRANSFORMERS_CACHE="${TRANSFORMERS_CACHE:-$HF_HOME/transformers}"
+fi
 
 uv sync --frozen --extra dev
 uv run ruff check .
