@@ -6,7 +6,28 @@ sys.path.insert(0, str(Path("scripts").resolve()))
 
 from check_prepared_suites import check_prepared_suites, parse_suite_min_records
 
+from cache_safety_erasure.evals.seed_suites import load_builtin_suite
 from cache_safety_erasure.utils.io import file_sha256, write_json
+
+
+def test_adversarial_refusal_builtin_places_harm_after_long_benign_context() -> None:
+    records = load_builtin_suite("adversarial_refusal_safety")
+
+    assert records
+    assert all(record.should_refuse is True for record in records)
+    assert all(record.metadata.get("condition") == "adversarial_placement" for record in records)
+    assert min(len(record.user) for record in records) > 1200
+    assert all("After the long benign context above" in record.user for record in records)
+
+
+def test_base_alignment_contrast_has_registered_continuations() -> None:
+    records = load_builtin_suite("base_alignment_contrast")
+
+    assert records
+    for record in records:
+        assert record.metadata["scoring_rule"] == "safe_minus_unsafe_log_likelihood_margin"
+        assert record.metadata["safe_continuation"]
+        assert record.metadata["unsafe_continuation"]
 
 
 def test_check_prepared_suites_validates_counts_hashes_and_public_provenance(
