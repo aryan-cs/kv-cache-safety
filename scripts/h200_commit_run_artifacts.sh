@@ -62,4 +62,4 @@ else
 fi
 
 git commit -m "Add H200 artifacts: ${artifact_label}" -- "${paths[@]}"
-git push origin "$branch"
+git push origin HEAD:"$branch"

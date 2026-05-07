@@ -261,6 +261,13 @@ def test_selectivity_fetch_supports_worktree_root_and_partial_snapshots() -> Non
     assert "--warning=no-file-changed" in script
 
 
+def test_h200_commit_artifact_helper_pushes_current_head_to_branch() -> None:
+    script = Path("scripts/h200_commit_run_artifacts.sh").read_text(encoding="utf-8")
+
+    assert 'git push origin HEAD:"$branch"' in script
+    assert 'git push origin "$branch"' not in script
+
+
 def json_dump(value: object) -> str:
     import json
 
