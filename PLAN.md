@@ -126,6 +126,16 @@ bash scripts/fetch_h200_selectivity_results.sh \
   results/selectivity_h200_powered_qwen2_5_7b_instruct
 ```
 
+If the run lives in a dedicated H200 worktree, override the remote root:
+
+```bash
+H200_WORKDIR=/home/aryang9/sandbox/llm-safety/_worktrees/powered-qwen-instruct \
+  bash scripts/fetch_h200_selectivity_results.sh \
+  results/selectivity_h200_powered_qwen2_5_7b_instruct
+```
+
+For a best-effort partial snapshot while a run is still writing files, add `FETCH_PARTIAL=1`; complete run fetches should leave it unset.
+
 ## Local Judging Workflow
 
 Judging happens on the Mac, not H200.

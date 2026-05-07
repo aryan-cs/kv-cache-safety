@@ -252,6 +252,15 @@ def test_h200_fetch_manifest_check_rejects_stale_compare_report(tmp_path: Path) 
     assert "artifact_manifest_compare_actual_manifest_sha256_stale" in report["failures"]
 
 
+def test_selectivity_fetch_supports_worktree_root_and_partial_snapshots() -> None:
+    script = Path("scripts/fetch_h200_selectivity_results.sh").read_text(encoding="utf-8")
+
+    assert "H200_WORKDIR" in script
+    assert "FETCH_PARTIAL" in script
+    assert "--ignore-failed-read" in script
+    assert "--warning=no-file-changed" in script
+
+
 def json_dump(value: object) -> str:
     import json
 
