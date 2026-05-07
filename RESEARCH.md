@@ -40,7 +40,7 @@ The registered panel uses official, documented checkpoints with pinned revisions
 | GPT-OSS | `openai/gpt-oss-20b` | Public open-weight model family, subject to H200 harness validation. |
 | Qwen 2.5 | `Qwen/Qwen2.5-7B` | Matched base checkpoint for raw-alignment and cache-sensitivity contrasts. |
 | Qwen 2.5 | `Qwen/Qwen2.5-7B-Instruct` | Matched official instruction-tuned checkpoint. |
-| Qwen 3.5 | `Qwen/Qwen3.5-9B` | Newer Qwen generation, subject to text-only cache-runner validation. |
+| Qwen 3 | `Qwen/Qwen3-8B` | Text-generation Qwen-series replacement for the originally considered Qwen3.5 multimodal checkpoint; subject to the same cache-runner validation. |
 | Llama | `meta-llama/Llama-3.1-8B-Instruct` | Meta Llama family representative. |
 | Gemma | `google/gemma-2-9b-it` | Google Gemma family representative. |
 | Mistral | `mistralai/Mistral-7B-Instruct-v0.3` | Mistral family representative. |

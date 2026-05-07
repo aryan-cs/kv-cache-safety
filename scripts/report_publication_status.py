@@ -114,10 +114,10 @@ PRIMARY_REQUIRED_SUITES = [
 
 
 def _required_arxiv_bundle_files(
-    primary_generated_dir: Path = Path("paper/generated/h200_qwen_full_sweep"),
-    causal_generated_dir: Path = Path("paper/generated/h200_causal_patch_qwen7b"),
-    primary_audit_dir: Path = Path("paper/audit/h200_qwen_full_sweep_summary"),
-    causal_audit_dir: Path = Path("paper/audit/h200_causal_patch_qwen7b_summary"),
+    primary_generated_dir: Path = Path("docs/generated/h200_qwen_full_sweep"),
+    causal_generated_dir: Path = Path("docs/generated/h200_causal_patch_qwen7b"),
+    primary_audit_dir: Path = Path("docs/audit/h200_qwen_full_sweep_summary"),
+    causal_audit_dir: Path = Path("docs/audit/h200_causal_patch_qwen7b_summary"),
 ) -> list[str]:
     primary_name = primary_generated_dir.name
     causal_name = causal_generated_dir.name
@@ -177,6 +177,7 @@ MIN_H200_DEVICE_MEMORY_BYTES = 100 * 1024**3
 EXPECTED_CLAIM_IDS = [
     "H1_behavioral_cache_sensitivity",
     "H2_selective_safety_degradation",
+    "H3_cross_family_replication",
     "H3_causal_safety_state_erasure",
 ]
 EXPECTED_PUBLICATION_REQUIRED_CLAIMS = [*EXPECTED_CLAIM_IDS, "human_audit_support"]
@@ -189,7 +190,7 @@ RAW_EVIDENCE_BASENAMES = {
     "prompts.jsonl",
 }
 RAW_EVIDENCE_SUFFIXES = {".csv", ".jsonl", ".parquet"}
-FINAL_PDF_NAME = "cache_mediated_safety_erasure.pdf"
+FINAL_PDF_NAME = "kv-cache-safety.pdf"
 FINAL_PDF_REQUIRED_SOURCE_PREFIXES = [
     "latex_main",
     "bibliography",
@@ -222,32 +223,32 @@ def main() -> None:
     parser.add_argument(
         "--primary-audit-dir",
         type=Path,
-        default=Path("paper/audit/h200_qwen_full_sweep_summary"),
+        default=Path("docs/audit/h200_qwen_full_sweep_summary"),
     )
     parser.add_argument(
         "--causal-audit-dir",
         type=Path,
-        default=Path("paper/audit/h200_causal_patch_qwen7b_summary"),
+        default=Path("docs/audit/h200_causal_patch_qwen7b_summary"),
     )
     parser.add_argument(
         "--claim-assessment",
         type=Path,
-        default=Path("paper/generated/claim_assessment/claim_assessment.json"),
+        default=Path("docs/generated/claim_assessment/claim_assessment.json"),
     )
     parser.add_argument(
         "--primary-generated-dir",
         type=Path,
-        default=Path("paper/generated/h200_qwen_full_sweep"),
+        default=Path("docs/generated/h200_qwen_full_sweep"),
     )
     parser.add_argument(
         "--causal-generated-dir",
         type=Path,
-        default=Path("paper/generated/h200_causal_patch_qwen7b"),
+        default=Path("docs/generated/h200_causal_patch_qwen7b"),
     )
     parser.add_argument(
         "--paper-pdf",
         type=Path,
-        default=Path("paper/cache_mediated_safety_erasure.pdf"),
+        default=Path("docs/kv-cache-safety.pdf"),
     )
     parser.add_argument(
         "--allow-missing-paper-pdf",
@@ -257,12 +258,12 @@ def main() -> None:
     parser.add_argument(
         "--arxiv-source-dir",
         type=Path,
-        default=Path("paper/build/arxiv_source"),
+        default=Path("docs/build/arxiv_source"),
     )
     parser.add_argument(
         "--arxiv-archive",
         type=Path,
-        default=Path("paper/build/arxiv_source.tar.gz"),
+        default=Path("docs/build/arxiv_source.tar.gz"),
     )
     parser.add_argument(
         "--require-arxiv-bundle",
@@ -306,11 +307,11 @@ def publication_status(
     causal_audit_dir: Path,
     claim_assessment_path: Path,
     paper_pdf: Path,
-    primary_generated_dir: Path = Path("paper/generated/h200_qwen_full_sweep"),
-    causal_generated_dir: Path = Path("paper/generated/h200_causal_patch_qwen7b"),
+    primary_generated_dir: Path = Path("docs/generated/h200_qwen_full_sweep"),
+    causal_generated_dir: Path = Path("docs/generated/h200_causal_patch_qwen7b"),
     require_paper_pdf: bool = True,
-    arxiv_source_dir: Path = Path("paper/build/arxiv_source"),
-    arxiv_archive: Path = Path("paper/build/arxiv_source.tar.gz"),
+    arxiv_source_dir: Path = Path("docs/build/arxiv_source"),
+    arxiv_archive: Path = Path("docs/build/arxiv_source.tar.gz"),
     require_arxiv_bundle: bool = False,
 ) -> dict[str, Any]:
     primary = _run_status(primary_results_dir, profile="primary")
@@ -748,18 +749,17 @@ def _ci_width_failures(metrics: dict[str, Any], *, profile: str) -> list[str]:
         return []
     max_width = PRIMARY_MAX_CI_WIDTH if profile == "primary" else CAUSAL_MAX_CI_WIDTH
     failures = []
-    if profile == "primary":
-        for policy, contrast in (metrics.get("policy_level_contrasts") or {}).items():
-            if str(policy) == "none" or not isinstance(contrast, dict):
-                continue
-            ci = contrast.get("selective_safety_erasure_index_ci") or {}
-            failures.extend(
-                _ci_interval_failures(
-                    f"{policy}:policy_level_ssei_ci",
-                    ci,
-                    max_width=max_width,
-                )
+    for policy, contrast in (metrics.get("policy_level_contrasts") or {}).items():
+        if str(policy) == "none" or not isinstance(contrast, dict):
+            continue
+        ci = contrast.get("selective_safety_erasure_index_ci") or {}
+        failures.extend(
+            _ci_interval_failures(
+                f"{policy}:policy_level_ssei_ci",
+                ci,
+                max_width=max_width,
             )
+        )
     for key, value in metrics.get("selective_safety_erasure", {}).items():
         if not isinstance(value, dict):
             failures.append(f"{key}:malformed_selective_safety_erasure_entry")
@@ -1038,7 +1038,6 @@ def _figure_manifest_failures(results_dir: Path, *, profile: str) -> list[str]:
         failures,
         require_causal_patch=profile == "causal",
         required_figures=required_figures,
-        allowed_figures=set(required_figures),
     )
     return failures
 
@@ -1459,8 +1458,8 @@ def _final_pdf_expected_sources(
     active_primary_audit_dir = primary_audit_dir.parent / "active_primary_summary"
     active_causal_audit_dir = causal_audit_dir.parent / "active_causal_summary"
     return [
-        ("latex_main", Path("paper/latex/main.tex")),
-        ("bibliography", Path("paper/references.bib")),
+        ("latex_main", Path("docs/latex/main.tex")),
+        ("bibliography", Path("docs/references.bib")),
         ("primary_results_manifest", primary_results_dir / "manifest.json"),
         ("primary_results_metrics", primary_results_dir / "metrics.json"),
         ("primary_figures_manifest", primary_results_dir / "figures" / "manifest.json"),
@@ -1532,10 +1531,10 @@ def _arxiv_status(
     source_dir: Path,
     archive: Path,
     *,
-    primary_generated_dir: Path = Path("paper/generated/h200_qwen_full_sweep"),
-    causal_generated_dir: Path = Path("paper/generated/h200_causal_patch_qwen7b"),
-    primary_audit_dir: Path = Path("paper/audit/h200_qwen_full_sweep_summary"),
-    causal_audit_dir: Path = Path("paper/audit/h200_causal_patch_qwen7b_summary"),
+    primary_generated_dir: Path = Path("docs/generated/h200_qwen_full_sweep"),
+    causal_generated_dir: Path = Path("docs/generated/h200_causal_patch_qwen7b"),
+    primary_audit_dir: Path = Path("docs/audit/h200_qwen_full_sweep_summary"),
+    causal_audit_dir: Path = Path("docs/audit/h200_causal_patch_qwen7b_summary"),
 ) -> dict[str, Any]:
     manifest_path = source_dir / "manifest.json"
     manifest = _read_json(manifest_path)
@@ -1973,6 +1972,8 @@ def _claim_failures(assessment: dict[str, Any], source_paths: dict[str, Path]) -
 def _claim_evidence_count(claim_id: str, claim: dict[str, Any]) -> int:
     if claim_id == "H3_causal_safety_state_erasure":
         raw_count = claim.get("eligible_comparison_count")
+    elif claim_id == "H3_cross_family_replication":
+        raw_count = claim.get("replicating_family_count")
     else:
         raw_count = claim.get("eligible_evidence_count")
     try:
@@ -1986,6 +1987,25 @@ def _claim_best_evidence_failures(
     claim: dict[str, Any],
     thresholds: dict[str, Any] | None = None,
 ) -> list[str]:
+    if claim_id == "H3_cross_family_replication":
+        families = claim.get("replicating_families")
+        evidence = claim.get("best_family_evidence")
+        failures = []
+        if not isinstance(families, list) or len(families) < 2:
+            failures.append(f"claim_lacks_two_replicating_families:{claim_id}")
+        if not isinstance(evidence, dict) or len(evidence) < 2:
+            failures.append(f"claim_lacks_family_evidence:{claim_id}")
+        else:
+            for family, values in evidence.items():
+                if not isinstance(values, dict):
+                    failures.append(f"claim_malformed_family_evidence:{claim_id}:{family}")
+                    continue
+                for key in ["family", "policy", "estimate", "ci_low", "ci_high", "ci_width", "passed"]:
+                    if key not in values:
+                        failures.append(
+                            f"claim_lacks_family_evidence_{key}:{claim_id}:{family}"
+                        )
+        return failures
     if claim_id == "H3_causal_safety_state_erasure":
         comparison = claim.get("best_comparison")
         if not isinstance(comparison, dict):

@@ -55,6 +55,13 @@ uv run python scripts/generate_selectivity_configs.py --stage smoke --overwrite
 uv run python scripts/generate_selectivity_configs.py --stage powered --overwrite
 uv run python scripts/prepare_data.py --suite all
 
+register_power_plan() {
+  uv run python scripts/plan_ci_power.py \
+    --target-ci-width "$target_ci_width" \
+    --output-json docs/generated/selectivity_panel_phase0_ci_power.json \
+    --output-md docs/generated/selectivity_panel_phase0_ci_power.md
+}
+
 prepare_powered_data() {
   uv run python scripts/prepare_data.py --source hf --suite cyberec_prompt_injection_leakage --limit "$public_prompt_limit" --output-suite public_system_leakage
   uv run python scripts/prepare_data.py --source hf --suite public_refusal_combo --limit "$public_prompt_limit" --output-suite public_refusal_safety
@@ -153,7 +160,42 @@ run_config() {
   fi
 }
 
+merge_stage_results() {
+  local run_stage="$1"
+  local output_dir="results/selectivity_h200_${run_stage}_combined"
+  local generated_dir="docs/generated/selectivity_h200_${run_stage}_combined"
+  local -a merge_args=()
+  local key
+  for key in "${model_keys[@]}"; do
+    local run_dir="results/selectivity_h200_${run_stage}_${key}"
+    if [[ -f "$run_dir/generations.jsonl" ]]; then
+      merge_args+=(--run-dir "$run_dir")
+    fi
+  done
+  if [[ "${#merge_args[@]}" -eq 0 ]]; then
+    echo "No completed ${run_stage} selectivity runs to merge." >&2
+    return 0
+  fi
+
+  uv run python scripts/merge_selectivity_panel_results.py \
+    --output-dir "$output_dir" \
+    "${merge_args[@]}"
+  uv run python scripts/make_figures.py --results-dir "$output_dir"
+  uv run python scripts/export_paper_assets.py --results-dir "$output_dir" --paper-dir "$generated_dir"
+  uv run python scripts/report_selectivity_status.py --run-dir "$output_dir"
+  uv run python scripts/plan_ci_power.py \
+    --results-dir "$output_dir" \
+    --target-ci-width "$target_ci_width" \
+    --output-json "$output_dir/ci_power.json" \
+    --output-md "$generated_dir/ci_power.md"
+
+  if [[ "$commit_run_artifacts" == "1" ]]; then
+    bash scripts/h200_commit_run_artifacts.sh "$output_dir" "$branch"
+  fi
+}
+
 if [[ "$stage" == "powered" || "$stage" == "all" ]]; then
+  register_power_plan
   prepare_powered_data
 fi
 
@@ -170,6 +212,7 @@ for run_stage in "${stages[@]}"; do
     echo "Waiting for GPU to clear after selectivity ${run_stage} ${key}..."
     bash scripts/wait_for_h200_gpu.sh
   done
+  merge_stage_results "$run_stage"
 done
 
 echo "Selectivity panel ${stage} run complete for model keys: ${model_keys[*]}"

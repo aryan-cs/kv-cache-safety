@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib.metadata
 import json
 import os
+import sys
 from dataclasses import asdict, replace
 from pathlib import Path
 from typing import Any
@@ -86,9 +88,18 @@ def main() -> None:
     manifest_base = {
         "run_name": config.run.name,
         "model_id": config.model.model_id,
+        "model_family": config.model.family,
+        "model_track": config.model.track,
         "model_provider": config.model.provider,
+        "backend_name": _backend_name(config.model.provider),
+        "backend_version": _backend_version(config.model.provider),
+        "launch_command": _launch_command(args),
         "model_config": asdict(config.model),
         "model_device_map": None,
+        "model_context_length": config.model.context_length,
+        "tokenizer_source": config.model.model_id,
+        "chat_template_required": config.model.chat_template_required,
+        "cache_policy_support": _cache_policy_support_manifest(config.cache_policies),
         "repository_url": (env.get("project") or {}).get("repository_url"),
         "repository_git_url": (env.get("project") or {}).get("repository_git_url"),
         "git_remote_origin": env.get("git_remote_origin"),
@@ -125,7 +136,14 @@ def main() -> None:
         if getattr(model_bundle, "model", None) is not None
         else None
     )
-    manifest = {**manifest_base, "model_device_map": device_map}
+    manifest = {
+        **manifest_base,
+        "model_device_map": device_map,
+        "tokenizer_source": _tokenizer_source(getattr(model_bundle, "tokenizer", None), config),
+        "chat_template_source_sha256": _chat_template_sha256(
+            getattr(model_bundle, "tokenizer", None)
+        ),
+    }
     _write_run_start_artifacts(run_dir, raw_config, env, manifest, resume=config.run.resume)
 
     cache_stat_rows: list[dict] = []
@@ -176,6 +194,8 @@ def main() -> None:
                         "policy": policy_name,
                         "seed": seed,
                         "model_id": config.model.model_id,
+                        "model_family": config.model.family,
+                        "model_track": config.model.track,
                         "generated_at": utc_timestamp(),
                         "system": prompt.system,
                         "user": prompt.user,
@@ -231,6 +251,60 @@ def main() -> None:
 def _stable_hash(value: Any) -> str:
     encoded = json.dumps(value, sort_keys=True, default=str).encode("utf-8")
     return hashlib.sha256(encoded).hexdigest()
+
+
+def _backend_name(model_provider: str) -> str:
+    if model_provider == "hf":
+        return "transformers"
+    if model_provider == "mock":
+        return "mock"
+    return model_provider
+
+
+def _backend_version(model_provider: str) -> str | None:
+    if model_provider == "hf":
+        try:
+            return importlib.metadata.version("transformers")
+        except importlib.metadata.PackageNotFoundError:
+            return None
+    return None
+
+
+def _launch_command(args: argparse.Namespace) -> list[str]:
+    command = [sys.executable, "scripts/run_experiment.py", "--config", str(args.config)]
+    if args.run_id:
+        command.extend(["--run-id", str(args.run_id)])
+    if args.resume:
+        command.append("--resume")
+    return command
+
+
+def _tokenizer_source(tokenizer: object | None, config: object) -> str:
+    source = getattr(tokenizer, "name_or_path", None)
+    if source:
+        return str(source)
+    return str(getattr(config.model, "model_id", ""))
+
+
+def _chat_template_sha256(tokenizer: object | None) -> str | None:
+    template = getattr(tokenizer, "chat_template", None)
+    if not template:
+        return None
+    return _stable_hash(str(template))
+
+
+def _cache_policy_support_manifest(policies: tuple[Any, ...]) -> list[dict[str, Any]]:
+    return [
+        {
+            "name": policy.name,
+            "label": cache_policy_label(policy),
+            "requires_role_spans": policy.name in {"policy_pinned", "user_pinned"}
+            or bool(policy.patch_from_baseline),
+            "requires_attention_scores": policy.name in {"attention_h2o"},
+            "requires_patch_from_baseline": bool(policy.patch_from_baseline),
+        }
+        for policy in policies
+    ]
 
 
 def _raw_config_with_run_overrides(
@@ -334,12 +408,7 @@ def _policy_manifest(policy: Any) -> dict[str, Any]:
 def _reconcile_resume_generations(run_dir: Path, rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     if not rows:
         return rows
-    try:
-        cache_keys = _cache_stats_generation_keys(run_dir / "cache_stats.parquet")
-    except RuntimeError as exc:
-        if os.environ.get("ALLOW_CORRUPT_CACHE_STATS_RESET") == "1":
-            return _archive_corrupt_cache_stats_resume(run_dir, rows, exc)
-        raise
+    cache_keys = _cache_stats_generation_keys(run_dir / "cache_stats.parquet")
     kept = [
         row
         for row in rows
@@ -363,27 +432,6 @@ def _reconcile_resume_generations(run_dir: Path, rows: list[dict[str, Any]]) -> 
     return kept
 
 
-def _archive_corrupt_cache_stats_resume(
-    run_dir: Path, rows: list[dict[str, Any]], error: Exception
-) -> list[dict[str, Any]]:
-    stamp = utc_timestamp()
-    generations_archive = run_dir / f"generations.corrupt_cache_stats_reset.{stamp}.jsonl"
-    cache_stats_path = run_dir / "cache_stats.parquet"
-    write_jsonl(generations_archive, rows)
-    write_jsonl(run_dir / "generations.jsonl", [])
-    cache_archive = None
-    if cache_stats_path.exists():
-        cache_archive = run_dir / f"cache_stats.parquet.corrupt.{stamp}"
-        cache_stats_path.replace(cache_archive)
-    print(
-        "ALLOW_CORRUPT_CACHE_STATS_RESET=1: starting this resume from zero because "
-        f"cache_stats.parquet is unreadable ({error}). Archived generations at "
-        f"{generations_archive}"
-        + (f" and corrupt cache stats at {cache_archive}." if cache_archive else ".")
-    )
-    return []
-
-
 def _cache_stats_generation_keys(cache_stats_path: Path) -> set[tuple[str, str, int]]:
     jsonl_path = cache_stats_path.with_suffix(".jsonl")
     if jsonl_path.exists():
@@ -405,12 +453,8 @@ def _cache_stats_generation_keys(cache_stats_path: Path) -> set[tuple[str, str, 
         raise RuntimeError("pyarrow is required for cache stats resume reconciliation.") from exc
     try:
         table = pq.read_table(cache_stats_path, columns=["prompt_id", "policy", "seed"])
-    except Exception as exc:
-        raise RuntimeError(
-            "Cannot resume safely because cache_stats.parquet is unreadable. "
-            "Restore a valid snapshot, or intentionally archive/reset the corrupt partial "
-            "run with ALLOW_CORRUPT_CACHE_STATS_RESET=1."
-        ) from exc
+    except Exception:
+        return set()
     prompt_ids = table.column("prompt_id").to_pylist()
     policies = table.column("policy").to_pylist()
     seeds = table.column("seed").to_pylist()

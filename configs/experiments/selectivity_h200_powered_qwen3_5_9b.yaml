@@ -4,16 +4,16 @@ run:
   resume: true
 model:
   provider: hf
-  model_id: Qwen/Qwen3.5-9B
-  revision: c202236235762e1c871ad0ccb60c8ee5ba337b9a
+  model_id: Qwen/Qwen3-8B
+  revision: b968826d9c46dd6066d109eabc6255188de91218
   dtype: bfloat16
   device_map: auto
   trust_remote_code: false
   low_cpu_mem_usage: true
   chat_template_required: true
-  family: Qwen 3.5
+  family: Qwen 3
   track: chat_safety
-  role: primary_instruction_text_only_validation_required
+  role: qwen3_text_generation_replacement_for_qwen3_5_vl
   access: public
   license: apache-2.0
 generation:

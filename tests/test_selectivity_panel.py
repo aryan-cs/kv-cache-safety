@@ -1,3 +1,4 @@
+import json
 import sys
 from pathlib import Path
 
@@ -5,8 +6,9 @@ sys.path.insert(0, str(Path("scripts").resolve()))
 
 import pytest
 from generate_selectivity_configs import experiment_config_for_panel_entry, load_yaml
+from merge_selectivity_panel_results import merge_runs
 from preflight_h200 import _check_config
-from score_base_model_track import compute_base_model_metrics
+from score_base_model_track import _merge_base_metrics, compute_base_model_metrics
 
 from cache_safety_erasure.config import parse_experiment_config
 
@@ -31,6 +33,9 @@ def test_selectivity_panel_records_registered_primary_models() -> None:
         "phi4",
     } <= keys
     assert any(entry["key"] == "phi4_mini_instruct" for entry in panel["fallbacks"])
+    qwen3 = next(entry for entry in panel["models"] if entry["key"] == "qwen3_5_9b")
+    assert qwen3["model"]["model_id"] == "Qwen/Qwen3-8B"
+    assert "text_generation_replacement" in qwen3["role"]
 
 
 @pytest.mark.skipif(
@@ -161,3 +166,67 @@ def test_base_model_metrics_report_safe_unsafe_margin_degradation() -> None:
         ]["margin_degradation"]
         == 1.5
     )
+
+
+def test_base_model_metrics_merge_into_standard_metrics(tmp_path: Path) -> None:
+    metrics_path = tmp_path / "metrics.json"
+    metrics_path.write_text('{"policy_level_contrasts": {}}\n', encoding="utf-8")
+    base_metrics = {"base_alignment_contrasts": {"base_alignment_contrast::sink_recent": {}}}
+
+    _merge_base_metrics(tmp_path, base_metrics)
+
+    merged = json.loads(metrics_path.read_text(encoding="utf-8"))
+    assert merged["base_model_metrics"] == base_metrics
+    assert merged["base_alignment_contrasts"] == base_metrics["base_alignment_contrasts"]
+
+
+def test_merge_selectivity_panel_preserves_family_rows(tmp_path: Path) -> None:
+    run_dirs = []
+    for family in ["Qwen", "Mistral"]:
+        run_dir = tmp_path / family.lower()
+        run_dir.mkdir()
+        (run_dir / "manifest.json").write_text(
+            json.dumps(
+                {
+                    "model_id": f"{family}/model",
+                    "model_family": family,
+                    "model_track": "chat_safety",
+                    "git_commit": "abc",
+                    "git_dirty": False,
+                }
+            ),
+            encoding="utf-8",
+        )
+        (run_dir / "metrics.json").write_text("{}", encoding="utf-8")
+        rows = [
+            {
+                "suite": "public_refusal_safety",
+                "prompt_id": "p1",
+                "seed": 0,
+                "policy": "none",
+                "model_family": family,
+                "model_track": "chat_safety",
+                "safety_score": 1.0,
+                "capability_score": None,
+            },
+            {
+                "suite": "public_refusal_safety",
+                "prompt_id": "p1",
+                "seed": 0,
+                "policy": "sliding_window__budget64",
+                "model_family": family,
+                "model_track": "chat_safety",
+                "safety_score": 0.0,
+                "capability_score": None,
+            },
+        ]
+        (run_dir / "generations.jsonl").write_text(
+            "\n".join(json.dumps(row) for row in rows) + "\n",
+            encoding="utf-8",
+        )
+        run_dirs.append(run_dir)
+
+    merged = merge_runs(run_dirs)
+
+    assert merged["manifest"]["instruction_tuned_families"] == ["Mistral", "Qwen"]
+    assert {row["source_run_id"] for row in merged["generations"]} == {"mistral", "qwen"}

@@ -149,7 +149,9 @@ def main() -> None:
 
     if not rows and output_path.exists():
         rows = [json.loads(line) for line in output_path.read_text(encoding="utf-8").splitlines() if line.strip()]
-    write_json(run_dir / "base_model_metrics.json", compute_base_model_metrics(rows))
+    metrics = compute_base_model_metrics(rows)
+    write_json(run_dir / "base_model_metrics.json", metrics)
+    _merge_base_metrics(run_dir, metrics)
     print(f"Wrote base-model continuation scores to {output_path}")
 
 
@@ -334,6 +336,19 @@ def _score_key(row: dict[str, Any]) -> tuple[str, str, str, int]:
         str(row.get("policy")),
         int(row.get("seed", 0)),
     )
+
+
+def _merge_base_metrics(run_dir: Path, base_metrics: dict[str, Any]) -> None:
+    metrics_path = run_dir / "metrics.json"
+    if metrics_path.exists():
+        metrics = json.loads(metrics_path.read_text(encoding="utf-8"))
+        if not isinstance(metrics, dict):
+            metrics = {}
+    else:
+        metrics = {}
+    metrics["base_model_metrics"] = base_metrics
+    metrics["base_alignment_contrasts"] = base_metrics.get("base_alignment_contrasts", {})
+    write_json(metrics_path, metrics)
 
 
 if __name__ == "__main__":

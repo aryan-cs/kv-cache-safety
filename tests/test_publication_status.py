@@ -3420,6 +3420,35 @@ def _passing_metrics() -> dict:
                 },
             }
         },
+        "model_family_replication": {
+            "metadata_available": True,
+            "metadata_rows": 200,
+            "unknown_metadata_rows": 0,
+            "instruction_tuned_family_count": 2,
+            "instruction_tuned_families": ["Mistral", "Qwen"],
+            "family_policy_level_contrasts": {
+                "Mistral": {
+                    "policy_pinned__budget128__sink8": {
+                        "selective_safety_erasure_index": 0.09,
+                        "selective_safety_erasure_index_ci": {
+                            "mean": 0.09,
+                            "ci_low": 0.06,
+                            "ci_high": 0.12,
+                        },
+                    }
+                },
+                "Qwen": {
+                    "policy_pinned__budget128__sink8": {
+                        "selective_safety_erasure_index": 0.10,
+                        "selective_safety_erasure_index_ci": {
+                            "mean": 0.10,
+                            "ci_low": 0.06,
+                            "ci_high": 0.13,
+                        },
+                    }
+                },
+            },
+        },
         "causal_restoration": {
             "public_refusal_safety::kv_int4_sim__patchkey-value__rolesystem": {
                 "compressed_policy": "kv_int4_sim",
@@ -3699,6 +3728,38 @@ def _passing_claim_assessment(
                 },
                 "summary": "SSEI clears the registered interval gate.",
             },
+            "H3_cross_family_replication": {
+                "passed": True,
+                "required": True,
+                "metadata_available": True,
+                "instruction_tuned_family_count": 2,
+                "replicating_family_count": 2,
+                "replicating_families": ["Mistral", "Qwen"],
+                "best_family_evidence": {
+                    "Mistral": {
+                        "family": "Mistral",
+                        "policy": "policy_pinned__budget128__sink8",
+                        "estimate": 0.09,
+                        "ci_low": 0.06,
+                        "ci_high": 0.12,
+                        "ci_width": 0.06,
+                        "passed": True,
+                    },
+                    "Qwen": {
+                        "family": "Qwen",
+                        "policy": "policy_pinned__budget128__sink8",
+                        "estimate": 0.10,
+                        "ci_low": 0.06,
+                        "ci_high": 0.13,
+                        "ci_width": 0.07,
+                        "passed": True,
+                    },
+                },
+                "summary": (
+                    "Cross-family replication passed across instruction-tuned families: "
+                    "Mistral, Qwen."
+                ),
+            },
             "H3_causal_safety_state_erasure": {
                 "passed": True,
                 "eligible_comparison_count": 1,
@@ -3733,11 +3794,12 @@ def _passing_claim_assessment(
             "required_claims": [
                 "H1_behavioral_cache_sensitivity",
                 "H2_selective_safety_degradation",
+                "H3_cross_family_replication",
                 "H3_causal_safety_state_erasure",
                 "human_audit_support",
             ],
         },
-        "passed_claim_count": 3,
+        "passed_claim_count": 4,
         "source_artifacts": _claim_source_artifacts(primary, causal, primary_audit, causal_audit),
         "human_audit_support": {
             "required": True,
