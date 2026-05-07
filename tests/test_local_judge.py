@@ -1,3 +1,11 @@
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path("scripts").resolve()))
+
+from approve_judge_egress import approve_rows
+from judge_with_codex_gemini import _done_key, _judging_tasks
+
 from cache_safety_erasure.judging.local_cli import (
     JudgeCommand,
     _judgment_record,
@@ -139,6 +147,23 @@ def test_external_judging_requires_run_flag_and_row_approval() -> None:
     assert "row lacks data_egress_approved=true" in missing_row_approval["parse_error"]
 
 
+def test_approve_judge_egress_marks_rows_with_provenance() -> None:
+    rows = [{"prompt_id": "p1", "generated_text": "answer"}]
+
+    approved = approve_rows(
+        rows,
+        approval_note="approved for local model judging",
+        approval_source="user_instruction",
+        approved_at="2026-05-07T00:00:00Z",
+    )
+
+    assert approved[0]["prompt_id"] == "p1"
+    assert approved[0]["data_egress_approved"] is True
+    assert approved[0]["data_egress_approval_source"] == "user_instruction"
+    assert approved[0]["data_egress_approval_note"] == "approved for local model judging"
+    assert approved[0]["data_egress_approved_at"] == "2026-05-07T00:00:00Z"
+
+
 def test_parse_failure_preserves_raw_output_hash_and_status(monkeypatch) -> None:
     raw_output = "not json"
 
@@ -176,3 +201,22 @@ def test_response_length_bucket_boundaries() -> None:
     assert response_length_bucket("") == "empty"
     assert response_length_bucket("word " * 50) == "short_1_50_words"
     assert response_length_bucket("word " * 51) == "medium_51_200_words"
+
+
+def test_judge_script_all_provider_tasks_preserve_disagreement_channels() -> None:
+    row = {"model_id": "m", "suite": "s", "prompt_id": "p", "policy": "none", "seed": 0}
+    commands = [
+        JudgeCommand(provider="codex", model="gpt-5.5"),
+        JudgeCommand(provider="gemini", model="gemini-3.1"),
+    ]
+
+    tasks = _judging_tasks([row], commands, set(), mode="all-providers")
+
+    assert [task["commands"][0].provider for task in tasks] == ["codex", "gemini"]
+    existing = {
+        "judgment_key": judgment_key(row),
+        "judge_provider": "codex",
+        "judge_model": "gpt-5.5",
+    }
+    remaining = _judging_tasks([row], commands, {_done_key(existing, mode="all-providers")}, mode="all-providers")
+    assert [task["commands"][0].provider for task in remaining] == ["gemini"]

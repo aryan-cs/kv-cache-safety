@@ -24,6 +24,15 @@ def main() -> None:
     parser.add_argument("--input-jsonl", required=True, type=Path)
     parser.add_argument("--output-jsonl", required=True, type=Path)
     parser.add_argument("--providers", default="codex,gemini")
+    parser.add_argument(
+        "--judge-mode",
+        choices=["all-providers", "first-success"],
+        default="all-providers",
+        help=(
+            "all-providers writes one source-marked row per eligible judge for disagreement "
+            "analysis; first-success keeps the historical fallback behavior."
+        ),
+    )
     parser.add_argument("--codex-model", default="gpt-5.5")
     parser.add_argument("--gemini-model", default=None)
     parser.add_argument("--workers", type=int, default=2)
@@ -56,26 +65,30 @@ def main() -> None:
         existing, corrupt_output = read_jsonl_tolerant(args.output_jsonl)
         if corrupt_output is not None:
             print(f"Quarantined corrupt output tail at {corrupt_output}.")
-        done = {str(row.get("judgment_key")) for row in existing if row.get("judgment_key")}
-    pending = [row for row in rows if judgment_key(row) not in done]
+        done = {
+            _done_key(row, mode=args.judge_mode)
+            for row in existing
+            if row.get("judgment_key")
+        }
     commands = _commands_from_args(args)
+    tasks = _judging_tasks(rows, commands, done, mode=args.judge_mode)
 
     args.output_jsonl.parent.mkdir(parents=True, exist_ok=True)
     lock = threading.Lock()
     completed = len(done)
-    total = len(done) + len(pending)
-    print(f"Judging {len(pending)} pending row(s); {len(done)} already complete.")
+    total = len(done) + len(tasks)
+    print(f"Judging {len(tasks)} pending task(s); {len(done)} already complete.")
 
     with ThreadPoolExecutor(max_workers=max(1, args.workers)) as executor:
         futures = {
             executor.submit(
                 judge_row,
-                row,
-                commands,
+                task["row"],
+                task["commands"],
                 allow_data_egress=args.allow_data_egress,
                 data_egress_field=args.data_egress_field,
-            ): row
-            for row in pending
+            ): task
+            for task in tasks
         }
         for future in as_completed(futures):
             judgment = future.result()
@@ -117,6 +130,44 @@ def _commands_from_args(args: argparse.Namespace) -> list[JudgeCommand]:
     if not commands:
         raise ValueError("--providers must include at least one provider")
     return commands
+
+
+def _judging_tasks(
+    rows: list[dict],
+    commands: list[JudgeCommand],
+    done: set[str],
+    *,
+    mode: str,
+) -> list[dict]:
+    if mode == "first-success":
+        return [
+            {"row": row, "commands": commands}
+            for row in rows
+            if judgment_key(row) not in done
+        ]
+    tasks = []
+    for row in rows:
+        for command in commands:
+            key = _provider_done_key(row, command)
+            if key not in done:
+                tasks.append({"row": row, "commands": [command]})
+    return tasks
+
+
+def _done_key(row: dict, *, mode: str) -> str:
+    if mode == "first-success":
+        return str(row.get("judgment_key"))
+    return "::".join(
+        [
+            str(row.get("judgment_key")),
+            str(row.get("judge_provider", "")),
+            str(row.get("judge_model", "")),
+        ]
+    )
+
+
+def _provider_done_key(row: dict, command: JudgeCommand) -> str:
+    return "::".join([judgment_key(row), command.provider, command.model or ""])
 
 
 if __name__ == "__main__":

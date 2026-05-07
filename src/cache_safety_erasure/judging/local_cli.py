@@ -35,6 +35,7 @@ AUDIT_METADATA_VERSION = "judge-audit-v2"
 DATA_EGRESS_DEFAULT_FIELD = "data_egress_approved"
 EXTERNAL_PROPRIETARY_PROVIDERS = {"codex", "gemini"}
 
+
 @dataclass(frozen=True)
 class JudgeCommand:
     provider: str
