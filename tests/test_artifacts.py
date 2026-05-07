@@ -253,6 +253,25 @@ def test_cache_stats_parquet_rebuild_uses_durable_jsonl_checkpoint(tmp_path: Pat
     assert table.column("prompt_id").to_pylist() == ["p1", "p2"]
 
 
+def test_cache_stats_sink_archives_corrupt_parquet_on_resume(tmp_path: Path) -> None:
+    import sys
+
+    import pyarrow.parquet as pq
+
+    sys.path.insert(0, str(Path("scripts").resolve()))
+    from run_experiment import _CacheStatsSink
+
+    parquet_path = tmp_path / "cache_stats.parquet"
+    parquet_path.write_bytes(b"not parquet")
+    sink = _CacheStatsSink(parquet_path, resume=True)
+    sink.write([{"prompt_id": "p2", "seed": 0, "policy": "sliding_window", "decode_step": 0}])
+    sink.close()
+
+    assert list(tmp_path.glob("cache_stats.parquet.corrupt.*"))
+    table = pq.read_table(parquet_path, columns=["prompt_id"])
+    assert table.column("prompt_id").to_pylist() == ["p2"]
+
+
 def test_empty_cache_stats_sink_writes_readable_schema(tmp_path: Path) -> None:
     import sys
 

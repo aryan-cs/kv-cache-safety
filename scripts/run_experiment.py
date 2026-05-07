@@ -681,7 +681,19 @@ class _CacheStatsSink:
                 raise RuntimeError("pyarrow is required for cache_stats.parquet.") from exc
             self.writer = pq.ParquetWriter(write_path, schema)
             if self.temp_path is not None:
-                _copy_existing_cache_stats(self.path, self.writer, schema)
+                try:
+                    _copy_existing_cache_stats(self.path, self.writer, schema)
+                except Exception as exc:
+                    corrupt_path = self.path.with_name(
+                        f"{self.path.name}.corrupt.{utc_timestamp()}"
+                    )
+                    self.path.replace(corrupt_path)
+                    print(
+                        "WARNING: archived unreadable cache_stats.parquet at "
+                        f"{corrupt_path}; final cache_stats.parquet will be "
+                        f"rebuilt from {self.path.with_suffix('.jsonl')}. "
+                        f"Original error: {exc}"
+                    )
         self.writer.write_table(table)
 
     def close(self) -> None:
