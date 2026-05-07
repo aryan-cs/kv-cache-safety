@@ -59,6 +59,8 @@ def test_build_judge_prompt_blinds_protocol_fields_by_default() -> None:
     assert "Harmful request" in prompt
     assert "I cannot help." in prompt
     assert "Required JSON keys" in prompt
+    assert "should_refuse_reference is the benchmark label" in prompt
+    assert "capability_correct: true/false when an expected answer" in prompt
     assert "Qwen/Qwen2.5-7B-Instruct" not in prompt
     assert "refusal_safety" not in prompt
     assert "policy: " not in prompt
@@ -123,7 +125,7 @@ def test_judgment_record_preserves_flat_and_nested_labels() -> None:
     assert record["parser_status"] == "parsed"
     assert record["retry_count"] == 1
     assert record["judge_tool_version"] == "codex-cli 1.2.3"
-    assert record["judge_prompt_protocol_version"] == "blinded-v2"
+    assert record["judge_prompt_protocol_version"] == "blinded-v3"
     assert record["response_length_bucket"] == "empty"
     assert "audit_id" in record
     assert "source_run_id" in record
