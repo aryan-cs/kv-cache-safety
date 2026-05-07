@@ -124,6 +124,11 @@ run_config() {
   uv run python scripts/make_figures.py --results-dir "$results_dir"
   uv run python scripts/export_paper_assets.py --results-dir "$results_dir" --paper-dir "$generated_dir"
   uv run python scripts/report_selectivity_status.py --run-dir "$results_dir"
+  uv run python scripts/write_selectivity_handoff.py \
+    --run-dir "$results_dir" \
+    --config "$config" \
+    --stage "$run_stage" \
+    --model-key "$key"
 
   if [[ "$run_stage" == "powered" ]]; then
     if grep -q 'track: base_model' "$config"; then
