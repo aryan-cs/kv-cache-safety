@@ -267,6 +267,7 @@ def _judgment_record(
         "raw_output": raw_output,
         "parser_status": parser_status,
         "parse_error": parse_error,
+        "labels": labels,
         **labels,
     }
 

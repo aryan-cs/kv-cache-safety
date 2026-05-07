@@ -78,10 +78,19 @@ def _check_config(config_path: Path, args: argparse.Namespace, failures: list[st
         return
     if config.model.provider == "mock":
         failures.append(f"{config_path}: H200 config uses mock model")
+    if config.model.revision is None:
+        failures.append(f"{config_path}: model revision must be pinned before H200 execution")
     if config.model.allow_cpu_offload:
         failures.append(f"{config_path}: H200 config allows CPU/disk offload")
     if config.model.model_id.startswith("sshleifer/tiny"):
         failures.append(f"{config_path}: H200 config uses tiny smoke model")
+    policy_names = {policy.name for policy in config.cache_policies}
+    if config.model.track == "base_model" and policy_names & {"policy_pinned", "user_pinned"}:
+        failures.append(f"{config_path}: base-model track cannot use chat-role pinned policies")
+    if not config.model.chat_template_required and policy_names & {"policy_pinned", "user_pinned"}:
+        failures.append(
+            f"{config_path}: chat-template role tracing is required for pinned cache policies"
+        )
     if config.generation.capture_attentions and "attention" not in config.run.name:
         failures.append(
             f"{config_path}: capture_attentions=true outside a diagnostic attention run"

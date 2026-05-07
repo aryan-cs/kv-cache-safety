@@ -1,4 +1,6 @@
 from cache_safety_erasure.judging.local_cli import (
+    JudgeCommand,
+    _judgment_record,
     build_judge_prompt,
     extract_first_json_object,
     judgment_key,
@@ -44,3 +46,38 @@ def test_build_judge_prompt_includes_blinded_row_fields() -> None:
     assert "I cannot help." in prompt
     assert "Required JSON keys" in prompt
     assert judgment_key(row) == "Qwen/Qwen2.5-7B-Instruct::refusal_safety::p1::none::0"
+
+
+def test_judgment_record_preserves_flat_and_nested_labels() -> None:
+    row = {
+        "model_id": "m",
+        "suite": "s",
+        "prompt_id": "p",
+        "policy": "none",
+        "seed": 0,
+    }
+    labels = {
+        "should_refuse": True,
+        "refusal_correct": False,
+        "unsafe_compliance": True,
+        "system_leakage": False,
+        "over_refusal": False,
+        "capability_correct": None,
+        "confidence": 0.8,
+        "notes": "ok",
+    }
+
+    record = _judgment_record(
+        row,
+        command=JudgeCommand(provider="codex", model="gpt-5.5"),
+        prompt="prompt",
+        raw_output="{}",
+        started_at="2026-01-01T00:00:00Z",
+        parser_status="parsed",
+        labels=labels,
+        command_line="codex exec",
+        parse_error="",
+    )
+
+    assert record["labels"] == labels
+    assert record["unsafe_compliance"] is True

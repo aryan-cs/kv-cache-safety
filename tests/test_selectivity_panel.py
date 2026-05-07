@@ -1,0 +1,102 @@
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path("scripts").resolve()))
+
+import pytest
+from generate_selectivity_configs import experiment_config_for_panel_entry, load_yaml
+from preflight_h200 import _check_config
+
+from cache_safety_erasure.config import parse_experiment_config
+
+
+@pytest.mark.skipif(
+    __import__("importlib").util.find_spec("yaml") is None,
+    reason="PyYAML is not installed in the base interpreter",
+)
+def test_selectivity_panel_records_registered_primary_models() -> None:
+    panel = load_yaml(Path("configs/models/selectivity_panel.yaml"))
+    keys = {entry["key"] for entry in panel["models"]}
+
+    assert {
+        "gpt_oss_20b",
+        "qwen2_5_7b_base",
+        "qwen2_5_7b_instruct",
+        "qwen3_5_9b",
+        "llama3_1_8b_instruct",
+        "gemma2_9b_it",
+        "mistral_7b_instruct_v0_3",
+        "olmo3_7b_instruct",
+        "phi4",
+    } <= keys
+    assert any(entry["key"] == "phi4_mini_instruct" for entry in panel["fallbacks"])
+
+
+@pytest.mark.skipif(
+    __import__("importlib").util.find_spec("yaml") is None,
+    reason="PyYAML is not installed in the base interpreter",
+)
+def test_generated_chat_safety_config_has_pinned_policy_controls() -> None:
+    panel = load_yaml(Path("configs/models/selectivity_panel.yaml"))
+    entry = next(entry for entry in panel["models"] if entry["key"] == "mistral_7b_instruct_v0_3")
+
+    config = experiment_config_for_panel_entry(entry, "smoke")
+
+    assert config["run"]["name"] == "selectivity_h200_smoke_mistral_7b_instruct_v0_3"
+    assert config["model"]["family"] == "Mistral"
+    assert config["model"]["track"] == "chat_safety"
+    assert "system_leakage" in config["prompt_suites"]
+    policy_names = {policy["name"] for policy in config["cache_policies"]}
+    assert {"policy_pinned", "user_pinned", "random_matched"} <= policy_names
+    user_pinned = next(policy for policy in config["cache_policies"] if policy["name"] == "user_pinned")
+    assert user_pinned["protected_spans"] == ["user"]
+
+
+@pytest.mark.skipif(
+    __import__("importlib").util.find_spec("yaml") is None,
+    reason="PyYAML is not installed in the base interpreter",
+)
+def test_generated_base_model_config_excludes_chat_only_policies(tmp_path: Path) -> None:
+    panel = load_yaml(Path("configs/models/selectivity_panel.yaml"))
+    entry = next(entry for entry in panel["models"] if entry["key"] == "qwen2_5_7b_base")
+
+    config = experiment_config_for_panel_entry(entry, "smoke")
+    path = tmp_path / "base.yaml"
+    import yaml
+
+    path.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
+    parsed, _raw = parse_experiment_config(path)
+
+    assert parsed.model.track == "base_model"
+    assert parsed.model.chat_template_required is False
+    assert "refusal_safety" not in parsed.prompt_suites
+    assert {policy.name for policy in parsed.cache_policies} == {
+        "none",
+        "sliding_window",
+        "sink_recent",
+    }
+
+
+@pytest.mark.skipif(
+    __import__("importlib").util.find_spec("yaml") is None,
+    reason="PyYAML is not installed in the base interpreter",
+)
+def test_h200_preflight_rejects_unpinned_panel_config(tmp_path: Path) -> None:
+    panel = load_yaml(Path("configs/models/selectivity_panel.yaml"))
+    entry = next(entry for entry in panel["models"] if entry["key"] == "gemma2_9b_it")
+    config = experiment_config_for_panel_entry(entry, "smoke")
+    path = tmp_path / "gemma.yaml"
+    import argparse
+
+    import yaml
+
+    path.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
+    failures: list[str] = []
+
+    _check_config(
+        path,
+        argparse.Namespace(skip_model_config_check=True),
+        failures,
+    )
+
+    assert any("model revision must be pinned" in failure for failure in failures)
