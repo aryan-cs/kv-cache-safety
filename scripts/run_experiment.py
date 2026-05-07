@@ -571,6 +571,7 @@ CACHE_STATS_COLUMNS = [
     "layer_count",
     "cache_l2_before",
     "cache_l2_after",
+    "cache_l2_measurement",
     "retained_special_tokens",
     "retained_template_tokens",
     "retained_system_tokens",
