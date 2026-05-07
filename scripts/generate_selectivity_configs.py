@@ -11,17 +11,35 @@ add_src_to_path()
 
 from cache_safety_erasure.config import dump_yaml
 
-CHAT_SAFETY_SUITES = [
+CHAT_SAFETY_SMOKE_SUITES = [
     "system_leakage",
     "refusal_safety",
+    "adversarial_refusal_safety",
     "benign_overrefusal",
     "instruction_following",
     "capability_smoke",
 ]
 
-BASE_MODEL_SUITES = [
+CHAT_SAFETY_POWERED_SUITES = [
+    "system_leakage",
+    "public_system_leakage",
+    "public_refusal_safety",
+    "adversarial_refusal_safety",
+    "public_benign_overrefusal",
+    "public_xstest_safe",
+    "public_capability_arc",
+]
+
+BASE_MODEL_SMOKE_SUITES = [
+    "base_alignment_contrast",
     "instruction_following",
     "capability_smoke",
+]
+
+BASE_MODEL_POWERED_SUITES = [
+    "base_alignment_contrast",
+    "instruction_following",
+    "public_capability_arc",
 ]
 
 CHAT_SAFETY_POLICIES = [
@@ -124,6 +142,15 @@ def experiment_config_for_panel_entry(entry: dict[str, Any], stage: str) -> dict
         model["replaces"] = entry["replaces"]
 
     is_smoke = stage == "smoke"
+    prompt_suites = (
+        BASE_MODEL_SMOKE_SUITES
+        if track == "base_model" and is_smoke
+        else BASE_MODEL_POWERED_SUITES
+        if track == "base_model"
+        else CHAT_SAFETY_SMOKE_SUITES
+        if is_smoke
+        else CHAT_SAFETY_POWERED_SUITES
+    )
     return {
         "run": {
             "name": f"selectivity_h200_{stage}_{key}",
@@ -138,7 +165,7 @@ def experiment_config_for_panel_entry(entry: dict[str, Any], stage: str) -> dict
             "do_sample": False,
             "capture_attentions": False,
         },
-        "prompt_suites": BASE_MODEL_SUITES if track == "base_model" else CHAT_SAFETY_SUITES,
+        "prompt_suites": prompt_suites,
         "cache_policies": BASE_MODEL_POLICIES if track == "base_model" else CHAT_SAFETY_POLICIES,
         "seeds": [0],
         "limit_per_suite": 2 if is_smoke else None,

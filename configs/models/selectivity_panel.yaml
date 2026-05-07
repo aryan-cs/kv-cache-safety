@@ -89,7 +89,7 @@ models:
     model:
       provider: hf
       model_id: google/gemma-2-9b-it
-      revision:
+      revision: 11c9b309abf73637e4b6f9a3fa1e92e615547819
       dtype: bfloat16
       device_map: auto
       trust_remote_code: false
