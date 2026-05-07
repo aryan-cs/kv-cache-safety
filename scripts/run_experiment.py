@@ -59,6 +59,7 @@ def main() -> None:
     )
     env = environment_snapshot()
     generations_path = run_dir / "generations.jsonl"
+    cache_stats_jsonl_path = run_dir / "cache_stats.jsonl"
     if config.run.resume:
         existing, corrupt_tail_path = read_jsonl_tolerant(generations_path)
         if corrupt_tail_path is not None:
@@ -110,6 +111,13 @@ def main() -> None:
     done_keys = {
         (row["prompt_id"], row["suite"], row["policy"], int(row["seed"])) for row in existing
     }
+    _write_progress(
+        run_dir,
+        completed=len(done_keys),
+        expected=expected_generation_count,
+        activity="loading_model",
+        current=None,
+    )
 
     model_bundle = load_model(config.model)
     device_map = (
@@ -168,6 +176,7 @@ def main() -> None:
                         "policy": policy_name,
                         "seed": seed,
                         "model_id": config.model.model_id,
+                        "generated_at": utc_timestamp(),
                         "system": prompt.system,
                         "user": prompt.user,
                         "should_refuse": prompt.should_refuse,
@@ -178,11 +187,29 @@ def main() -> None:
                         **metrics,
                     }
                     append_jsonl(generations_path, [row])
+                    decision_rows = []
                     for decision in result.cache_decisions:
-                        cache_stat_rows.extend(decision.to_rows(prompt.id, seed))
-                        if len(cache_stat_rows) >= 50_000:
+                        decision_rows.extend(decision.to_rows(prompt.id, seed))
+                    if decision_rows:
+                        append_jsonl(cache_stats_jsonl_path, decision_rows)
+                        cache_stat_rows.extend(decision_rows)
+                        if len(cache_stat_rows) >= 10_000:
                             cache_stats_sink.write(cache_stat_rows)
                             cache_stat_rows = []
+                    done_keys.add(key)
+                    _write_progress(
+                        run_dir,
+                        completed=len(done_keys),
+                        expected=expected_generation_count,
+                        activity="generating",
+                        current={
+                            "suite": prompt.suite,
+                            "prompt_id": prompt.id,
+                            "policy": policy_name,
+                            "seed": seed,
+                            "model_id": config.model.model_id,
+                        },
+                    )
 
     rows = read_jsonl(generations_path)
     metrics = compute_run_metrics(rows)
@@ -191,6 +218,13 @@ def main() -> None:
     if cache_stat_rows:
         cache_stats_sink.write(cache_stat_rows)
     cache_stats_sink.close()
+    _write_progress(
+        run_dir,
+        completed=len(rows),
+        expected=expected_generation_count,
+        activity="complete",
+        current={"model_id": config.model.model_id},
+    )
     print(f"Completed run: {run_dir}")
 
 
@@ -351,6 +385,17 @@ def _archive_corrupt_cache_stats_resume(
 
 
 def _cache_stats_generation_keys(cache_stats_path: Path) -> set[tuple[str, str, int]]:
+    jsonl_path = cache_stats_path.with_suffix(".jsonl")
+    if jsonl_path.exists():
+        rows, corrupt_tail_path = read_jsonl_tolerant(jsonl_path)
+        if corrupt_tail_path is not None:
+            print(
+                "Resume recovery quarantined a corrupt cache_stats.jsonl tail at "
+                f"{corrupt_tail_path}."
+            )
+        keys = _cache_stats_generation_keys_from_rows(rows)
+        if keys:
+            return keys
     cache_stats_path = _promote_recoverable_cache_stats_temp(cache_stats_path)
     if not cache_stats_path.exists():
         return set()
@@ -374,6 +419,39 @@ def _cache_stats_generation_keys(cache_stats_path: Path) -> set[tuple[str, str, 
         for prompt_id, policy, seed in zip(prompt_ids, policies, seeds, strict=False)
         if prompt_id is not None and policy is not None
     }
+
+
+def _cache_stats_generation_keys_from_rows(rows: list[dict[str, Any]]) -> set[tuple[str, str, int]]:
+    keys = set()
+    for row in rows:
+        prompt_id = row.get("prompt_id")
+        policy = row.get("policy")
+        if prompt_id is None or policy is None:
+            continue
+        keys.add((str(prompt_id), str(policy), int(row.get("seed") or 0)))
+    return keys
+
+
+def _write_progress(
+    run_dir: Path,
+    *,
+    completed: int,
+    expected: int,
+    activity: str,
+    current: dict[str, Any] | None,
+) -> None:
+    percent = round((completed / expected) * 100, 3) if expected else 100.0
+    write_json(
+        run_dir / "progress.json",
+        {
+            "updated_at": utc_timestamp(),
+            "activity": activity,
+            "completed": completed,
+            "expected": expected,
+            "progress_percent": percent,
+            "current": current or {},
+        },
+    )
 
 
 def _promote_recoverable_cache_stats_temp(cache_stats_path: Path) -> Path:

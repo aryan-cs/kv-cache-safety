@@ -51,6 +51,16 @@ def build_cache_policy(config: CachePolicyConfig, seed: int) -> object:
             sink_tokens=config.sink_tokens,
             name=label,
         )
+    if name == "user_pinned":
+        protected_spans = config.protected_spans
+        if protected_spans == ("system", "policy"):
+            protected_spans = ("user",)
+        return PolicyPinnedPolicy(
+            budget=_require_budget(config),
+            protected_spans=protected_spans,
+            sink_tokens=config.sink_tokens,
+            name=label,
+        )
     raise ValueError(f"Unknown cache policy: {name}")
 
 
@@ -60,7 +70,7 @@ def cache_policy_label(config: CachePolicyConfig) -> str:
     parts = [config.name]
     if config.budget is not None:
         parts.append(f"budget{config.budget}")
-    if config.name in {"sink_recent", "attention_h2o", "policy_pinned"}:
+    if config.name in {"sink_recent", "attention_h2o", "policy_pinned", "user_pinned"}:
         parts.append(f"sink{config.sink_tokens}")
     if config.recent_tokens is not None:
         parts.append(f"recent{config.recent_tokens}")
