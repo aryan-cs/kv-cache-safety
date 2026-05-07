@@ -18,7 +18,7 @@ selectivity_h200_powered_qwen2_5_7b_instruct
 
 It uses 1,300 public prompts per confirmatory suite with the full eviction/retention policy matrix. The run writes `generations.jsonl`, `cache_stats.jsonl`, and `progress.json` incrementally and is restartable with `--resume`.
 
-The first 225 rows were generated at commit `d7b4431`. Rows 226-544 were generated after resuming at commit `90ca99e`, which preserves generation semantics but limits expensive cache L2 norm diagnostics to pre-response cache states by default. The run was then resumed again at commit `449b842`, which rebuilds final `cache_stats.parquet` from the durable `cache_stats.jsonl` checkpoint. These changes keep the confirmatory generation outcomes unchanged while making the powered sweep operationally tractable and restart-safe. The mixed diagnostic metadata is provenance-relevant and must be reported if cache-norm figures use this run.
+The first 225 rows were generated at commit `d7b4431`. Rows 226-544 were generated after resuming at commit `90ca99e`, which preserves generation semantics but limits expensive cache L2 norm diagnostics to pre-response cache states by default. The run was then resumed again at commit `449b842`, which rebuilds final `cache_stats.parquet` from the durable `cache_stats.jsonl` checkpoint, and at commit `5e71104`, which recovers safely from a corrupt partial parquet artifact. These changes keep the confirmatory generation outcomes unchanged while making the powered sweep operationally tractable and restart-safe. The mixed diagnostic metadata is provenance-relevant and must be reported if cache-norm figures use this run.
 
 ## What "Clear Out The Codebase" Means
 
@@ -139,37 +139,42 @@ codex exec --cd /Users/aryan/Desktop/projects/llm-safety --sandbox read-only --e
 Fallback judge command:
 
 ```bash
-gemini -p '<prompt>'
+gemini --approval-mode plan --sandbox --output-format text -p '<prompt>'
 ```
 
-For powered runs, judge sampled audit rows rather than blindly judging every generation row. Export a per-model audit sample first:
+For powered runs, judge sampled audit rows rather than blindly judging every generation row. The preferred completed-run handoff is:
+
+```bash
+uv run python scripts/sync_and_judge_selectivity_run.py \
+  --run-id <run_id> \
+  --workers 4
+```
+
+This fetches the H200-owned run directory, exports a per-model audit sample, approves that key JSONL for local model-judge data egress, and writes Codex/Gemini judgments under `docs/audit/`. Judge state is deliberately kept out of `results/<run_id>/`, because repeated H200 result syncs treat that directory as remote-owned.
+
+For merged panel artifacts, the audit exporter preserves `source_run_id` and `model_id` scope so identical public prompt IDs from different models cannot collapse into one sampled item.
+
+Manual equivalent:
 
 ```bash
 uv run python scripts/export_human_audit_sample.py \
   --results-dir results/<run_id> \
-  --output-dir paper/audit \
-  --per-suite-policy 25 \
+  --output-dir docs/audit \
+  --per-suite-policy 8 \
   --strategy effect \
-  --annotator-template-count 2 \
   --include-hidden-reference \
   --seed 0
-```
 
-For merged panel artifacts, the audit exporter preserves `source_run_id` and `model_id` scope so identical public prompt IDs from different models cannot collapse into one sampled item.
-
-Then approve the key JSONL for local model-judge data egress and run the external judge harness:
-
-```bash
 uv run python scripts/approve_judge_egress.py \
-  --input-jsonl paper/audit/<run_id>_audit_key.jsonl \
-  --output-jsonl results/<run_id>/judge_input.codex_gemini.jsonl \
-  --approval-note "User approved local Codex/Gemini judging for H200-generated selectivity rows." \
+  --input-jsonl docs/audit/<run_id>_audit_key.jsonl \
+  --output-jsonl docs/audit/<run_id>_audit_key.codex_gemini_approved.jsonl \
+  --approval-note "User approved local Codex/Gemini judging for H200-generated selectivity audit rows." \
   --approval-source user_instruction \
   --overwrite
 
 uv run python scripts/judge_with_codex_gemini.py \
-  --input-jsonl results/<run_id>/judge_input.codex_gemini.jsonl \
-  --output-jsonl results/<run_id>/judgments.codex_gemini.jsonl \
+  --input-jsonl docs/audit/<run_id>_audit_key.codex_gemini_approved.jsonl \
+  --output-jsonl docs/audit/<run_id>_judgments.codex_gemini.jsonl \
   --providers codex,gemini \
   --judge-mode all-providers \
   --workers 4 \
@@ -209,6 +214,7 @@ Use `scripts/report_selectivity_status.py` to generate this format from a run di
 - If H200 expires, notify Aryan and resume the same run after restart; do not relaunch a duplicate run while a process or lock is active.
 - Fetch and push completed powered Qwen artifacts.
 - Export powered audit samples per model, approve only those sampled rows for local judge egress, and run Codex/Gemini judging with family separation.
+- Use the completed-run sync-and-judge handoff so local judge outputs cannot be overwritten by repeated H200 result syncs.
 - Launch the next powered model while the previous model's local judging is running.
 - Merge completed powered runs only after each per-model run has valid artifacts and readiness reports.
 - Extend paper analysis only from completed, provenance-valid runs; keep smoke and pilot evidence scoped accordingly.

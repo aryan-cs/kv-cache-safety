@@ -319,10 +319,17 @@ def _run_codex(command: JudgeCommand, prompt: str) -> dict[str, Any]:
 
 
 def _run_gemini(command: JudgeCommand, prompt: str) -> dict[str, Any]:
-    args = ["gemini"]
+    args = [
+        "gemini",
+        "--approval-mode",
+        "plan",
+        "--sandbox",
+        "--output-format",
+        "text",
+    ]
     if command.model:
         args.extend(["--model", command.model])
-    args.extend(["--prompt", prompt])
+    args.extend(["-p", prompt])
     env = os.environ.copy()
     env.setdefault("TERM", "xterm-256color")
     completed = subprocess.run(
@@ -337,10 +344,13 @@ def _run_gemini(command: JudgeCommand, prompt: str) -> dict[str, Any]:
     raw_output = completed.stdout.strip()
     if completed.returncode != 0 and not raw_output:
         raise RuntimeError((completed.stderr or completed.stdout).strip())
+    if not raw_output:
+        raise RuntimeError((completed.stderr or "gemini produced no output").strip())
     redacted = ["gemini"]
+    redacted.extend(["--approval-mode", "plan", "--sandbox", "--output-format", "text"])
     if command.model:
         redacted.extend(["--model", command.model])
-    redacted.extend(["--prompt", "<prompt>"])
+    redacted.extend(["-p", "<prompt>"])
     return {
         "raw_output": raw_output,
         "command_line": " ".join(redacted),

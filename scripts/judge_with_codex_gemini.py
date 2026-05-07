@@ -140,17 +140,24 @@ def _judging_tasks(
     mode: str,
 ) -> list[dict]:
     if mode == "first-success":
-        return [
-            {"row": row, "commands": commands}
-            for row in rows
-            if judgment_key(row) not in done
-        ]
+        tasks = []
+        seen: set[str] = set()
+        for row in rows:
+            key = judgment_key(row)
+            if key in done or key in seen:
+                continue
+            seen.add(key)
+            tasks.append({"row": row, "commands": commands})
+        return tasks
     tasks = []
+    seen = set()
     for row in rows:
         for command in commands:
             key = _provider_done_key(row, command)
-            if key not in done:
-                tasks.append({"row": row, "commands": [command]})
+            if key in done or key in seen:
+                continue
+            seen.add(key)
+            tasks.append({"row": row, "commands": [command]})
     return tasks
 
 

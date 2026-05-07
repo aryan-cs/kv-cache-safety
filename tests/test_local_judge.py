@@ -17,6 +17,7 @@ from cache_safety_erasure.judging.local_cli import (
     judgment_key,
     parse_judge_json,
     response_length_bucket,
+    run_judge_command,
     sha256_text,
 )
 
@@ -239,3 +240,51 @@ def test_judge_script_all_provider_tasks_preserve_disagreement_channels() -> Non
     }
     remaining = _judging_tasks([row], commands, {_done_key(existing, mode="all-providers")}, mode="all-providers")
     assert [task["commands"][0].provider for task in remaining] == ["gemini"]
+
+
+def test_judge_script_deduplicates_duplicate_input_rows() -> None:
+    row = {"model_id": "m", "suite": "s", "prompt_id": "p", "policy": "none", "seed": 0}
+    commands = [
+        JudgeCommand(provider="codex", model="gpt-5.5"),
+        JudgeCommand(provider="gemini", model="gemini-3.1"),
+    ]
+
+    all_provider_tasks = _judging_tasks([row, dict(row)], commands, set(), mode="all-providers")
+    first_success_tasks = _judging_tasks([row, dict(row)], commands, set(), mode="first-success")
+
+    assert [task["commands"][0].provider for task in all_provider_tasks] == ["codex", "gemini"]
+    assert len(first_success_tasks) == 1
+
+
+def test_gemini_command_uses_headless_plan_sandbox(monkeypatch, tmp_path: Path) -> None:
+    calls = []
+
+    class Completed:
+        returncode = 0
+        stdout = '{"ok": true}'
+        stderr = ""
+
+    def fake_run(args, **kwargs):
+        calls.append((args, kwargs))
+        return Completed()
+
+    monkeypatch.setattr("cache_safety_erasure.judging.local_cli.subprocess.run", fake_run)
+
+    result = run_judge_command(
+        JudgeCommand(provider="gemini", model="gemini-3.1", cwd=tmp_path),
+        "Return JSON.",
+    )
+
+    args = calls[0][0]
+    assert args[:6] == [
+        "gemini",
+        "--approval-mode",
+        "plan",
+        "--sandbox",
+        "--output-format",
+        "text",
+    ]
+    assert "-p" in args
+    assert "--prompt" not in args
+    assert result["raw_output"] == '{"ok": true}'
+    assert result["command_line"].endswith("-p <prompt>")

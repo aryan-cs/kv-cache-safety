@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import fcntl
 import hashlib
 import importlib.metadata
 import json
@@ -33,6 +34,8 @@ from cache_safety_erasure.utils.io import (
     write_jsonl,
 )
 
+_ACTIVE_RUN_LOCKS: list[Any] = []
+
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run cache safety erasure experiments.")
@@ -59,6 +62,7 @@ def main() -> None:
     run_dir = make_run_dir(
         config.run.output_dir, config.run.name, config.run.run_id, config.run.resume
     )
+    _hold_run_lock(run_dir)
     env = environment_snapshot()
     generations_path = run_dir / "generations.jsonl"
     cache_stats_jsonl_path = run_dir / "cache_stats.jsonl"
@@ -247,6 +251,35 @@ def main() -> None:
         current={"model_id": config.model.model_id},
     )
     print(f"Completed run: {run_dir}")
+
+
+def _hold_run_lock(run_dir: Path) -> None:
+    """Hold an advisory per-run lock for the lifetime of this process."""
+    lock_path = run_dir / ".run.lock"
+    lock_handle = lock_path.open("a+", encoding="utf-8")
+    try:
+        fcntl.flock(lock_handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError as exc:
+        lock_handle.seek(0)
+        holder = lock_handle.read().strip()
+        lock_handle.close()
+        detail = f" Current holder: {holder}" if holder else ""
+        raise RuntimeError(f"Run directory is already locked: {run_dir}.{detail}") from exc
+    lock_handle.seek(0)
+    lock_handle.truncate()
+    lock_handle.write(
+        json.dumps(
+            {
+                "pid": os.getpid(),
+                "locked_at": utc_timestamp(),
+                "run_dir": str(run_dir),
+            },
+            sort_keys=True,
+        )
+        + "\n"
+    )
+    lock_handle.flush()
+    _ACTIVE_RUN_LOCKS.append(lock_handle)
 
 
 def _stable_hash(value: Any) -> str:
