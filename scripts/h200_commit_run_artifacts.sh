@@ -2,6 +2,7 @@
 set -euo pipefail
 
 branch="${BRANCH:-master}"
+max_git_artifact_bytes="${MAX_GIT_ARTIFACT_BYTES:-95000000}"
 paths=()
 
 usage() {
@@ -48,7 +49,33 @@ for path in "${paths[@]}"; do
   fi
 done
 
-git add -f -- "${paths[@]}"
+stage_artifact_path() {
+  local path="$1"
+  local bytes
+
+  if [[ -f "$path" ]]; then
+    bytes="$(wc -c < "$path" | tr -d '[:space:]')"
+    if [[ "$bytes" -gt "$max_git_artifact_bytes" ]]; then
+      echo "Skipping oversized artifact for git (${bytes} bytes): $path" >&2
+      return 0
+    fi
+    git add -f -- "$path"
+    return 0
+  fi
+
+  if [[ -d "$path" ]]; then
+    while IFS= read -r -d '' file; do
+      stage_artifact_path "$file"
+    done < <(find "$path" -type f -print0)
+    return 0
+  fi
+
+  git add -f -- "$path"
+}
+
+for path in "${paths[@]}"; do
+  stage_artifact_path "$path"
+done
 
 if git diff --cached --quiet -- "${paths[@]}"; then
   echo "No artifact changes to commit for: ${paths[*]}"

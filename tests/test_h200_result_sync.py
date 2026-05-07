@@ -84,6 +84,15 @@ def test_fetch_h200_results_script_is_guarded_and_checksum_verified() -> None:
     assert "git pull" not in script
 
 
+def test_h200_artifact_commit_skips_github_oversized_files() -> None:
+    script = Path("scripts/h200_commit_run_artifacts.sh").read_text(encoding="utf-8")
+
+    assert "MAX_GIT_ARTIFACT_BYTES" in script
+    assert "95000000" in script
+    assert "Skipping oversized artifact for git" in script
+    assert "find \"$path\" -type f -print0" in script
+
+
 def test_h200_snapshot_script_copies_run_and_writes_manifest() -> None:
     script = Path("scripts/snapshot_h200_run.sh").read_text(encoding="utf-8")
 
