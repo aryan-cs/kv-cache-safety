@@ -14,7 +14,7 @@ if [[ ! -d "$run_dir" ]]; then
   exit 1
 fi
 
-git add "$run_dir"
+git add -f "$run_dir"
 
 if git diff --cached --quiet -- "$run_dir"; then
   echo "No run artifact changes to commit for $run_dir"
