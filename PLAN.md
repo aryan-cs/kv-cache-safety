@@ -1,5 +1,7 @@
 # KV-Cache Safety Selectivity Execution Plan
 
+For an executable fresh-clone handoff, use `SELECTIVITY_RUNBOOK.md`. This file is a planning log and may mention pilot artifacts or one-off smoke commands that are not the current registered launch path.
+
 ## Current State
 
 The project is pivoting from a Qwen-centered cache-erasure draft to a cross-family safety-selectivity study. Existing Qwen H200 artifacts are preserved as pilot evidence and will not be relabeled as final cross-family evidence. The active experimental path is now the protocol in `RESEARCH.md`.

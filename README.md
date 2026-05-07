@@ -8,6 +8,8 @@ This repository tests a phenomenon-first alignment hypothesis:
 
 The project is intentionally built around open models, local inference, and reproducible artifacts. It does not depend on paid endpoints, closed-source judges, or private datasets.
 
+The current registered cross-family selectivity workflow is documented in [`SELECTIVITY_RUNBOOK.md`](SELECTIVITY_RUNBOOK.md). Use that runbook for a fresh handoff: it gives the exact H200 launch, fetch, audit, claim-gate, and paper-build procedure for the `RESEARCH.md` protocol.
+
 ## Why This Project Exists
 
 Earlier candidate work focused on safety-classifier supply-chain auditing. That is useful, but the closest prior work already covers much of the attack and audit surface: Anthropic's classifier poisoning post, Rapid Poison, AI-BOM/provenance work, and guardrail robustness benchmarks. This repository instead targets a more surprising mechanism: **deployment-time inference infrastructure itself may alter alignment behavior without changing model weights or prompts**.
@@ -25,9 +27,12 @@ The claims ladder is deliberately strict:
 
 1. cache policies change behavior;
 2. safety degrades more than ordinary capability;
-3. targeted system-role cache preservation/restoration causally recovers safety more than matched user-role controls.
+3. the safety-selectivity effect replicates across at least two instruction-tuned model families;
+4. policy/system-preserving cache retention mitigates the selective loss without unacceptable capability loss or over-refusal;
+5. policy/system preservation or restoration beats matched non-policy controls;
+6. matched base-model behavior supports alignment-specific selectivity rather than generic cache sensitivity.
 
-Only the third result justifies the stronger "safety erasure" language.
+Only the causal-localization and audit-supported gates justify the stronger "safety erasure" language.
 
 ## Hardware Assumptions
 
@@ -42,14 +47,13 @@ Full sweep target:
 
 Primary model targets:
 
-- `Qwen/Qwen2.5-7B-Instruct`
-- `Qwen/Qwen2.5-14B-Instruct`
-- `Qwen/Qwen2.5-32B-Instruct`
+- The registered selectivity panel is frozen in `configs/models/selectivity_panel.yaml` and generated into stage-specific experiment configs by `scripts/generate_selectivity_configs.py`.
+- Default non-gated H200 keys are `gpt_oss_20b`, `qwen2_5_7b_base`, `qwen2_5_7b_instruct`, `qwen3_5_9b`, `mistral_7b_instruct_v0_3`, `olmo3_7b_instruct`, and `phi4`.
 
 Optional targets if locally available and licensing/gating is resolved:
 
-- `meta-llama/Llama-3.1-8B-Instruct`
-- `google/gemma-2-9b-it` or a current open Gemma instruct model
+- `llama3_1_8b_instruct`
+- `gemma2_9b_it`
 
 ## Quickstart
 
@@ -99,7 +103,18 @@ uv run python scripts/run_experiment.py \
   --resume
 ```
 
-Run the primary H200 workflow:
+Run the current registered cross-family H200 selectivity workflow:
+
+```bash
+SELECTIVITY_STAGE=all \
+SWEEP_SCRIPT=scripts/run_h200_selectivity_panel.sh \
+setsid -f bash scripts/wait_and_run_h200_sweep.sh \
+  </dev/null > logs/h200/selectivity_launcher.out 2>&1
+```
+
+The registered selectivity launcher defaults to the non-gated model panel, writes result artifacts under `results/selectivity_h200_<stage>_<model_key>/`, writes paper assets under `paper/generated/selectivity_h200_<stage>_<model_key>/`, and merges completed stage results into `results/selectivity_h200_<stage>_combined/` plus `paper/generated/selectivity_h200_<stage>_combined/`. Set `SELECTIVITY_INCLUDE_GATED=1` only after the H200 Hugging Face token has accepted Llama/Gemma access. Set `SELECTIVITY_MODELS="qwen2_5_7b_instruct mistral_7b_instruct_v0_3"` for a registered subset, `PUBLIC_PROMPT_LIMIT=<n>` for powered public-suite prompt count, and `TARGET_CI_WIDTH=<width>` for readiness and power reports. See `SELECTIVITY_RUNBOOK.md` for the complete handoff.
+
+Run the older Qwen primary/causal H200 workflow used by the current manuscript wrappers:
 
 ```bash
 bash scripts/run_h200_sweep.sh
@@ -113,7 +128,7 @@ If the H200 GPU is busy, queue the sweep behind an availability gate from the H2
 setsid -f bash scripts/wait_and_run_h200_sweep.sh </dev/null > logs/h200/launcher.out 2>&1
 ```
 
-The launcher refuses to run outside `/home/aryang9/sandbox/llm-safety`, pulls `master`, checks that the tree is clean, runs the CPU-only test suite, waits until `nvidia-smi` is below `MAX_USED_MIB=20000` and `MAX_UTIL_PCT=20`, then pulls and validates `master` again before starting the selected sweep. Override `SWEEP_SCRIPT=scripts/run_h200_ci_extension.sh` or `SWEEP_SCRIPT=scripts/run_qwen32b_followup.sh` only after the earlier registered stage has passed.
+The launcher refuses to run outside `/home/aryang9/sandbox/llm-safety`, pulls `master`, checks that the tree is clean, runs the CPU-only test suite, waits until `nvidia-smi` is below `MAX_USED_MIB=20000` and `MAX_UTIL_PCT=20`, then pulls and validates `master` again before starting the selected sweep. Valid overrides are `SWEEP_SCRIPT=scripts/run_h200_selectivity_panel.sh`, `SWEEP_SCRIPT=scripts/run_h200_ci_extension.sh`, `SWEEP_SCRIPT=scripts/run_h200_causal_ci_extension.sh`, or `SWEEP_SCRIPT=scripts/run_qwen32b_followup.sh`; use CI/follow-up overrides only after the earlier registered stage has passed.
 
 Summarize the H200 wait/run state without changing it:
 
@@ -261,6 +276,14 @@ locally from the current clean checkout:
 bash scripts/fetch_h200_results.sh results/h200_qwen_full_sweep results/h200_causal_patch_qwen7b
 bash scripts/prepare_after_h200_fetch.sh
 ```
+
+Fetch completed selectivity-panel artifacts from the local checkout with checksum verification:
+
+```bash
+SELECTIVITY_STAGE=all bash scripts/fetch_h200_selectivity_panel.sh
+```
+
+Use the same `SELECTIVITY_MODELS` and `SELECTIVITY_INCLUDE_GATED` values used for launch. The fetch wrapper discovers completed remote selectivity result and `paper/generated` directories, then delegates to `scripts/fetch_h200_results.sh` for manifest comparison.
 
 This writes remote and local artifact manifests in `logs/h200/`, compares hashes
 and byte counts, and refuses paths outside `results/`, `paper/generated/`, and
@@ -413,7 +436,7 @@ Every run writes:
 - `paper/generated/<run>/main_results_table.tex`: LaTeX version of the paper-ready summary table
 - `paper/generated/<run>/suite_level_effects_table.md`: suite-level effect table with paired CIs
 - `paper/generated/<run>/suite_level_effects_table.tex`: LaTeX version of the suite-level effect table
-- `paper/generated/claim_assessment/`: H1/H2/H3 claim-ladder assessment generated from primary and causal metrics
+- `paper/generated/claim_assessment/`: H1-H6 claim-ladder assessment generated from primary and causal metrics
 - `cache_stats.parquet`: retained/evicted cache-token stats by policy application, including layer count and role-level retained/evicted token counts
 - `figures/*.png`, `figures/*.svg`, and `figures/*.pdf`: generated by `scripts/make_figures.py`
 - `figures/*.csv` and `figures/manifest.json`: figure source data plus SHA256 hashes for every plotted artifact

@@ -230,3 +230,63 @@ def test_merge_selectivity_panel_preserves_family_rows(tmp_path: Path) -> None:
 
     assert merged["manifest"]["instruction_tuned_families"] == ["Mistral", "Qwen"]
     assert {row["source_run_id"] for row in merged["generations"]} == {"mistral", "qwen"}
+
+
+def test_h200_selectivity_launcher_writes_paper_artifacts_to_paper_tree() -> None:
+    script = Path("scripts/run_h200_selectivity_panel.sh").read_text(encoding="utf-8")
+
+    assert "paper/generated/selectivity_panel_phase0_ci_power.json" in script
+    assert "paper/generated/selectivity_panel_phase0_ci_power.md" in script
+    assert 'local generated_dir="paper/generated/${run_id}"' in script
+    assert (
+        'local generated_dir="paper/generated/selectivity_h200_${run_stage}_combined"'
+        in script
+    )
+    assert "docs/generated" not in script
+
+
+def test_h200_selectivity_launcher_commits_results_with_paper_assets() -> None:
+    launcher = Path("scripts/run_h200_selectivity_panel.sh").read_text(encoding="utf-8")
+    commit_script = Path("scripts/h200_commit_run_artifacts.sh").read_text(encoding="utf-8")
+
+    assert 'commit_artifacts "$results_dir" "$generated_dir"' in launcher
+    assert 'commit_artifacts "$output_dir" "$generated_dir"' in launcher
+    assert "paper/generated/selectivity_panel_phase0_ci_power.json" in launcher
+    assert "git add -f -- \"${paths[@]}\"" in commit_script
+    assert '--branch "$branch"' in launcher
+
+
+def test_selectivity_fetcher_uses_standard_h200_env_and_verified_fetch() -> None:
+    script = Path("scripts/fetch_h200_selectivity_panel.sh").read_text(encoding="utf-8")
+    legacy_fetcher = Path("scripts/fetch_h200_selectivity_results.sh").read_text(
+        encoding="utf-8"
+    )
+
+    assert "H200_HOST:-uiuc-h200" in script
+    assert "H200_WORKDIR:-/home/aryang9/sandbox/llm-safety" in script
+    assert "paper/generated/selectivity_h200_${run_stage}_${key}" in script
+    assert "paper/generated/selectivity_h200_${run_stage}_combined" in script
+    assert "bash scripts/fetch_h200_results.sh" in script
+    assert "H200_HOST:-uiuc-h200" in legacy_fetcher
+    assert "H200_WORKDIR:-/home/aryang9/sandbox/llm-safety" in legacy_fetcher
+
+
+def test_selectivity_runbook_is_operator_complete() -> None:
+    readme = Path("README.md").read_text(encoding="utf-8")
+    runbook = Path("SELECTIVITY_RUNBOOK.md").read_text(encoding="utf-8")
+
+    for text in [readme, runbook]:
+        assert "SWEEP_SCRIPT=scripts/run_h200_selectivity_panel.sh" in text
+        assert "SELECTIVITY_STAGE=all" in text
+        assert "SELECTIVITY_MODELS" in text
+        assert "SELECTIVITY_INCLUDE_GATED" in text
+        assert "PUBLIC_PROMPT_LIMIT" in text
+        assert "TARGET_CI_WIDTH" in text
+        assert "paper/generated/selectivity_h200_<stage>_<model_key>" in text
+
+    assert "scripts/fetch_h200_selectivity_panel.sh" in runbook
+    assert "paper/generated/selectivity_panel_phase0_ci_power.md" in runbook
+    assert "scripts/approve_judge_egress.py" in runbook
+    assert "scripts/judge_with_codex_gemini.py" in runbook
+    assert "scripts/assess_claims.py" in runbook
+    assert "Phase 4 causal diagnostics are conditional" in runbook

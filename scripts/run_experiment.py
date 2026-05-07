@@ -343,6 +343,12 @@ RESUME_MANIFEST_STABLE_KEYS = [
 ]
 
 
+class CorruptCacheStatsError(RuntimeError):
+    def __init__(self, path: Path, message: str) -> None:
+        super().__init__(message)
+        self.path = path
+
+
 def _validate_resume_manifest(
     run_dir: Path, planned_manifest: dict[str, Any], env: dict[str, Any]
 ) -> None:
@@ -408,7 +414,24 @@ def _policy_manifest(policy: Any) -> dict[str, Any]:
 def _reconcile_resume_generations(run_dir: Path, rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     if not rows:
         return rows
-    cache_keys = _cache_stats_generation_keys(run_dir / "cache_stats.parquet")
+    cache_stats_path = run_dir / "cache_stats.parquet"
+    try:
+        cache_keys = _cache_stats_generation_keys(cache_stats_path)
+    except CorruptCacheStatsError as exc:
+        if os.environ.get("ALLOW_CORRUPT_CACHE_STATS_RESET") != "1":
+            raise RuntimeError(f"{cache_stats_path.name} is unreadable: {exc}") from exc
+        stamp = utc_timestamp()
+        generation_archive = run_dir / f"generations.corrupt_cache_stats_reset.{stamp}.jsonl"
+        cache_archive = run_dir / f"{cache_stats_path.name}.corrupt.{stamp}"
+        write_jsonl(generation_archive, rows)
+        write_jsonl(run_dir / "generations.jsonl", [])
+        if exc.path.exists():
+            exc.path.replace(cache_archive)
+        print(
+            "Resume reconciliation reset generations because cache_stats.parquet was unreadable; "
+            f"archived generations at {generation_archive} and cache stats at {cache_archive}."
+        )
+        return []
     kept = [
         row
         for row in rows
@@ -453,8 +476,8 @@ def _cache_stats_generation_keys(cache_stats_path: Path) -> set[tuple[str, str, 
         raise RuntimeError("pyarrow is required for cache stats resume reconciliation.") from exc
     try:
         table = pq.read_table(cache_stats_path, columns=["prompt_id", "policy", "seed"])
-    except Exception:
-        return set()
+    except Exception as exc:
+        raise CorruptCacheStatsError(cache_stats_path, str(exc)) from exc
     prompt_ids = table.column("prompt_id").to_pylist()
     policies = table.column("policy").to_pylist()
     seeds = table.column("seed").to_pylist()

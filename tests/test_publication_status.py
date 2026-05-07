@@ -57,6 +57,23 @@ def test_required_arxiv_bundle_files_follow_selected_generated_dirs() -> None:
     assert "audit/h200_qwen_full_sweep_summary/human_audit_summary_table.tex" not in files
 
 
+def test_publication_status_defaults_follow_paper_tree() -> None:
+    script = Path("scripts/report_publication_status.py").read_text(encoding="utf-8")
+    files = _required_arxiv_bundle_files()
+
+    assert "docs/generated" not in script
+    assert "docs/audit" not in script
+    assert "docs/build" not in script
+    assert "docs/latex" not in script
+    assert "docs/references" not in script
+    assert 'default=Path("paper/generated/h200_qwen_full_sweep")' in script
+    assert 'default=Path("paper/audit/h200_qwen_full_sweep_summary")' in script
+    assert 'default=Path("paper/build/arxiv_source")' in script
+    assert 'FINAL_PDF_NAME = "cache_mediated_safety_erasure.pdf"' in script
+    assert "generated/h200_qwen_full_sweep/main_results_table.tex" in files
+    assert "audit/h200_qwen_full_sweep_summary/human_audit_summary_table.tex" in files
+
+
 def _test_pdf_bytes(text: str = "Publication evidence") -> bytes:
     stream = f"BT /F1 12 Tf 72 72 Td ({text}) Tj ET".encode("ascii")
     objects = [

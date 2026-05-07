@@ -8,8 +8,8 @@ fi
 
 remote_run_dir="$1"
 local_results_dir="${2:-results}"
-remote_root="/home/aryang9/sandbox/llm-safety"
-remote="uiuc-h200"
+remote_root="${H200_WORKDIR:-/home/aryang9/sandbox/llm-safety}"
+remote="${H200_HOST:-uiuc-h200}"
 remote_parent="$(dirname "$remote_run_dir")"
 remote_base="$(basename "$remote_run_dir")"
 
