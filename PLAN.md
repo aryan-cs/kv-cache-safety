@@ -18,7 +18,7 @@ selectivity_h200_powered_qwen2_5_7b_instruct
 
 It uses 1,300 public prompts per confirmatory suite with the full eviction/retention policy matrix. The run writes `generations.jsonl`, `cache_stats.jsonl`, and `progress.json` incrementally and is restartable with `--resume`.
 
-The first 225 rows were generated at commit `d7b4431`. The run was then paused and resumed at commit `90ca99e`, which preserves generation semantics but limits expensive cache L2 norm diagnostics to pre-response cache states by default. This keeps the confirmatory outcomes unchanged while making the powered sweep operationally tractable. The mixed diagnostic metadata is provenance-relevant and must be reported if cache-norm figures use this run.
+The first 225 rows were generated at commit `d7b4431`. Rows 226-544 were generated after resuming at commit `90ca99e`, which preserves generation semantics but limits expensive cache L2 norm diagnostics to pre-response cache states by default. The run was then resumed again at commit `449b842`, which rebuilds final `cache_stats.parquet` from the durable `cache_stats.jsonl` checkpoint. These changes keep the confirmatory generation outcomes unchanged while making the powered sweep operationally tractable and restart-safe. The mixed diagnostic metadata is provenance-relevant and must be reported if cache-norm figures use this run.
 
 ## What "Clear Out The Codebase" Means
 
