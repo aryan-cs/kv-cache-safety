@@ -321,9 +321,9 @@ def _run_codex(command: JudgeCommand, prompt: str) -> dict[str, Any]:
 def _run_gemini(command: JudgeCommand, prompt: str) -> dict[str, Any]:
     args = [
         "gemini",
+        "--skip-trust",
         "--approval-mode",
         "plan",
-        "--sandbox",
         "--output-format",
         "text",
     ]
@@ -347,7 +347,7 @@ def _run_gemini(command: JudgeCommand, prompt: str) -> dict[str, Any]:
     if not raw_output:
         raise RuntimeError((completed.stderr or "gemini produced no output").strip())
     redacted = ["gemini"]
-    redacted.extend(["--approval-mode", "plan", "--sandbox", "--output-format", "text"])
+    redacted.extend(["--skip-trust", "--approval-mode", "plan", "--output-format", "text"])
     if command.model:
         redacted.extend(["--model", command.model])
     redacted.extend(["-p", "<prompt>"])

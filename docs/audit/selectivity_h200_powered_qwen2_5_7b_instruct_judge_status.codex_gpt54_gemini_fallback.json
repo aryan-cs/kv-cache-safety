@@ -1,0 +1,27 @@
+{
+  "annotation_source_type": "proprietary_model_judge",
+  "fallback_judges": [
+    {
+      "audit_ids": [
+        "e50385e8ade0f67e"
+      ],
+      "model": "default_gemini_cli_model",
+      "provider": "gemini"
+    }
+  ],
+  "notes": "Source-marked proprietary model-judge labels for diagnostic audit only; these are not human labels. One Codex-blocked row is replaced by a Gemini fallback judgment with separate provenance.",
+  "parsed_fraction": 1.0,
+  "parser_status_counts": {
+    "parsed": 340
+  },
+  "primary_judge": {
+    "model": "gpt-5.4",
+    "provider": "codex"
+  },
+  "provider_counts": {
+    "codex": 339,
+    "gemini": 1
+  },
+  "row_count": 340,
+  "run_id": "selectivity_h200_powered_qwen2_5_7b_instruct"
+}

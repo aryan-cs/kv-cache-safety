@@ -256,7 +256,7 @@ def test_judge_script_deduplicates_duplicate_input_rows() -> None:
     assert len(first_success_tasks) == 1
 
 
-def test_gemini_command_uses_headless_plan_sandbox(monkeypatch, tmp_path: Path) -> None:
+def test_gemini_command_uses_headless_plan_skip_trust(monkeypatch, tmp_path: Path) -> None:
     calls = []
 
     class Completed:
@@ -278,12 +278,13 @@ def test_gemini_command_uses_headless_plan_sandbox(monkeypatch, tmp_path: Path) 
     args = calls[0][0]
     assert args[:6] == [
         "gemini",
+        "--skip-trust",
         "--approval-mode",
         "plan",
-        "--sandbox",
         "--output-format",
         "text",
     ]
+    assert "--sandbox" not in args
     assert "-p" in args
     assert "--prompt" not in args
     assert result["raw_output"] == '{"ok": true}'

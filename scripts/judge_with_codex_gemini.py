@@ -33,7 +33,7 @@ def main() -> None:
             "analysis; first-success keeps the historical fallback behavior."
         ),
     )
-    parser.add_argument("--codex-model", default="gpt-5.5")
+    parser.add_argument("--codex-model", default="gpt-5.4")
     parser.add_argument("--gemini-model", default=None)
     parser.add_argument("--workers", type=int, default=2)
     parser.add_argument("--limit", type=int, default=None)
