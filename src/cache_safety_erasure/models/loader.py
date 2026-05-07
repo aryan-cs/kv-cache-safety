@@ -13,6 +13,7 @@ class ModelBundle:
     model_id: str
     model: Any
     tokenizer: Any
+    cache_position_mode: str = "absolute"
 
 
 def load_model(config: ModelConfig) -> ModelBundle | MockModelBundle:
@@ -70,7 +71,13 @@ def _load_hf_model(config: ModelConfig) -> ModelBundle:
             "`model.allow_cpu_offload: true` only for local smoke tests."
         )
     model.eval()
-    return ModelBundle(provider="hf", model_id=config.model_id, model=model, tokenizer=tokenizer)
+    return ModelBundle(
+        provider="hf",
+        model_id=config.model_id,
+        model=model,
+        tokenizer=tokenizer,
+        cache_position_mode=config.cache_position_mode,
+    )
 
 
 def hf_device_map(model: Any) -> dict[str, str] | None:
