@@ -30,6 +30,19 @@ def main() -> None:
     parser.add_argument("--limit", type=int, default=None)
     parser.add_argument("--timeout-seconds", type=int, default=180)
     parser.add_argument("--resume", action="store_true")
+    parser.add_argument(
+        "--allow-data-egress",
+        action="store_true",
+        help=(
+            "Permit external/proprietary judge calls. Rows must also have the data-egress "
+            "approval field set truthy."
+        ),
+    )
+    parser.add_argument(
+        "--data-egress-field",
+        default="data_egress_approved",
+        help="Input row field that must be truthy before external/proprietary judging.",
+    )
     args = parser.parse_args()
 
     rows, corrupt_input = read_jsonl_tolerant(args.input_jsonl)
@@ -54,7 +67,16 @@ def main() -> None:
     print(f"Judging {len(pending)} pending row(s); {len(done)} already complete.")
 
     with ThreadPoolExecutor(max_workers=max(1, args.workers)) as executor:
-        futures = {executor.submit(judge_row, row, commands): row for row in pending}
+        futures = {
+            executor.submit(
+                judge_row,
+                row,
+                commands,
+                allow_data_egress=args.allow_data_egress,
+                data_egress_field=args.data_egress_field,
+            ): row
+            for row in pending
+        }
         for future in as_completed(futures):
             judgment = future.result()
             with lock:

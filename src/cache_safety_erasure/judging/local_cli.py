@@ -30,6 +30,10 @@ should_refuse, refusal_correct, unsafe_compliance, system_leakage, over_refusal,
 capability_correct, confidence, notes
 """
 
+PROMPT_PROTOCOL_VERSION = "blinded-v2"
+AUDIT_METADATA_VERSION = "judge-audit-v2"
+DATA_EGRESS_DEFAULT_FIELD = "data_egress_approved"
+EXTERNAL_PROPRIETARY_PROVIDERS = {"codex", "gemini"}
 
 @dataclass(frozen=True)
 class JudgeCommand:
@@ -44,14 +48,9 @@ class JudgeCommand:
 
 
 def build_judge_prompt(row: dict[str, Any]) -> str:
+    """Build a blinded prompt that excludes model, suite, policy, and arm identity."""
     fields = {
-        "model_id": row.get("model_id", ""),
-        "suite": row.get("suite", ""),
-        "category": row.get("category", ""),
-        "policy": row.get("policy", ""),
-        "seed": row.get("seed", ""),
-        "system_or_policy_text": row.get("system", ""),
-        "hidden_system_reference": row.get("hidden_system", ""),
+        "private_reference_text": row.get("system", "") or row.get("hidden_system", ""),
         "user_prompt": row.get("user", ""),
         "expected_answer": row.get("expected_answer", ""),
         "should_refuse_reference": row.get("should_refuse", ""),
@@ -69,13 +68,36 @@ def run_judge_command(command: JudgeCommand, prompt: str) -> dict[str, Any]:
     raise ValueError(f"Unsupported judge provider: {command.provider}")
 
 
-def judge_row(row: dict[str, Any], commands: list[JudgeCommand]) -> dict[str, Any]:
+def judge_row(
+    row: dict[str, Any],
+    commands: list[JudgeCommand],
+    *,
+    allow_data_egress: bool = False,
+    data_egress_field: str = DATA_EGRESS_DEFAULT_FIELD,
+) -> dict[str, Any]:
     prompt = build_judge_prompt(row)
     errors = []
+    evaluated_family = infer_evaluated_family(row)
     for command in commands:
+        judge_family = infer_judge_family(command)
+        block_reason = _judge_block_reason(
+            row,
+            command,
+            allow_data_egress=allow_data_egress,
+            data_egress_field=data_egress_field,
+            evaluated_family=evaluated_family,
+            judge_family=judge_family,
+        )
+        if block_reason:
+            errors.append(f"{command.label}: blocked: {block_reason}")
+            continue
         started_at = utc_now()
         try:
             result = run_judge_command(command, prompt)
+        except Exception as exc:  # noqa: BLE001 - recorded for audit provenance.
+            errors.append(f"{command.label}: {type(exc).__name__}: {exc}")
+            continue
+        try:
             parsed = parse_judge_json(result["raw_output"])
             return _judgment_record(
                 row,
@@ -87,9 +109,23 @@ def judge_row(row: dict[str, Any], commands: list[JudgeCommand]) -> dict[str, An
                 labels=parsed,
                 command_line=result["command_line"],
                 parse_error="",
+                retry_count=len(errors),
+                judge_tool_version=result.get("tool_version", ""),
             )
         except Exception as exc:  # noqa: BLE001 - recorded for audit provenance.
-            errors.append(f"{command.label}: {type(exc).__name__}: {exc}")
+            return _judgment_record(
+                row,
+                command=command,
+                prompt=prompt,
+                raw_output=result["raw_output"],
+                started_at=started_at,
+                parser_status="parse_error",
+                labels=unlabeled_labels(f"parse_error:{exc}"),
+                command_line=result["command_line"],
+                parse_error=f"{type(exc).__name__}: {exc}",
+                retry_count=len(errors),
+                judge_tool_version=result.get("tool_version", ""),
+            )
     fallback_command = commands[-1] if commands else JudgeCommand(provider="none")
     return _judgment_record(
         row,
@@ -97,10 +133,12 @@ def judge_row(row: dict[str, Any], commands: list[JudgeCommand]) -> dict[str, An
         prompt=prompt,
         raw_output="",
         started_at=utc_now(),
-        parser_status="unlabeled",
+        parser_status="blocked" if errors else "unlabeled",
         labels=unlabeled_labels("; ".join(errors)),
         command_line="",
         parse_error="; ".join(errors),
+        retry_count=len(errors),
+        judge_tool_version="",
     )
 
 
@@ -161,6 +199,65 @@ def judgment_key(row: dict[str, Any]) -> str:
     return "::".join(str(part) for part in parts)
 
 
+def infer_evaluated_family(row: dict[str, Any]) -> str:
+    return infer_model_family(
+        str(
+            row.get("evaluated_model_family")
+            or row.get("model_family")
+            or row.get("family")
+            or row.get("model_id")
+            or ""
+        )
+    )
+
+
+def infer_judge_family(command: JudgeCommand) -> str:
+    explicit_family = getattr(command, "judge_family", None)
+    if explicit_family:
+        return infer_model_family(str(explicit_family))
+    if command.provider == "codex":
+        return "openai_gpt"
+    if command.provider == "gemini":
+        return "gemini"
+    return infer_model_family(command.model or command.provider)
+
+
+def infer_model_family(identifier: str) -> str:
+    normalized = identifier.lower().strip()
+    if not normalized:
+        return "unknown"
+    if "gpt-oss" in normalized or normalized.startswith("openai/") or normalized.startswith("gpt-"):
+        return "openai_gpt"
+    if "qwen" in normalized:
+        return "qwen"
+    if "llama" in normalized or "meta-llama" in normalized:
+        return "llama"
+    if "gemma" in normalized:
+        return "gemma"
+    if "gemini" in normalized:
+        return "gemini"
+    if "mistral" in normalized:
+        return "mistral"
+    if "olmo" in normalized:
+        return "olmo"
+    if "phi" in normalized:
+        return "phi"
+    return normalized.split("/", maxsplit=1)[0].replace("-", "_")
+
+
+def response_length_bucket(text: str) -> str:
+    words = len(str(text).split())
+    if words == 0:
+        return "empty"
+    if words <= 50:
+        return "short_1_50_words"
+    if words <= 200:
+        return "medium_51_200_words"
+    if words <= 500:
+        return "long_201_500_words"
+    return "very_long_501_plus_words"
+
+
 def sha256_text(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
@@ -202,7 +299,11 @@ def _run_codex(command: JudgeCommand, prompt: str) -> dict[str, Any]:
             raw_output = completed.stdout.strip()
         if completed.returncode != 0 and not raw_output:
             raise RuntimeError((completed.stderr or completed.stdout).strip())
-        return {"raw_output": raw_output, "command_line": " ".join(args)}
+        return {
+            "raw_output": raw_output,
+            "command_line": " ".join(args),
+            "tool_version": _tool_version("codex"),
+        }
     finally:
         output_path.unlink(missing_ok=True)
 
@@ -230,7 +331,56 @@ def _run_gemini(command: JudgeCommand, prompt: str) -> dict[str, Any]:
     if command.model:
         redacted.extend(["--model", command.model])
     redacted.extend(["--prompt", "<prompt>"])
-    return {"raw_output": raw_output, "command_line": " ".join(redacted)}
+    return {
+        "raw_output": raw_output,
+        "command_line": " ".join(redacted),
+        "tool_version": _tool_version("gemini"),
+    }
+
+
+def _tool_version(binary: str) -> str:
+    for version_args in ([binary, "--version"], [binary, "version"]):
+        try:
+            completed = subprocess.run(
+                version_args,
+                text=True,
+                capture_output=True,
+                timeout=10,
+                check=False,
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            continue
+        output = (completed.stdout or completed.stderr).strip()
+        if output:
+            return output.splitlines()[0]
+    return ""
+
+
+def _judge_block_reason(
+    row: dict[str, Any],
+    command: JudgeCommand,
+    *,
+    allow_data_egress: bool,
+    data_egress_field: str,
+    evaluated_family: str,
+    judge_family: str,
+) -> str:
+    if command.provider in EXTERNAL_PROPRIETARY_PROVIDERS:
+        if not allow_data_egress:
+            return "data egress flag not set"
+        if not _truthy(row.get(data_egress_field)):
+            return f"row lacks {data_egress_field}=true"
+    if evaluated_family != "unknown" and evaluated_family == judge_family:
+        return f"evaluated family {evaluated_family} matches judge family {judge_family}"
+    if evaluated_family == "openai_gpt" and judge_family == "openai_gpt":
+        return "GPT-OSS/OpenAI-family rows require a non-GPT primary judge"
+    return ""
+
+
+def _truthy(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    return str(value).strip().lower() in {"1", "true", "yes", "y", "approved"}
 
 
 def _judgment_record(
@@ -244,7 +394,12 @@ def _judgment_record(
     labels: dict[str, Any],
     command_line: str,
     parse_error: str,
+    retry_count: int,
+    judge_tool_version: str,
 ) -> dict[str, Any]:
+    evaluated_family = infer_evaluated_family(row)
+    judge_family = infer_judge_family(command)
+    generated_text = str(row.get("generated_text", ""))
     return {
         "judgment_key": judgment_key(row),
         "prompt_id": row.get("prompt_id"),
@@ -255,7 +410,10 @@ def _judgment_record(
         "model_id": row.get("model_id"),
         "judge_provider": command.provider,
         "judge_model": command.model or "",
+        "evaluated_family": evaluated_family,
+        "judge_family": judge_family,
         "judge_command": command_line,
+        "judge_tool_version": judge_tool_version,
         "judge_started_at": started_at,
         "judge_completed_at": utc_now(),
         "annotation_source_type": "proprietary_model_judge"
@@ -263,10 +421,16 @@ def _judgment_record(
         else "model_judge",
         "rubric_sha256": sha256_text(RUBRIC),
         "judge_prompt_sha256": sha256_text(prompt),
+        "judge_prompt_protocol_version": PROMPT_PROTOCOL_VERSION,
+        "audit_metadata_version": AUDIT_METADATA_VERSION,
         "raw_output_sha256": sha256_text(raw_output),
         "raw_output": raw_output,
         "parser_status": parser_status,
         "parse_error": parse_error,
+        "retry_count": retry_count,
+        "response_length_bucket": response_length_bucket(generated_text),
+        "response_length_chars": len(generated_text),
+        "response_length_words": len(generated_text.split()),
         "labels": labels,
         **labels,
     }
