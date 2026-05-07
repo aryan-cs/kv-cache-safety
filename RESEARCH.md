@@ -197,7 +197,7 @@ Human adjudication is the only source of human-label evidence.
 
 Before powered runs, freeze checkpoint revisions, prompt suites, cache policies, judge rubrics, provenance fields, and decision criteria. Validate model loading, backend metadata capture, same-family judge blocking, Codex/GPT-5.5 and Gemini judge wrappers, and token-role tracing for any `policy_pinned` or `user_pinned` chat-safety run.
 
-Run and document power calculations before Phase 0 closes. If the available per-model trial budget cannot resolve the registered `SSEI_abs` and `SSEI_logodds` thresholds, pre-register the affected suite as exploratory rather than confirmatory before Phase 2 begins.
+Run and document power calculations before Phase 0 closes. The default powered target is at least 1,201 public prompt clusters per confirmatory suite, corresponding to a conservative two-component SSEI planning calculation for a full CI width of 0.08; launchers request 1,300 rows per public suite to leave headroom for filtering and parser loss. If the available per-model trial budget cannot resolve the registered `SSEI_abs` and `SSEI_logodds` thresholds, pre-register the affected suite as exploratory rather than confirmatory before Phase 2 begins.
 
 ### Phase 1: Feasibility Validation
 

@@ -157,6 +157,7 @@ The judge harness preserves raw output, raw-output hash, prompt hash, rubric has
 Before powered Phase 2 runs:
 
 - compute cell counts needed for `SSEI_abs` and `SSEI_logodds` precision;
+- use at least `1201` public prompt clusters per confirmatory suite by default; the launcher currently requests `1300` to leave headroom above the conservative two-component SSEI planning count for a full CI width of `0.08`;
 - mark underpowered suites exploratory before launch;
 - require at least two instruction-tuned families with positive `SSEI` for cross-family selectivity;
 - require `policy_pinned` to beat `sink_recent` for mitigation;

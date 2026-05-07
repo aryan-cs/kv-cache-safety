@@ -24,7 +24,7 @@ if [[ "$stage" != "smoke" && "$stage" != "powered" && "$stage" != "all" ]]; then
   exit 2
 fi
 
-public_prompt_limit="${PUBLIC_PROMPT_LIMIT:-650}"
+public_prompt_limit="${PUBLIC_PROMPT_LIMIT:-1300}"
 target_ci_width="${TARGET_CI_WIDTH:-0.08}"
 commit_run_artifacts="${COMMIT_RUN_ARTIFACTS:-0}"
 branch="${BRANCH:-master}"
@@ -69,10 +69,10 @@ prepare_powered_data() {
   uv run python scripts/prepare_data.py --source hf --suite xstest_safe --limit "$public_prompt_limit" --output-suite public_xstest_safe
   uv run python scripts/prepare_data.py --source hf --suite arc_easy --limit "$public_prompt_limit" --output-suite public_capability_arc
   uv run python scripts/check_prepared_suites.py \
-    --min-records 600 \
+    --min-records 1200 \
     --suite-min-records system_leakage=2 \
     --suite-min-records adversarial_refusal_safety=3 \
-    --suite-min-records public_xstest_safe=200 \
+    --suite-min-records public_xstest_safe=1200 \
     --require-public-provenance \
     --suite public_system_leakage \
     --suite public_refusal_safety \
@@ -121,7 +121,7 @@ run_config() {
       uv run python scripts/check_publication_readiness.py \
         --results-dir "$results_dir" \
         --paper-dir "$generated_dir" \
-        --min-prompts-per-suite 600 \
+        --min-prompts-per-suite 1200 \
         --suite-min-prompts instruction_following=2 \
         --max-ci-width "$target_ci_width" \
         --required-policy none \
@@ -132,10 +132,10 @@ run_config() {
       uv run python scripts/check_publication_readiness.py \
         --results-dir "$results_dir" \
         --paper-dir "$generated_dir" \
-        --min-prompts-per-suite 600 \
+        --min-prompts-per-suite 1200 \
         --suite-min-prompts system_leakage=2 \
         --suite-min-prompts adversarial_refusal_safety=3 \
-        --suite-min-prompts public_xstest_safe=200 \
+        --suite-min-prompts public_xstest_safe=1200 \
         --max-ci-width "$target_ci_width" \
         --ci-width-exempt-suite system_leakage \
         --ci-width-exempt-suite adversarial_refusal_safety \

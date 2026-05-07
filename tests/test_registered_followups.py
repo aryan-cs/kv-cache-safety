@@ -27,6 +27,7 @@ def test_followup_plan_blocks_positive_claim_when_selectivity_fails() -> None:
         _assessment(h1=True, h2=False, h3=False, gate=False),
         primary_ci_power={
             "conservative_bernoulli_required_cluster_n": 601,
+            "conservative_ssei_two_component_required_cluster_n": 1201,
             "pilot_estimates": [{"estimated_required_cluster_n": 700}],
         },
     )
@@ -34,7 +35,7 @@ def test_followup_plan_blocks_positive_claim_when_selectivity_fails() -> None:
     assert plan["status"] == "selectivity_gate_failed"
     followup = plan["registered_followups"][0]
     assert followup["name"] == "powered selectivity extension"
-    assert "`700` prompt clusters" in followup["success_criterion"]
+    assert "`1201` prompt clusters" in followup["success_criterion"]
     assert "Do not describe a safety-erasure phenomenon" in followup["manuscript_scope"]
 
 

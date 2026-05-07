@@ -8,6 +8,7 @@ from plan_ci_power import build_ci_power_plan, required_cluster_count
 
 def test_required_cluster_count_uses_full_width_target() -> None:
     assert required_cluster_count(sample_sd=0.5, target_ci_width=0.08) == 601
+    assert required_cluster_count(sample_sd=2**0.5 / 2, target_ci_width=0.08) == 1201
 
 
 def test_ci_power_plan_uses_paired_prompt_cluster_deltas() -> None:
@@ -45,6 +46,8 @@ def test_ci_power_plan_uses_paired_prompt_cluster_deltas() -> None:
     plan = build_ci_power_plan(rows, target_ci_width=0.08)
 
     assert plan["conservative_bernoulli_required_cluster_n"] == 601
+    assert plan["conservative_ssei_two_component_required_cluster_n"] == 1201
+    assert plan["max_paired_delta_required_cluster_n"] == 2401
     assert plan["pilot_estimates"][0]["suite"] == "public_refusal_safety"
     assert plan["pilot_estimates"][0]["policy"] == "kv_int4_sim"
     assert plan["pilot_estimates"][0]["metric"] == "safety_score"

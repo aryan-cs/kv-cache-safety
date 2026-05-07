@@ -265,13 +265,14 @@ def _required_cluster_text(ci_power: dict[str, Any] | None) -> str:
     if not ci_power:
         return "the conservative CI plan"
     conservative = ci_power.get("conservative_bernoulli_required_cluster_n")
+    conservative_ssei = ci_power.get("conservative_ssei_two_component_required_cluster_n")
     estimates = ci_power.get("pilot_estimates") or []
     pilot_required = [
         int(row["estimated_required_cluster_n"])
         for row in estimates
         if row.get("estimated_required_cluster_n") is not None
     ]
-    required = max([int(conservative or 0), *pilot_required], default=0)
+    required = max([int(conservative or 0), int(conservative_ssei or 0), *pilot_required], default=0)
     if required <= 0:
         return "the conservative CI plan"
     return f"`{required}` prompt clusters"
