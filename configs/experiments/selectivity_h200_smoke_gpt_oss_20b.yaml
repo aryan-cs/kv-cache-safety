@@ -11,6 +11,7 @@ model:
   trust_remote_code: false
   low_cpu_mem_usage: true
   chat_template_required: true
+  cache_position_mode: compact
   family: GPT-OSS
   track: chat_safety
   role: primary_instruction

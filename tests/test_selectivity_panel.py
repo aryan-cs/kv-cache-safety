@@ -56,6 +56,19 @@ def test_generated_chat_safety_config_has_pinned_policy_controls() -> None:
     __import__("importlib").util.find_spec("yaml") is None,
     reason="PyYAML is not installed in the base interpreter",
 )
+def test_gpt_oss_uses_compact_cache_position_mode() -> None:
+    panel = load_yaml(Path("configs/models/selectivity_panel.yaml"))
+    entry = next(entry for entry in panel["models"] if entry["key"] == "gpt_oss_20b")
+
+    config = experiment_config_for_panel_entry(entry, "smoke")
+
+    assert config["model"]["cache_position_mode"] == "compact"
+
+
+@pytest.mark.skipif(
+    __import__("importlib").util.find_spec("yaml") is None,
+    reason="PyYAML is not installed in the base interpreter",
+)
 def test_generated_base_model_config_excludes_chat_only_policies(tmp_path: Path) -> None:
     panel = load_yaml(Path("configs/models/selectivity_panel.yaml"))
     entry = next(entry for entry in panel["models"] if entry["key"] == "qwen2_5_7b_base")

@@ -23,5 +23,6 @@ def generate_one(
         prompt=prompt,
         policy=policy,
         generation_config=generation_config,
+        cache_position_mode=getattr(model_bundle, "cache_position_mode", "absolute"),
         patch_from_baseline=patch_from_baseline,
     )

@@ -32,6 +32,7 @@ def hf_generate(
     prompt: PromptRecord,
     policy: Any,
     generation_config: GenerationConfig,
+    cache_position_mode: str = "absolute",
     patch_from_baseline: dict[str, Any] | None = None,
 ) -> GenerationResult:
     try:
@@ -95,6 +96,7 @@ def hf_generate(
                 token_id=last_prompt_token,
                 past=past,
                 absolute_position=int(input_ids.shape[-1]) - 1,
+                cache_position_mode=cache_position_mode,
                 output_attentions=generation_config.capture_attentions,
             )
             past = outputs.past_key_values
@@ -159,6 +161,7 @@ def hf_generate(
                 token_id=next_token.reshape(1, 1),
                 past=past,
                 absolute_position=absolute_position,
+                cache_position_mode=cache_position_mode,
                 output_attentions=generation_config.capture_attentions,
             )
             absolute_position += 1
@@ -221,6 +224,7 @@ def _forward_one_token(
     token_id: Any,
     past: Any,
     absolute_position: int,
+    cache_position_mode: str,
     output_attentions: bool,
 ) -> Any:
     try:
@@ -239,8 +243,11 @@ def _forward_one_token(
         "return_dict": True,
         "position_ids": torch.tensor([[absolute_position]], dtype=torch.long, device=device),
     }
+    if cache_position_mode not in {"absolute", "compact"}:
+        raise ValueError("cache_position_mode must be `absolute` or `compact`")
+    cache_position = cache_len if cache_position_mode == "compact" else absolute_position
     try:
-        kwargs["cache_position"] = torch.tensor([absolute_position], dtype=torch.long, device=device)
+        kwargs["cache_position"] = torch.tensor([cache_position], dtype=torch.long, device=device)
         return model(**kwargs)
     except TypeError:
         kwargs.pop("cache_position", None)

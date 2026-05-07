@@ -51,6 +51,7 @@ class ModelConfig:
     license: str | None = None
     context_length: int | None = None
     chat_template_required: bool = True
+    cache_position_mode: str = "absolute"
     dtype: str = "bfloat16"
     device_map: str = "auto"
     allow_cpu_offload: bool = False
@@ -133,6 +134,7 @@ def parse_experiment_config(path: str | Path) -> tuple[ExperimentConfig, dict[st
         if model_raw.get("context_length") is None
         else int(model_raw["context_length"]),
         chat_template_required=bool(model_raw.get("chat_template_required", True)),
+        cache_position_mode=str(model_raw.get("cache_position_mode", "absolute")),
         dtype=str(model_raw.get("dtype", "bfloat16")),
         device_map=str(model_raw.get("device_map", "auto")),
         allow_cpu_offload=bool(model_raw.get("allow_cpu_offload", False)),
