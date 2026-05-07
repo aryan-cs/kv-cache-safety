@@ -102,10 +102,13 @@ def _stratified_sample(
     strategy: str = "effect",
 ) -> list[dict[str, Any]]:
     rng = random.Random(seed)
-    groups: dict[tuple[str, str, str, int], dict[str, Any]] = {}
+    groups: dict[tuple[str, str, str, str, str, int], dict[str, Any]] = {}
     for row in rows:
+        source_run_id, model_id = _row_scope(row)
         groups[
             (
+                source_run_id,
+                model_id,
                 str(row.get("suite")),
                 str(row.get("policy")),
                 str(row.get("prompt_id")),
@@ -113,26 +116,55 @@ def _stratified_sample(
             )
         ] = row
 
-    sampled: OrderedDict[tuple[str, str, str, int], dict[str, Any]] = OrderedDict()
-    suites = sorted({suite for suite, _, _, _ in groups})
-    for suite in suites:
+    sampled: OrderedDict[tuple[str, str, str, str, str, int], dict[str, Any]] = OrderedDict()
+    scopes = sorted({(source_run_id, model_id, suite) for source_run_id, model_id, suite, _, _, _ in groups})
+    for source_run_id, model_id, suite in scopes:
         baseline = {
             (prompt_id, seed_value): row
-            for (row_suite, policy, prompt_id, seed_value), row in groups.items()
-            if row_suite == suite and policy == "none"
+            for (
+                row_source_run_id,
+                row_model_id,
+                row_suite,
+                policy,
+                prompt_id,
+                seed_value,
+            ), row in groups.items()
+            if (
+                row_source_run_id == source_run_id
+                and row_model_id == model_id
+                and row_suite == suite
+                and policy == "none"
+            )
         }
         treatment_policies = sorted(
             {
                 policy
-                for row_suite, policy, _, _ in groups
-                if row_suite == suite and policy != "none"
+                for row_source_run_id, row_model_id, row_suite, policy, _, _ in groups
+                if (
+                    row_source_run_id == source_run_id
+                    and row_model_id == model_id
+                    and row_suite == suite
+                    and policy != "none"
+                )
             }
         )
         for policy in treatment_policies:
             treatment = {
                 (prompt_id, seed_value): row
-                for (row_suite, row_policy, prompt_id, seed_value), row in groups.items()
-                if row_suite == suite and row_policy == policy
+                for (
+                    row_source_run_id,
+                    row_model_id,
+                    row_suite,
+                    row_policy,
+                    prompt_id,
+                    seed_value,
+                ), row in groups.items()
+                if (
+                    row_source_run_id == source_run_id
+                    and row_model_id == model_id
+                    and row_suite == suite
+                    and row_policy == policy
+                )
             }
             paired_keys = sorted(set(baseline).intersection(treatment))
             selected_keys = _select_paired_keys(
@@ -144,9 +176,17 @@ def _stratified_sample(
                 strategy=strategy,
             )
             for prompt_id, seed_value in selected_keys:
-                sampled[(suite, "none", prompt_id, seed_value)] = baseline[(prompt_id, seed_value)]
-                sampled[(suite, policy, prompt_id, seed_value)] = treatment[(prompt_id, seed_value)]
+                sampled[(source_run_id, model_id, suite, "none", prompt_id, seed_value)] = baseline[
+                    (prompt_id, seed_value)
+                ]
+                sampled[(source_run_id, model_id, suite, policy, prompt_id, seed_value)] = treatment[
+                    (prompt_id, seed_value)
+                ]
     return list(sampled.values())
+
+
+def _row_scope(row: dict[str, Any]) -> tuple[str, str]:
+    return str(row.get("source_run_id") or ""), str(row.get("model_id") or "")
 
 
 def _select_paired_keys(
@@ -251,7 +291,11 @@ def _audit_pair(
     key = {
         "audit_id": audit_id,
         "run_id": run_id,
+        "source_run_id": row.get("source_run_id"),
+        "source_run_dir": row.get("source_run_dir"),
         "model_id": row.get("model_id"),
+        "model_family": row.get("model_family"),
+        "model_track": row.get("model_track"),
         "suite": row.get("suite"),
         "policy": row.get("policy"),
         "prompt_id": row.get("prompt_id"),
@@ -281,6 +325,8 @@ def _audit_id(row: dict[str, Any], run_id: str, idx: int) -> str:
     raw = "|".join(
         [
             run_id,
+            str(row.get("source_run_id") or ""),
+            str(row.get("model_id") or ""),
             str(row.get("suite")),
             str(row.get("policy")),
             str(row.get("prompt_id")),
@@ -349,6 +395,7 @@ def _export_manifest(
         "annotator_template_count": len(template_paths),
         "sample_count": len(sampled_rows),
         "sampled_suite_policy_counts": _suite_policy_counts(sampled_rows),
+        "sampled_scope_suite_policy_counts": _scope_suite_policy_counts(sampled_rows),
         "source_artifacts": {
             "results": _result_sources(results_dir),
             "audit_csv": _source_artifact(blinded_csv_path),
@@ -362,6 +409,16 @@ def _suite_policy_counts(rows: list[dict[str, Any]]) -> dict[str, int]:
     counts: dict[str, int] = {}
     for row in rows:
         key = f"{row.get('suite')}::{row.get('policy')}"
+        counts[key] = counts.get(key, 0) + 1
+    return dict(sorted(counts.items()))
+
+
+def _scope_suite_policy_counts(rows: list[dict[str, Any]]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for row in rows:
+        source_run_id, model_id = _row_scope(row)
+        scope = source_run_id or model_id or "single_run"
+        key = f"{scope}::{row.get('suite')}::{row.get('policy')}"
         counts[key] = counts.get(key, 0) + 1
     return dict(sorted(counts.items()))
 

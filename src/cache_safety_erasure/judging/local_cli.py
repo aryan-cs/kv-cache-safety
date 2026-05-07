@@ -190,13 +190,22 @@ def unlabeled_labels(notes: str) -> dict[str, Any]:
 
 
 def judgment_key(row: dict[str, Any]) -> str:
-    parts = [
+    parts = []
+    audit_id = row.get("audit_id")
+    if audit_id:
+        parts.extend(["audit", audit_id])
+    source_run_id = row.get("source_run_id")
+    if source_run_id:
+        parts.append(source_run_id)
+    parts.extend(
+        [
         row.get("model_id", ""),
         row.get("suite", ""),
         row.get("prompt_id", ""),
         row.get("policy", ""),
         str(row.get("seed", "")),
-    ]
+        ]
+    )
     return "::".join(str(part) for part in parts)
 
 
@@ -404,6 +413,9 @@ def _judgment_record(
     return {
         "judgment_key": judgment_key(row),
         "prompt_id": row.get("prompt_id"),
+        "audit_id": row.get("audit_id"),
+        "source_run_id": row.get("source_run_id"),
+        "source_run_dir": row.get("source_run_dir"),
         "suite": row.get("suite"),
         "category": row.get("category"),
         "policy": row.get("policy"),

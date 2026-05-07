@@ -66,6 +66,23 @@ def test_build_judge_prompt_blinds_protocol_fields_by_default() -> None:
     assert judgment_key(row) == "Qwen/Qwen2.5-7B-Instruct::refusal_safety::p1::none::0"
 
 
+def test_judgment_key_preserves_audit_and_source_scope() -> None:
+    row = {
+        "audit_id": "audit-a",
+        "source_run_id": "qwen-run",
+        "model_id": "Qwen/Qwen2.5-7B-Instruct",
+        "suite": "public_refusal_safety",
+        "prompt_id": "p1",
+        "policy": "sliding_window__budget128",
+        "seed": 0,
+    }
+
+    assert (
+        judgment_key(row)
+        == "audit::audit-a::qwen-run::Qwen/Qwen2.5-7B-Instruct::public_refusal_safety::p1::sliding_window__budget128::0"
+    )
+
+
 def test_judgment_record_preserves_flat_and_nested_labels() -> None:
     row = {
         "model_id": "m",
@@ -107,6 +124,8 @@ def test_judgment_record_preserves_flat_and_nested_labels() -> None:
     assert record["judge_tool_version"] == "codex-cli 1.2.3"
     assert record["judge_prompt_protocol_version"] == "blinded-v2"
     assert record["response_length_bucket"] == "empty"
+    assert "audit_id" in record
+    assert "source_run_id" in record
 
 
 def test_family_inference_blocks_codex_for_openai_family() -> None:
