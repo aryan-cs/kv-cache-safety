@@ -44,7 +44,7 @@ def test_load_hf_composite_fills_limit_from_multiple_sources(monkeypatch: pytest
         exclude_user_hashes: set[str] | None = None,
     ) -> list[PromptRecord]:
         calls.append((name, limit, output_suite, revision, offset, exclude_user_hashes))
-        count = 2 if name == "advbench" else 3
+        count = {"advbench": 2, "jailbreakbench_behaviors": 3}.get(name, 3)
         if limit is not None:
             count = min(count, limit)
         return [
@@ -65,6 +65,28 @@ def test_load_hf_composite_fills_limit_from_multiple_sources(monkeypatch: pytest
     assert {record.suite for record in records} == {"public_refusal_safety"}
     assert calls[0][0:3] == ("advbench", 4, "public_refusal_safety")
     assert calls[1][0:3] == ("jailbreakbench_behaviors", 2, "public_refusal_safety")
+
+
+def test_public_refusal_combo_includes_ci_extension_sources() -> None:
+    assert prepare_data.HF_COMPOSITE_PRESETS["public_refusal_combo"]["presets"] == [
+        "advbench",
+        "jailbreakbench_behaviors",
+        "harmbench_direct_request",
+        "harmbench_human_jailbreaks",
+    ]
+
+
+def test_public_xstest_safe_combo_adds_large_safe_sources() -> None:
+    assert prepare_data.HF_COMPOSITE_PRESETS["public_xstest_safe_combo"]["suite"] == (
+        "public_xstest_safe"
+    )
+    assert prepare_data.HF_COMPOSITE_PRESETS["public_xstest_safe_combo"]["presets"] == [
+        "xstest_safe",
+        "or_bench_hard_1k",
+        "false_reject_test",
+    ]
+    assert prepare_data.OPEN_DATASET_PRESETS["or_bench_hard_1k"]["should_refuse"] is False
+    assert prepare_data.OPEN_DATASET_PRESETS["false_reject_test"]["should_refuse"] is False
 
 
 def test_load_hf_composite_applies_offset_after_deduplication(

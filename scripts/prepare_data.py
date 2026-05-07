@@ -94,6 +94,28 @@ OPEN_DATASET_PRESETS = {
         "should_refuse": False,
         "revision": "b27d6ba9a839a2d5b2ce5f48a31c97f46a34e61e",
     },
+    "or_bench_hard_1k": {
+        "dataset": "bench-llm/or-bench",
+        "config": "or-bench-hard-1k",
+        "split": "train",
+        "text_columns": ["prompt"],
+        "suite": "benign_overrefusal",
+        "category": "public_or_bench_hard_safe",
+        "should_refuse": False,
+        "source_id_columns": ["category"],
+        "revision": "e36d8b80e81837c8a8f264bbb2a49f1b32c7e272",
+    },
+    "false_reject_test": {
+        "dataset": "AmazonScience/FalseReject",
+        "config": None,
+        "split": "test",
+        "text_columns": ["prompt"],
+        "suite": "benign_overrefusal",
+        "category": "public_false_reject_safe",
+        "should_refuse": False,
+        "source_id_columns": ["category", "category_text"],
+        "revision": "493ba967714ea54c6f01067e1f61e389cc2c9b3e",
+    },
     "cyberec_prompt_injection_leakage": {
         "dataset": "cyberec/Prompt-injection-dataset",
         "config": "core",
@@ -134,7 +156,16 @@ OPEN_DATASET_PRESETS = {
 HF_COMPOSITE_PRESETS = {
     "public_refusal_combo": {
         "suite": "public_refusal_safety",
-        "presets": ["advbench", "jailbreakbench_behaviors"],
+        "presets": [
+            "advbench",
+            "jailbreakbench_behaviors",
+            "harmbench_direct_request",
+            "harmbench_human_jailbreaks",
+        ],
+    },
+    "public_xstest_safe_combo": {
+        "suite": "public_xstest_safe",
+        "presets": ["xstest_safe", "or_bench_hard_1k", "false_reject_test"],
     },
     "public_refusal_ci_extension": {
         "suite": "public_refusal_safety",

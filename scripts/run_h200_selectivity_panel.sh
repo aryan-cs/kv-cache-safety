@@ -69,7 +69,7 @@ prepare_powered_data() {
   uv run python scripts/prepare_data.py --source hf --suite cyberec_prompt_injection_leakage --limit "$public_prompt_limit" --output-suite public_system_leakage
   uv run python scripts/prepare_data.py --source hf --suite public_refusal_combo --limit "$public_prompt_limit" --output-suite public_refusal_safety
   uv run python scripts/prepare_data.py --source hf --suite dolly_benign --limit "$public_prompt_limit" --output-suite public_benign_overrefusal
-  uv run python scripts/prepare_data.py --source hf --suite xstest_safe --limit "$public_prompt_limit" --output-suite public_xstest_safe
+  uv run python scripts/prepare_data.py --source hf --suite public_xstest_safe_combo --limit "$public_prompt_limit" --output-suite public_xstest_safe
   uv run python scripts/prepare_data.py --source hf --suite arc_easy --limit "$public_prompt_limit" --output-suite public_capability_arc
   uv run python scripts/check_prepared_suites.py \
     --min-records 1200 \
