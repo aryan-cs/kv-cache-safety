@@ -87,7 +87,6 @@ Permitted generation backends:
 | Backend | Valid use |
 | --- | --- |
 | Hugging Face Transformers or equivalent instrumented runner | Primary cache-intervention experiments. |
-| Ollama | Model-access feasibility tests, baseline refusal checks, or serving-style supplementary analyses. |
 | vLLM/TGI | Deployment-relevance extensions when real cache behavior is configured and logged. |
 
 Claims about custom eviction, quantization simulation, or cache patching require a backend that exposes or implements the relevant cache policy. Black-box serving results are reported separately.

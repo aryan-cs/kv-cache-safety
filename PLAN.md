@@ -4,7 +4,9 @@
 
 The project is pivoting from a Qwen-centered cache-erasure draft to a cross-family safety-selectivity study. Existing Qwen H200 artifacts are preserved as pilot evidence and will not be relabeled as final cross-family evidence. The active experimental path is now the protocol in `RESEARCH.md`.
 
-The H200 instance was not reachable at the start of this implementation pass. `ssh uiuc-h200` returned a JupyterHub `302 Found` redirect and closed the connection. Remote cleanup, remote installation checks, and H200 smoke runs are blocked until the instance is restarted.
+Model access is Hugging Face only. Do not use Ollama for this protocol.
+
+Hugging Face gated access is working on H200 with the supplied read-only token. Llama and Gemma smoke configs pass H200 preflight. The Llama smoke run completed and was judged locally with Codex and Gemini. H200 is currently unreachable again through the university JupyterHub SSH proxy with `403 Forbidden`; Gemma execution is blocked until the instance is restarted.
 
 ## What "Clear Out The Codebase" Means
 
@@ -37,8 +39,8 @@ Primary chat-safety models:
 | GPT-OSS | `openai/gpt-oss-20b` | Public/open on Hugging Face; use as evaluated model only if H200 harness validation passes. |
 | Qwen 2.5 | `Qwen/Qwen2.5-7B-Instruct` | Pinned smoke config added. |
 | Qwen 3.5 | `Qwen/Qwen3.5-9B` | Exists, but HF metadata is multimodal; use only if text-only cache harness passes. |
-| Llama | `meta-llama/Llama-3.1-8B-Instruct` | Gated; requires accepted access on H200. |
-| Gemma | `google/gemma-2-9b-it` | Gated; requires accepted access on H200. |
+| Llama | `meta-llama/Llama-3.1-8B-Instruct` | Gated HF access validated; smoke run complete and locally judged. |
+| Gemma | `google/gemma-2-9b-it` | Gated HF access validated by preflight; run next after H200 restart. |
 | Mistral | `mistralai/Mistral-7B-Instruct-v0.3` | Public Apache-2.0; good fallback/additional family. |
 | OLMo | `allenai/Olmo-3-7B-Instruct` | Public/open; keep current ID. |
 | Phi | `microsoft/phi-4` | Public; `microsoft/Phi-4-mini-instruct` is a fallback if needed. |
@@ -82,32 +84,34 @@ The current implementation adds durable `cache_stats.jsonl` and `progress.json` 
 
 1. Restart H200 if SSH fails.
 2. On H200, work only in `/home/aryang9/sandbox/llm-safety`.
-3. Verify no active run lock/process before launching.
-4. Run smoke:
+3. Use Hugging Face token/cache discovery. Do not set `HF_HOME` unless intentionally overriding the cache path.
+4. Verify no active run lock/process before launching.
+5. Run smoke:
 
 ```bash
 uv run python scripts/run_experiment.py \
-  --config configs/experiments/selectivity_h200_qwen2_5_7b_instruct_smoke.yaml \
+  --config configs/experiments/selectivity_h200_smoke_gemma2_9b_it.yaml \
+  --run-id selectivity_h200_smoke_gemma2_9b_it_<UTC_TIMESTAMP> \
   --resume
 ```
 
-5. Watch progress:
+6. Watch progress:
 
 ```bash
 uv run python scripts/report_selectivity_status.py \
-  --run-dir results/selectivity_h200_qwen2_5_7b_instruct_smoke
+  --run-dir results/selectivity_h200_smoke_gemma2_9b_it_<UTC_TIMESTAMP>
 ```
 
-6. Commit and push run artifacts from H200:
+7. Commit and push run artifacts from H200:
 
 ```bash
-bash scripts/h200_commit_run_artifacts.sh results/selectivity_h200_qwen2_5_7b_instruct_smoke master
+bash scripts/h200_commit_run_artifacts.sh results/selectivity_h200_smoke_gemma2_9b_it_<UTC_TIMESTAMP> master
 ```
 
-7. Fetch to Mac. If the Mac worktree is too dirty to pull safely, use the rsync fetch helper:
+8. Fetch to Mac. If the Mac worktree is too dirty to pull safely, use the tar fetch helper:
 
 ```bash
-bash scripts/fetch_h200_selectivity_results.sh results/selectivity_h200_qwen2_5_7b_instruct_smoke
+bash scripts/fetch_h200_selectivity_results.sh results/selectivity_h200_smoke_gemma2_9b_it_<UTC_TIMESTAMP>
 ```
 
 ## Local Judging Workflow
@@ -129,15 +133,24 @@ gemini -p '<prompt>'
 The implemented harness:
 
 ```bash
-uv run python scripts/judge_with_codex_gemini.py \
+uv run python scripts/approve_judge_egress.py \
   --input-jsonl results/<run_id>/generations.jsonl \
+  --output-jsonl results/<run_id>/judge_input.codex_gemini.jsonl \
+  --approval-note "User approved local Codex/Gemini judging for H200-generated selectivity rows." \
+  --approval-source user_instruction \
+  --overwrite
+
+uv run python scripts/judge_with_codex_gemini.py \
+  --input-jsonl results/<run_id>/judge_input.codex_gemini.jsonl \
   --output-jsonl results/<run_id>/judgments.codex_gemini.jsonl \
   --providers codex,gemini \
-  --workers 2 \
-  --resume
+  --judge-mode all-providers \
+  --workers 4 \
+  --resume \
+  --allow-data-egress
 ```
 
-The judge harness preserves raw output, raw-output hash, prompt hash, rubric hash, command, parser status, timestamps, and label source type. These are model-judge labels, not human labels.
+The judge harness preserves raw output, raw-output hash, prompt hash, rubric hash, command, parser status, timestamps, response-length bucket, data-egress approval provenance, and label source type. These are model-judge labels, not human labels.
 
 ## Power And Decision Gates
 
@@ -170,8 +183,9 @@ Use `scripts/report_selectivity_status.py` to generate this format from a run di
 - Add H200 artifact commit helper.
 - Add Mac fetch helper.
 - Add selectivity smoke configs.
-- Run local tests.
+- Validate Hugging Face gated access for Llama and Gemma.
+- Run H200 Llama 3.1 8B instruct smoke.
+- Sync Llama data back to Mac.
+- Run local Codex and Gemini judging on Llama smoke.
 - Retry H200 SSH after restart.
-- Run H200 Qwen 2.5 7B instruct smoke.
-- Sync H200 data back to Mac.
-- Run local judging smoke on synced data.
+- Run H200 Gemma 2 9B IT smoke.
