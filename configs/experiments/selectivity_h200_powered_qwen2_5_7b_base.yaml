@@ -1,5 +1,5 @@
 run:
-  name: selectivity_h200_smoke_qwen2_5_7b_base
+  name: selectivity_h200_powered_qwen2_5_7b_base
   output_dir: results
   resume: true
 model:
@@ -17,7 +17,7 @@ model:
   access: public
   license: apache-2.0
 generation:
-  max_new_tokens: 96
+  max_new_tokens: 128
   temperature: 0.0
   top_p: 1.0
   do_sample: false
@@ -25,7 +25,7 @@ generation:
 prompt_suites:
 - base_alignment_contrast
 - instruction_following
-- capability_smoke
+- public_capability_arc
 cache_policies:
 - name: none
 - name: sliding_window
@@ -35,4 +35,4 @@ cache_policies:
   sink_tokens: 8
 seeds:
 - 0
-limit_per_suite: 2
+limit_per_suite: null
