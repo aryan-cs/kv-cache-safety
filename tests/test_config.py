@@ -31,6 +31,44 @@ def test_tiny_hf_smoke_explicitly_allows_offload() -> None:
     __import__("importlib").util.find_spec("yaml") is None,
     reason="PyYAML is not installed in the base interpreter",
 )
+def test_parse_hf_adapter_model_fields(tmp_path: Path) -> None:
+    config_path = tmp_path / "adapter.yaml"
+    config_path.write_text(
+        """
+run:
+  name: adapter_smoke
+model:
+  provider: hf
+  model_id: Qwen/Qwen2.5-14B-Instruct
+  revision: base-rev
+  tokenizer_id: chloeli/qwen-2.5-14b-rules-spec-msm
+  tokenizer_revision: tok-rev
+  adapter_id: chloeli/qwen-2.5-14b-rules-spec-msm
+  adapter_revision: adapter-rev
+generation:
+  max_new_tokens: 1
+prompt_suites:
+  - system_leakage
+cache_policies:
+  - name: none
+""",
+        encoding="utf-8",
+    )
+
+    config, _raw = parse_experiment_config(config_path)
+
+    assert config.model.model_id == "Qwen/Qwen2.5-14B-Instruct"
+    assert config.model.revision == "base-rev"
+    assert config.model.tokenizer_id == "chloeli/qwen-2.5-14b-rules-spec-msm"
+    assert config.model.tokenizer_revision == "tok-rev"
+    assert config.model.adapter_id == "chloeli/qwen-2.5-14b-rules-spec-msm"
+    assert config.model.adapter_revision == "adapter-rev"
+
+
+@pytest.mark.skipif(
+    __import__("importlib").util.find_spec("yaml") is None,
+    reason="PyYAML is not installed in the base interpreter",
+)
 def test_h200_public_sweep_uses_prompt_clusters_not_repeated_deterministic_seeds() -> None:
     config, _raw = parse_experiment_config(Path("configs/experiments/h200_public_qwen14b.yaml"))
     assert config.generation.do_sample is False

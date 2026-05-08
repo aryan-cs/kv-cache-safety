@@ -101,7 +101,7 @@ def main() -> None:
         "model_config": asdict(config.model),
         "model_device_map": None,
         "model_context_length": config.model.context_length,
-        "tokenizer_source": config.model.model_id,
+        "tokenizer_source": config.model.tokenizer_id or config.model.model_id,
         "chat_template_required": config.model.chat_template_required,
         "cache_policy_support": _cache_policy_support_manifest(config.cache_policies),
         "repository_url": (env.get("project") or {}).get("repository_url"),

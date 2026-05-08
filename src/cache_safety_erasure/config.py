@@ -44,6 +44,10 @@ class ModelConfig:
     provider: str
     model_id: str
     revision: str | None = None
+    tokenizer_id: str | None = None
+    tokenizer_revision: str | None = None
+    adapter_id: str | None = None
+    adapter_revision: str | None = None
     family: str | None = None
     track: str = "chat_safety"
     role: str | None = None
@@ -125,6 +129,10 @@ def parse_experiment_config(path: str | Path) -> tuple[ExperimentConfig, dict[st
         provider=str(model_raw.get("provider", "hf")),
         model_id=str(model_raw["model_id"]),
         revision=model_raw.get("revision"),
+        tokenizer_id=model_raw.get("tokenizer_id"),
+        tokenizer_revision=model_raw.get("tokenizer_revision"),
+        adapter_id=model_raw.get("adapter_id"),
+        adapter_revision=model_raw.get("adapter_revision"),
         family=model_raw.get("family"),
         track=str(model_raw.get("track", "chat_safety")),
         role=model_raw.get("role"),
