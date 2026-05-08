@@ -40,6 +40,16 @@ def main() -> None:
     parser.add_argument("--timeout-seconds", type=int, default=180)
     parser.add_argument("--resume", action="store_true")
     parser.add_argument(
+        "--retry-statuses",
+        default="",
+        help=(
+            "Comma-separated parser_status values to retry even when --resume is set. "
+            "Use this for transient judge failures such as blocked,parse_error,unlabeled. "
+            "Existing attempts are preserved; successful retries are appended with the same "
+            "source-marked judgment key."
+        ),
+    )
+    parser.add_argument(
         "--allow-data-egress",
         action="store_true",
         help=(
@@ -65,10 +75,12 @@ def main() -> None:
         existing, corrupt_output = read_jsonl_tolerant(args.output_jsonl)
         if corrupt_output is not None:
             print(f"Quarantined corrupt output tail at {corrupt_output}.")
+        retry_statuses = _retry_statuses_from_args(args.retry_statuses)
         done = {
             _done_key(row, mode=args.judge_mode)
             for row in existing
             if row.get("judgment_key")
+            and str(row.get("parser_status", "")).strip() not in retry_statuses
         }
     commands = _commands_from_args(args)
     tasks = _judging_tasks(rows, commands, done, mode=args.judge_mode)
@@ -171,6 +183,10 @@ def _done_key(row: dict, *, mode: str) -> str:
             str(row.get("judge_model", "")),
         ]
     )
+
+
+def _retry_statuses_from_args(value: str) -> set[str]:
+    return {status.strip() for status in value.split(",") if status.strip()}
 
 
 def _provider_done_key(row: dict, command: JudgeCommand) -> str:

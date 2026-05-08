@@ -4,7 +4,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path("scripts").resolve()))
 
 from approve_judge_egress import approve_rows
-from judge_with_codex_gemini import _done_key, _judging_tasks
+from judge_with_codex_gemini import _done_key, _judging_tasks, _retry_statuses_from_args
 
 from cache_safety_erasure.judging.local_cli import (
     JudgeCommand,
@@ -241,6 +241,37 @@ def test_judge_script_all_provider_tasks_preserve_disagreement_channels() -> Non
         "judge_model": "gpt-5.5",
     }
     remaining = _judging_tasks([row], commands, {_done_key(existing, mode="all-providers")}, mode="all-providers")
+    assert [task["commands"][0].provider for task in remaining] == ["gemini"]
+
+
+def test_retry_statuses_exclude_failed_attempts_from_resume_done_set() -> None:
+    row = {"model_id": "m", "suite": "s", "prompt_id": "p", "policy": "none", "seed": 0}
+    failed_existing = {
+        "judgment_key": judgment_key(row),
+        "judge_provider": "gemini",
+        "judge_model": "gemini-3.1",
+        "parser_status": "blocked",
+    }
+    parsed_existing = {
+        "judgment_key": judgment_key(row),
+        "judge_provider": "codex",
+        "judge_model": "gpt-5.4",
+        "parser_status": "parsed",
+    }
+    retry_statuses = _retry_statuses_from_args("blocked, parse_error,unlabeled")
+
+    done = {
+        _done_key(existing, mode="all-providers")
+        for existing in [failed_existing, parsed_existing]
+        if existing["parser_status"] not in retry_statuses
+    }
+    commands = [
+        JudgeCommand(provider="codex", model="gpt-5.4"),
+        JudgeCommand(provider="gemini", model="gemini-3.1"),
+    ]
+
+    remaining = _judging_tasks([row], commands, done, mode="all-providers")
+
     assert [task["commands"][0].provider for task in remaining] == ["gemini"]
 
 
