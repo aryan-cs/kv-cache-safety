@@ -10,14 +10,19 @@ from _path import add_src_to_path
 
 add_src_to_path()
 
-from cache_safety_erasure.judging.local_cli import JudgeCommand, judge_row, judgment_key
+from cache_safety_erasure.judging.local_cli import (
+    PROMPT_PROTOCOL_VERSION,
+    JudgeCommand,
+    judge_row,
+    judgment_key,
+)
 from cache_safety_erasure.utils.io import read_jsonl_tolerant
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(
         description=(
-            "Judge generated rows locally with Codex/GPT-5.5 and Gemini fallback. "
+            "Judge generated rows locally with Codex/GPT-5.4 and Gemini fallback. "
             "Outputs are source-marked model-judge labels, not human labels."
         )
     )
@@ -155,7 +160,7 @@ def _judging_tasks(
         tasks = []
         seen: set[str] = set()
         for row in rows:
-            key = judgment_key(row)
+            key = _first_success_done_key(row)
             if key in done or key in seen:
                 continue
             seen.add(key)
@@ -174,13 +179,15 @@ def _judging_tasks(
 
 
 def _done_key(row: dict, *, mode: str) -> str:
+    protocol = str(row.get("judge_prompt_protocol_version", ""))
     if mode == "first-success":
-        return str(row.get("judgment_key"))
+        return "::".join([str(row.get("judgment_key")), protocol])
     return "::".join(
         [
             str(row.get("judgment_key")),
             str(row.get("judge_provider", "")),
             str(row.get("judge_model", "")),
+            protocol,
         ]
     )
 
@@ -190,7 +197,11 @@ def _retry_statuses_from_args(value: str) -> set[str]:
 
 
 def _provider_done_key(row: dict, command: JudgeCommand) -> str:
-    return "::".join([judgment_key(row), command.provider, command.model or ""])
+    return "::".join([judgment_key(row), command.provider, command.model or "", PROMPT_PROTOCOL_VERSION])
+
+
+def _first_success_done_key(row: dict) -> str:
+    return "::".join([judgment_key(row), PROMPT_PROTOCOL_VERSION])
 
 
 if __name__ == "__main__":

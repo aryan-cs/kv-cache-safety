@@ -8,6 +8,7 @@ from judge_with_codex_gemini import _done_key, _judging_tasks, _retry_statuses_f
 
 from cache_safety_erasure.judging.local_cli import (
     JudgeCommand,
+    PROMPT_PROTOCOL_VERSION,
     _judgment_record,
     build_judge_prompt,
     extract_first_json_object,
@@ -107,7 +108,7 @@ def test_judgment_record_preserves_flat_and_nested_labels() -> None:
 
     record = _judgment_record(
         row,
-        command=JudgeCommand(provider="codex", model="gpt-5.5"),
+        command=JudgeCommand(provider="codex", model="gpt-5.4"),
         prompt="prompt",
         raw_output="{}",
         started_at="2026-01-01T00:00:00Z",
@@ -138,7 +139,7 @@ def test_family_inference_blocks_codex_for_openai_family() -> None:
         "policy": "none",
         "data_egress_approved": True,
     }
-    command = JudgeCommand(provider="codex", model="gpt-5.5")
+    command = JudgeCommand(provider="codex", model="gpt-5.4")
 
     assert infer_evaluated_family(row) == "openai_gpt"
     assert infer_judge_family(command) == "openai_gpt"
@@ -228,7 +229,7 @@ def test_response_length_bucket_boundaries() -> None:
 def test_judge_script_all_provider_tasks_preserve_disagreement_channels() -> None:
     row = {"model_id": "m", "suite": "s", "prompt_id": "p", "policy": "none", "seed": 0}
     commands = [
-        JudgeCommand(provider="codex", model="gpt-5.5"),
+        JudgeCommand(provider="codex", model="gpt-5.4"),
         JudgeCommand(provider="gemini", model="gemini-3.1"),
     ]
 
@@ -238,10 +239,31 @@ def test_judge_script_all_provider_tasks_preserve_disagreement_channels() -> Non
     existing = {
         "judgment_key": judgment_key(row),
         "judge_provider": "codex",
-        "judge_model": "gpt-5.5",
+        "judge_model": "gpt-5.4",
+        "judge_prompt_protocol_version": PROMPT_PROTOCOL_VERSION,
     }
     remaining = _judging_tasks([row], commands, {_done_key(existing, mode="all-providers")}, mode="all-providers")
     assert [task["commands"][0].provider for task in remaining] == ["gemini"]
+
+
+def test_judge_script_resume_is_protocol_aware() -> None:
+    row = {"model_id": "m", "suite": "s", "prompt_id": "p", "policy": "none", "seed": 0}
+    commands = [JudgeCommand(provider="codex", model="gpt-5.4")]
+    old_protocol_existing = {
+        "judgment_key": judgment_key(row),
+        "judge_provider": "codex",
+        "judge_model": "gpt-5.4",
+        "judge_prompt_protocol_version": "blinded-v2",
+    }
+
+    remaining = _judging_tasks(
+        [row],
+        commands,
+        {_done_key(old_protocol_existing, mode="all-providers")},
+        mode="all-providers",
+    )
+
+    assert [task["commands"][0].provider for task in remaining] == ["codex"]
 
 
 def test_retry_statuses_exclude_failed_attempts_from_resume_done_set() -> None:
@@ -257,6 +279,7 @@ def test_retry_statuses_exclude_failed_attempts_from_resume_done_set() -> None:
         "judge_provider": "codex",
         "judge_model": "gpt-5.4",
         "parser_status": "parsed",
+        "judge_prompt_protocol_version": PROMPT_PROTOCOL_VERSION,
     }
     retry_statuses = _retry_statuses_from_args("blocked, parse_error,unlabeled")
 
@@ -278,7 +301,7 @@ def test_retry_statuses_exclude_failed_attempts_from_resume_done_set() -> None:
 def test_judge_script_deduplicates_duplicate_input_rows() -> None:
     row = {"model_id": "m", "suite": "s", "prompt_id": "p", "policy": "none", "seed": 0}
     commands = [
-        JudgeCommand(provider="codex", model="gpt-5.5"),
+        JudgeCommand(provider="codex", model="gpt-5.4"),
         JudgeCommand(provider="gemini", model="gemini-3.1"),
     ]
 
@@ -287,6 +310,40 @@ def test_judge_script_deduplicates_duplicate_input_rows() -> None:
 
     assert [task["commands"][0].provider for task in all_provider_tasks] == ["codex", "gemini"]
     assert len(first_success_tasks) == 1
+
+
+def test_judge_script_first_success_resume_is_protocol_aware() -> None:
+    row = {"model_id": "m", "suite": "s", "prompt_id": "p", "policy": "none", "seed": 0}
+    commands = [
+        JudgeCommand(provider="codex", model="gpt-5.4"),
+        JudgeCommand(provider="gemini", model="gemini-3.1"),
+    ]
+    parsed_existing = {
+        "judgment_key": judgment_key(row),
+        "judge_provider": "codex",
+        "judge_model": "gpt-5.4",
+        "parser_status": "parsed",
+        "judge_prompt_protocol_version": PROMPT_PROTOCOL_VERSION,
+    }
+    old_protocol_existing = {**parsed_existing, "judge_prompt_protocol_version": "blinded-v2"}
+
+    assert (
+        _judging_tasks(
+            [row],
+            commands,
+            {_done_key(parsed_existing, mode="first-success")},
+            mode="first-success",
+        )
+        == []
+    )
+    assert len(
+        _judging_tasks(
+            [row],
+            commands,
+            {_done_key(old_protocol_existing, mode="first-success")},
+            mode="first-success",
+        )
+    ) == 1
 
 
 def test_gemini_command_uses_headless_plan_skip_trust(monkeypatch, tmp_path: Path) -> None:
