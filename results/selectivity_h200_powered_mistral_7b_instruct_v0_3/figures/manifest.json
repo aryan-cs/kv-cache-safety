@@ -1,0 +1,195 @@
+{
+  "figures": [
+    {
+      "data_csv": "results/selectivity_h200_powered_mistral_7b_instruct_v0_3/figures/prompt_effect_constellation.csv",
+      "data_csv_sha256": "7b64642bdc0d17af473247624011125b7325e1c69d779e13e5f3c63eb1c0ac12",
+      "data_row_count": 14663,
+      "name": "prompt_effect_constellation",
+      "pdf": "results/selectivity_h200_powered_mistral_7b_instruct_v0_3/figures/prompt_effect_constellation.pdf",
+      "pdf_sha256": "7647577ca7855ae1d1cf4d8322fc927f65a9859cf9acdda3886c2211caddda09",
+      "png": "results/selectivity_h200_powered_mistral_7b_instruct_v0_3/figures/prompt_effect_constellation.png",
+      "png_sha256": "f7b4f3f3da3c5089f2a9912f980ef3ed2303d4e69a333f7252a204d5686405e2",
+      "svg": "results/selectivity_h200_powered_mistral_7b_instruct_v0_3/figures/prompt_effect_constellation.svg",
+      "svg_sha256": "7ff2944ba8cfeb27fd75c02b61d3a8f6a2398b8e8b7fbff08fa7ac609c080b87"
+    },
+    {
+      "data_csv": "results/selectivity_h200_powered_mistral_7b_instruct_v0_3/figures/safety_score.csv",
+      "data_csv_sha256": "20941d501aa26835c891f981a54a42c0b253f96411ba1b29eb0d97f2f4646e2f",
+      "data_row_count": 42,
+      "name": "safety_score",
+      "pdf": "results/selectivity_h200_powered_mistral_7b_instruct_v0_3/figures/safety_score.pdf",
+      "pdf_sha256": "4cc0a27ede85b5f240602240bd7b0bdd2a20fa925f20f4cd7071913f102e4b29",
+      "png": "results/selectivity_h200_powered_mistral_7b_instruct_v0_3/figures/safety_score.png",
+      "png_sha256": "068ff94041202ba6db9b6b0066befbdc600605d6794e95cb6822b46c40faff8d",
+      "svg": "results/selectivity_h200_powered_mistral_7b_instruct_v0_3/figures/safety_score.svg",
+      "svg_sha256": "965bd329a3277268731799f29c39f666ba50831fa5f1edaef03b365ba545884f"
+    },
+    {
+      "data_csv": "results/selectivity_h200_powered_mistral_7b_instruct_v0_3/figures/capability_score.csv",
+      "data_csv_sha256": "47c0f123c61aa5e081ea7690ea9673941b1e7a74d98dc2d8d26d529d21a446d7",
+      "data_row_count": 42,
+      "name": "capability_score",
+      "pdf": "results/selectivity_h200_powered_mistral_7b_instruct_v0_3/figures/capability_score.pdf",
+      "pdf_sha256": "2d2ffccd5eb799861ae613f9c5892389a311c4285881178fa78651b7adcbd0d8",
+      "png": "results/selectivity_h200_powered_mistral_7b_instruct_v0_3/figures/capability_score.png",
+      "png_sha256": "f5f5e87cd1d23a6b21d7857353112e19b7e4b63dc8b9f61a4c2987716ac5c719",
+      "svg": "results/selectivity_h200_powered_mistral_7b_instruct_v0_3/figures/capability_score.svg",
+      "svg_sha256": "e8be89b4654791ead11d5cb220ddbd3dbcaab3a111ef3c02b7da158020c23e61"
+    },
+    {
+      "data_csv": "results/selectivity_h200_powered_mistral_7b_instruct_v0_3/figures/rouge_l_leakage_recall.csv",
+      "data_csv_sha256": "06ad3a28200c0925cd8e1594d816aca4c3ad70130a5206839cf71797e8bef85f",
+      "data_row_count": 42,
+      "name": "rouge_l_leakage_recall",
+      "pdf": "results/selectivity_h200_powered_mistral_7b_instruct_v0_3/figures/rouge_l_leakage_recall.pdf",
+      "pdf_sha256": "ad540a4e9fbdd227bc68cf43fc92b742b6917feb6fd906680f8ce69684079e4b",
+      "png": "results/selectivity_h200_powered_mistral_7b_instruct_v0_3/figures/rouge_l_leakage_recall.png",
+      "png_sha256": "bc9118739f94683b854d8f3fc7e057c740bce717356d08a594e04b91269e68b5",
+      "svg": "results/selectivity_h200_powered_mistral_7b_instruct_v0_3/figures/rouge_l_leakage_recall.svg",
+      "svg_sha256": "4bdacd56acf6fd5f956662887bff0294ef1c09ecc0d28eb406acb70685b70b2a"
+    },
+    {
+      "data_csv": "results/selectivity_h200_powered_mistral_7b_instruct_v0_3/figures/selective_safety_erasure_heatmap.csv",
+      "data_csv_sha256": "5207793dbfca2cbb5070db23f02b7adc8ac77630a9972e2f0f80b11fd8e56d9c",
+      "data_row_count": 5,
+      "name": "selective_safety_erasure_heatmap",
+      "pdf": "results/selectivity_h200_powered_mistral_7b_instruct_v0_3/figures/selective_safety_erasure_heatmap.pdf",
+      "pdf_sha256": "d34e60045637520c167254457695275eca46bac202f0a9a8973799ede28b98a2",
+      "png": "results/selectivity_h200_powered_mistral_7b_instruct_v0_3/figures/selective_safety_erasure_heatmap.png",
+      "png_sha256": "3d5095dd1556f6973edc2a6e2b5223d1c1a5fdc1ba1d8d64df92045c0b966711",
+      "svg": "results/selectivity_h200_powered_mistral_7b_instruct_v0_3/figures/selective_safety_erasure_heatmap.svg",
+      "svg_sha256": "80427f508a82afe66d3a86f253271ad87d1a1aac1d8d0e0797d87ecd94e47eae"
+    },
+    {
+      "data_csv": "results/selectivity_h200_powered_mistral_7b_instruct_v0_3/figures/safety_vs_capability_degradation.csv",
+      "data_csv_sha256": "86392bd2be94ec1b8f8338439e2d8162e0e99beb94623d00d0e87b24e0ed954f",
+      "data_row_count": 5,
+      "name": "safety_vs_capability_degradation",
+      "pdf": "results/selectivity_h200_powered_mistral_7b_instruct_v0_3/figures/safety_vs_capability_degradation.pdf",
+      "pdf_sha256": "b565fe9a241cdc29d1cf2dc2bb597ae266808f652b78e34f308abab4501fe7ee",
+      "png": "results/selectivity_h200_powered_mistral_7b_instruct_v0_3/figures/safety_vs_capability_degradation.png",
+      "png_sha256": "84e9a208c60e0c70100f99c7a9647bae17fed11d8d964fe92a766b72e76083a6",
+      "svg": "results/selectivity_h200_powered_mistral_7b_instruct_v0_3/figures/safety_vs_capability_degradation.svg",
+      "svg_sha256": "1fc898595d1514badf2df1f09171afe772f10793ef3ae9a0d3bc86018e324293"
+    },
+    {
+      "data_csv": "results/selectivity_h200_powered_mistral_7b_instruct_v0_3/figures/safety_capability_phase_portrait.csv",
+      "data_csv_sha256": "807a1b002bf238b7ef17c01e627891dba093bddc11511e9a16087b531e1ca9a0",
+      "data_row_count": 5,
+      "name": "safety_capability_phase_portrait",
+      "pdf": "results/selectivity_h200_powered_mistral_7b_instruct_v0_3/figures/safety_capability_phase_portrait.pdf",
+      "pdf_sha256": "3beb806ed7bb9bd3597ada5acd612c7c8330f5e2c3f1cde27de339a56729c4c1",
+      "png": "results/selectivity_h200_powered_mistral_7b_instruct_v0_3/figures/safety_capability_phase_portrait.png",
+      "png_sha256": "18d071a6c02935959862e85688080f75c1175a839ca704dceae4a481fa54a5ec",
+      "svg": "results/selectivity_h200_powered_mistral_7b_instruct_v0_3/figures/safety_capability_phase_portrait.svg",
+      "svg_sha256": "48f4f915e8800d662d60ed4e7dc3ec2fee45cf2f34f4a5b9e4d445d2d53e1fce"
+    },
+    {
+      "data_csv": "results/selectivity_h200_powered_mistral_7b_instruct_v0_3/figures/paired_safety_degradation_forest.csv",
+      "data_csv_sha256": "dc540b125170afccd2cd86af37d3b83afe15629b3c487132f501a1a368277f43",
+      "data_row_count": 30,
+      "name": "paired_safety_degradation_forest",
+      "pdf": "results/selectivity_h200_powered_mistral_7b_instruct_v0_3/figures/paired_safety_degradation_forest.pdf",
+      "pdf_sha256": "dcddc98c3f0a8e137d2bb55f14705f6d86ddcc370cfbf099938ec7d30d6bc3fd",
+      "png": "results/selectivity_h200_powered_mistral_7b_instruct_v0_3/figures/paired_safety_degradation_forest.png",
+      "png_sha256": "bbbc248f78cc237ca0a8078b2f40918ee83b4170110fc7b70b4e21b5dee5b8bb",
+      "svg": "results/selectivity_h200_powered_mistral_7b_instruct_v0_3/figures/paired_safety_degradation_forest.svg",
+      "svg_sha256": "58e1982243162cd1efb8223021f5b4b65a7287e0be599c2935c0e5f590ecdb99"
+    },
+    {
+      "data_csv": "results/selectivity_h200_powered_mistral_7b_instruct_v0_3/figures/policy_uncertainty_braid.csv",
+      "data_csv_sha256": "a21fa13329dff690f6bb3eda510427e9a11831980acab90d80572a12f136eebd",
+      "data_row_count": 15,
+      "name": "policy_uncertainty_braid",
+      "pdf": "results/selectivity_h200_powered_mistral_7b_instruct_v0_3/figures/policy_uncertainty_braid.pdf",
+      "pdf_sha256": "7387fbb6b3fd0a1006e0080c45f8ae673f34dbc98869e899ee74d9253405b450",
+      "png": "results/selectivity_h200_powered_mistral_7b_instruct_v0_3/figures/policy_uncertainty_braid.png",
+      "png_sha256": "ec7f1b09655eb3c095bd2114755423d9b33c86df97dbb486dd27c1373eb64801",
+      "svg": "results/selectivity_h200_powered_mistral_7b_instruct_v0_3/figures/policy_uncertainty_braid.svg",
+      "svg_sha256": "2f9f1b52022c40d74649eb8f44d05d2315a77327121e3f92c6f3ee3ffcd73fd5"
+    },
+    {
+      "data_csv": "results/selectivity_h200_powered_mistral_7b_instruct_v0_3/figures/top_selective_effects.csv",
+      "data_csv_sha256": "0f537b35f3d558994c940f2325cc92aeecbb0fd70aca4c341e06244eacca9834",
+      "data_row_count": 5,
+      "name": "top_selective_effects",
+      "pdf": "results/selectivity_h200_powered_mistral_7b_instruct_v0_3/figures/top_selective_effects.pdf",
+      "pdf_sha256": "7738a83ccbbd17fff8333e84a178378b7558a3a9efc8938b18e6c83c9f483fac",
+      "png": "results/selectivity_h200_powered_mistral_7b_instruct_v0_3/figures/top_selective_effects.png",
+      "png_sha256": "b8b5dafa9b571ff294fb82d0f31158b5f4d15386d20e38ae17b919e55e75724c",
+      "svg": "results/selectivity_h200_powered_mistral_7b_instruct_v0_3/figures/top_selective_effects.svg",
+      "svg_sha256": "38efa90b15866524097e9b1afb5bb591e790db76fd25928055483b8ab3c20f44"
+    },
+    {
+      "data_csv": "results/selectivity_h200_powered_mistral_7b_instruct_v0_3/figures/cache_l2_retained_fraction.csv",
+      "data_csv_sha256": "07ba0c77ef811e525d028eb499a4c3c37e55a294b665a0dc90efc77f3c63a15a",
+      "data_row_count": 12,
+      "name": "cache_l2_retained_fraction",
+      "pdf": "results/selectivity_h200_powered_mistral_7b_instruct_v0_3/figures/cache_l2_retained_fraction.pdf",
+      "pdf_sha256": "4ca78648efcc75031400b3c0594e4d64150d0c6470a18ffe1e3a29b4f87ac115",
+      "png": "results/selectivity_h200_powered_mistral_7b_instruct_v0_3/figures/cache_l2_retained_fraction.png",
+      "png_sha256": "859ce1dd232b3247fa855bbd397008755bbc3d69ffd7546537fcc5848c2ab41e",
+      "svg": "results/selectivity_h200_powered_mistral_7b_instruct_v0_3/figures/cache_l2_retained_fraction.svg",
+      "svg_sha256": "fee7fdd1a8afb8467783defe3579216ad333885f0d7124dd7c6c20ffe91ee325"
+    },
+    {
+      "data_csv": "results/selectivity_h200_powered_mistral_7b_instruct_v0_3/figures/token_role_retention_heatmap.csv",
+      "data_csv_sha256": "6f3cdbecfcf2085f476d38fb36f405225866104874d8b068483f38be9f602c0b",
+      "data_row_count": 30,
+      "name": "token_role_retention_heatmap",
+      "pdf": "results/selectivity_h200_powered_mistral_7b_instruct_v0_3/figures/token_role_retention_heatmap.pdf",
+      "pdf_sha256": "eeb24536b6fcca8f7e1ea2ec701439624e747c6ec52da4e60e2536a7c32feafe",
+      "png": "results/selectivity_h200_powered_mistral_7b_instruct_v0_3/figures/token_role_retention_heatmap.png",
+      "png_sha256": "4d7139bbe0a29cf63e45526552dc1d17c5ba38ba375a1141458c0498a08f0834",
+      "svg": "results/selectivity_h200_powered_mistral_7b_instruct_v0_3/figures/token_role_retention_heatmap.svg",
+      "svg_sha256": "e08f14732d6a4cfc06bc657d2630c0b066afd57b1214eef2ec88806266d5ad09"
+    },
+    {
+      "data_csv": "results/selectivity_h200_powered_mistral_7b_instruct_v0_3/figures/safety_state_atlas.csv",
+      "data_csv_sha256": "39c6a1c6348622a808090fb9a7424e0c407d39a6c5d235bf4d5373dae23d9515",
+      "data_row_count": 5,
+      "name": "safety_state_atlas",
+      "pdf": "results/selectivity_h200_powered_mistral_7b_instruct_v0_3/figures/safety_state_atlas.pdf",
+      "pdf_sha256": "289f4b494561443c08cd17cbb70ea72fa485653bbfca1e01fe070a79fddd9b9c",
+      "png": "results/selectivity_h200_powered_mistral_7b_instruct_v0_3/figures/safety_state_atlas.png",
+      "png_sha256": "62279fe4010623abe0c3da38b9d9665eef8d4f7ea357d1fb7903e40f5c290aa4",
+      "svg": "results/selectivity_h200_powered_mistral_7b_instruct_v0_3/figures/safety_state_atlas.svg",
+      "svg_sha256": "a0a21a533ac01a75c3cd84aa7fc68fa9f23f2508f362f4571f4264837e2f5f57"
+    },
+    {
+      "data_csv": "results/selectivity_h200_powered_mistral_7b_instruct_v0_3/figures/cache_state_fingerprint.csv",
+      "data_csv_sha256": "c61b247f737760ef674cecc722e0e856b436d6c5eaa6f10c622555ae3956aaf9",
+      "data_row_count": 834,
+      "name": "cache_state_fingerprint",
+      "pdf": "results/selectivity_h200_powered_mistral_7b_instruct_v0_3/figures/cache_state_fingerprint.pdf",
+      "pdf_sha256": "987157e27fa018b0cf35daf42025d68c22186c59deb82e29640b4656ce88e16a",
+      "png": "results/selectivity_h200_powered_mistral_7b_instruct_v0_3/figures/cache_state_fingerprint.png",
+      "png_sha256": "b7d1f17fcd7646eb1e4c0a9f366d1fc466d587a327a6e729fb76c74a28e5b46d",
+      "svg": "results/selectivity_h200_powered_mistral_7b_instruct_v0_3/figures/cache_state_fingerprint.svg",
+      "svg_sha256": "90f21f7e486c8c947ce7fa1ec4fff91972ee56532bc6059a5428d36cf2fa70ed"
+    }
+  ],
+  "schema_version": 1,
+  "source_artifacts": {
+    "cache_stats.parquet": {
+      "bytes": 41999600,
+      "path": "results/selectivity_h200_powered_mistral_7b_instruct_v0_3/cache_stats.parquet",
+      "sha256": "b8ec67cbaf6b4435268856c31fe2854c4035cdc9a51d99729182591ca07f6387"
+    },
+    "generations.jsonl": {
+      "bytes": 82176054,
+      "path": "results/selectivity_h200_powered_mistral_7b_instruct_v0_3/generations.jsonl",
+      "sha256": "0de03ca69ceb74740a249588eb65f20424b895d356936473d3d7f46f38522846"
+    },
+    "manifest.json": {
+      "bytes": 244449,
+      "path": "results/selectivity_h200_powered_mistral_7b_instruct_v0_3/manifest.json",
+      "sha256": "7b5b481d595a0ae589939b39391d384b7ddccd21d4da49ecc96cb453da3b07da"
+    },
+    "metrics.json": {
+      "bytes": 164918,
+      "path": "results/selectivity_h200_powered_mistral_7b_instruct_v0_3/metrics.json",
+      "sha256": "cc22ee1fdeaf93deb7659bf4d80a20d99295b51f2e3b76adc4479c280610ee5a"
+    }
+  }
+}
