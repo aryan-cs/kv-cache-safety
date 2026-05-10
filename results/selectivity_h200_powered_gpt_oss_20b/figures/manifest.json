@@ -1,0 +1,195 @@
+{
+  "figures": [
+    {
+      "data_csv": "results/selectivity_h200_powered_gpt_oss_20b/figures/prompt_effect_constellation.csv",
+      "data_csv_sha256": "39d77d39370f1a8c73714c3699eddfe890e04cb56f682ae213f41e948a10b01d",
+      "data_row_count": 30823,
+      "name": "prompt_effect_constellation",
+      "pdf": "results/selectivity_h200_powered_gpt_oss_20b/figures/prompt_effect_constellation.pdf",
+      "pdf_sha256": "e4dbb72bb1e388989f38fe38fe3664fb7f7947fcab3eff8da0fb53664d76a96c",
+      "png": "results/selectivity_h200_powered_gpt_oss_20b/figures/prompt_effect_constellation.png",
+      "png_sha256": "cecdcd7a6b029c586a9714b66805e92fe17c06c785f2e2bab97443dd2cc4e42d",
+      "svg": "results/selectivity_h200_powered_gpt_oss_20b/figures/prompt_effect_constellation.svg",
+      "svg_sha256": "1bef228451e09050fed4a1e7be046b3634272a775697603db9d197c3340a9204"
+    },
+    {
+      "data_csv": "results/selectivity_h200_powered_gpt_oss_20b/figures/safety_score.csv",
+      "data_csv_sha256": "7559a1d2031ce069692c8d1b11ac6cca5c143f4682fb1d7b24f5f030a177c2da",
+      "data_row_count": 42,
+      "name": "safety_score",
+      "pdf": "results/selectivity_h200_powered_gpt_oss_20b/figures/safety_score.pdf",
+      "pdf_sha256": "a442331e567a6752921757115d25d525edb5912c03b0b158e94e593b190168fd",
+      "png": "results/selectivity_h200_powered_gpt_oss_20b/figures/safety_score.png",
+      "png_sha256": "826162fb236a9e2eec3713718205d11e44c55b5e019218d307a96784b8afba0e",
+      "svg": "results/selectivity_h200_powered_gpt_oss_20b/figures/safety_score.svg",
+      "svg_sha256": "3ced605ea0f38b0015de40baf276887d0a2ef56296f6dbabe41a87965c61ce06"
+    },
+    {
+      "data_csv": "results/selectivity_h200_powered_gpt_oss_20b/figures/capability_score.csv",
+      "data_csv_sha256": "7812db5479994bb1ab91801ebd02a0eff1c911dfe1cb1b21aa1853a2e71a8dc2",
+      "data_row_count": 42,
+      "name": "capability_score",
+      "pdf": "results/selectivity_h200_powered_gpt_oss_20b/figures/capability_score.pdf",
+      "pdf_sha256": "b08b69439f55ee3b8b69cedb94f0336a67a4a41c2d743f94066f804fb4ab470d",
+      "png": "results/selectivity_h200_powered_gpt_oss_20b/figures/capability_score.png",
+      "png_sha256": "8e03fe5577985334fb552a10b27c11d4a15c2d52dd834ce4d891af9fd2920475",
+      "svg": "results/selectivity_h200_powered_gpt_oss_20b/figures/capability_score.svg",
+      "svg_sha256": "12e33e717e1a0307c7598e1b7efbec63fec11dcc125a5a14626294d5541d2269"
+    },
+    {
+      "data_csv": "results/selectivity_h200_powered_gpt_oss_20b/figures/rouge_l_leakage_recall.csv",
+      "data_csv_sha256": "dcb39141cf0d399812690f361bcce60c1872175a035861e5bf74a63ed44dff08",
+      "data_row_count": 42,
+      "name": "rouge_l_leakage_recall",
+      "pdf": "results/selectivity_h200_powered_gpt_oss_20b/figures/rouge_l_leakage_recall.pdf",
+      "pdf_sha256": "05d5b3d4377640499f71bf09f0d28af3bd5562a26c907d359ff588be839abb11",
+      "png": "results/selectivity_h200_powered_gpt_oss_20b/figures/rouge_l_leakage_recall.png",
+      "png_sha256": "90224745435b1f753fee9e1df41c3abdd04c9661490666137961a3071cf23b13",
+      "svg": "results/selectivity_h200_powered_gpt_oss_20b/figures/rouge_l_leakage_recall.svg",
+      "svg_sha256": "8ec39a87a3c9d635bcd318aa7d6c5b202f7c0cffcf61536f6563b1e99f6ae524"
+    },
+    {
+      "data_csv": "results/selectivity_h200_powered_gpt_oss_20b/figures/selective_safety_erasure_heatmap.csv",
+      "data_csv_sha256": "5021ec98f9765dc098d81e20a94a9204eabea171bccde6b2d1c5734dbceecd4f",
+      "data_row_count": 5,
+      "name": "selective_safety_erasure_heatmap",
+      "pdf": "results/selectivity_h200_powered_gpt_oss_20b/figures/selective_safety_erasure_heatmap.pdf",
+      "pdf_sha256": "8a3de9c774a2aab843d24b830170c56938f3b6287c431fa98de4e90b577b8bfa",
+      "png": "results/selectivity_h200_powered_gpt_oss_20b/figures/selective_safety_erasure_heatmap.png",
+      "png_sha256": "48a85bb48030cb881e1dd2e7dd45114d4f93d9e493c9fb0abe2b6d66a624905a",
+      "svg": "results/selectivity_h200_powered_gpt_oss_20b/figures/selective_safety_erasure_heatmap.svg",
+      "svg_sha256": "40bebbbb248bc46c63447d72a5d0079f78a430c825d29d47285d5c05cd1d2069"
+    },
+    {
+      "data_csv": "results/selectivity_h200_powered_gpt_oss_20b/figures/safety_vs_capability_degradation.csv",
+      "data_csv_sha256": "eca01806f2a3d8732d43beeaa8470a249ec4bc948bea3075cc3469ea9ea60fac",
+      "data_row_count": 5,
+      "name": "safety_vs_capability_degradation",
+      "pdf": "results/selectivity_h200_powered_gpt_oss_20b/figures/safety_vs_capability_degradation.pdf",
+      "pdf_sha256": "d2e30c63684a769031afc43e4eb5e3cf10d6e50ad6d2971727ff42c47f49e26b",
+      "png": "results/selectivity_h200_powered_gpt_oss_20b/figures/safety_vs_capability_degradation.png",
+      "png_sha256": "0c0e5e1e0a90f2d7f006917ea64cb2e372920e408039b761c143ae56da612bea",
+      "svg": "results/selectivity_h200_powered_gpt_oss_20b/figures/safety_vs_capability_degradation.svg",
+      "svg_sha256": "af05b73d9a25b062a92f6ee34ccbf1237ad26c9f71e96d568b578349ff66b5e8"
+    },
+    {
+      "data_csv": "results/selectivity_h200_powered_gpt_oss_20b/figures/safety_capability_phase_portrait.csv",
+      "data_csv_sha256": "377aa666de6af00a308e35b8a4a15804cb14bdce123a1a765e8ec9114c74d042",
+      "data_row_count": 5,
+      "name": "safety_capability_phase_portrait",
+      "pdf": "results/selectivity_h200_powered_gpt_oss_20b/figures/safety_capability_phase_portrait.pdf",
+      "pdf_sha256": "2fd56e6a337bc1b060e39cf7544f15ee7f6540f87eb87eec9c4e12cf5a3a68f9",
+      "png": "results/selectivity_h200_powered_gpt_oss_20b/figures/safety_capability_phase_portrait.png",
+      "png_sha256": "646ee7f6a4448d1b18497313edf9b82451935a6804dc294cefa8c17a9896b495",
+      "svg": "results/selectivity_h200_powered_gpt_oss_20b/figures/safety_capability_phase_portrait.svg",
+      "svg_sha256": "b326223b7480bf80f4184f69c41653228a9ba8cc20a720a0baf18845544b6c91"
+    },
+    {
+      "data_csv": "results/selectivity_h200_powered_gpt_oss_20b/figures/paired_safety_degradation_forest.csv",
+      "data_csv_sha256": "2277b43159747c99187a2e862aa4f530b86dfaa5e2b0bf53b8db8176d48be781",
+      "data_row_count": 30,
+      "name": "paired_safety_degradation_forest",
+      "pdf": "results/selectivity_h200_powered_gpt_oss_20b/figures/paired_safety_degradation_forest.pdf",
+      "pdf_sha256": "06dcbd711f23050cb9c632a86f9be26f2ccb0dc9d35eb2329798ff68c7140be2",
+      "png": "results/selectivity_h200_powered_gpt_oss_20b/figures/paired_safety_degradation_forest.png",
+      "png_sha256": "032475ddfdb1078ea990a3aae36e26161b7c8d2c2dae5cd122514e6d93199060",
+      "svg": "results/selectivity_h200_powered_gpt_oss_20b/figures/paired_safety_degradation_forest.svg",
+      "svg_sha256": "bfb1c4897da8e5e44aedf6c8f35b6e1345754d7b6976209b4640dc663403005b"
+    },
+    {
+      "data_csv": "results/selectivity_h200_powered_gpt_oss_20b/figures/policy_uncertainty_braid.csv",
+      "data_csv_sha256": "838e47b051c60b60dc4d761f68dba96a094fe330e463256abd97eddad6a4b15a",
+      "data_row_count": 15,
+      "name": "policy_uncertainty_braid",
+      "pdf": "results/selectivity_h200_powered_gpt_oss_20b/figures/policy_uncertainty_braid.pdf",
+      "pdf_sha256": "15a6601de0bd10fa5cfbeaf77b53788505a2ad59051b70bc34b1d151c60f8588",
+      "png": "results/selectivity_h200_powered_gpt_oss_20b/figures/policy_uncertainty_braid.png",
+      "png_sha256": "55f74c3d4cafef4b1b89fa3c5b6fd8450c46a925da1c8705afe8681a76a44202",
+      "svg": "results/selectivity_h200_powered_gpt_oss_20b/figures/policy_uncertainty_braid.svg",
+      "svg_sha256": "fb04d3742166c349850b505c4f762064fdf8837a491d9e0873da610629f5df4f"
+    },
+    {
+      "data_csv": "results/selectivity_h200_powered_gpt_oss_20b/figures/top_selective_effects.csv",
+      "data_csv_sha256": "56527281ea8b68edb9116ff0b10c40dd1149891e5dc15932f6c4dac3d1821199",
+      "data_row_count": 5,
+      "name": "top_selective_effects",
+      "pdf": "results/selectivity_h200_powered_gpt_oss_20b/figures/top_selective_effects.pdf",
+      "pdf_sha256": "826d2e2f07f1ae67369694233f08424cd9c3c119b76293d6fb53a289ce1c5722",
+      "png": "results/selectivity_h200_powered_gpt_oss_20b/figures/top_selective_effects.png",
+      "png_sha256": "7088b236dcebc350406a7b0b62793b37cec9aec80876e7a52e2bf43e02c959f7",
+      "svg": "results/selectivity_h200_powered_gpt_oss_20b/figures/top_selective_effects.svg",
+      "svg_sha256": "4de3bd2ba4c853b54245aeeec2cab2684f9ad35401cd5750b8ae9ab82c19c664"
+    },
+    {
+      "data_csv": "results/selectivity_h200_powered_gpt_oss_20b/figures/cache_l2_retained_fraction.csv",
+      "data_csv_sha256": "b89aaeabcad72e94963ef10b47bc8a59e9e3172d887dffb8d6b074f0cd1b3212",
+      "data_row_count": 12,
+      "name": "cache_l2_retained_fraction",
+      "pdf": "results/selectivity_h200_powered_gpt_oss_20b/figures/cache_l2_retained_fraction.pdf",
+      "pdf_sha256": "2d8b513c8e1027ec959dda3057a8eb161430404a9f73aaa5ad98057301011e02",
+      "png": "results/selectivity_h200_powered_gpt_oss_20b/figures/cache_l2_retained_fraction.png",
+      "png_sha256": "bf0c6a55f1fe4b14d3f336f1c2e2fe0f1e58fae8497d20dd986d8cd83f2c62af",
+      "svg": "results/selectivity_h200_powered_gpt_oss_20b/figures/cache_l2_retained_fraction.svg",
+      "svg_sha256": "169206a8a158ff6570bac1c0c7f44f4649a16b016e82be2acae71293da6a94e0"
+    },
+    {
+      "data_csv": "results/selectivity_h200_powered_gpt_oss_20b/figures/token_role_retention_heatmap.csv",
+      "data_csv_sha256": "a312b06261efd884f02dcf2a94f43403ede36c08bb1f549136b5986e708c32de",
+      "data_row_count": 24,
+      "name": "token_role_retention_heatmap",
+      "pdf": "results/selectivity_h200_powered_gpt_oss_20b/figures/token_role_retention_heatmap.pdf",
+      "pdf_sha256": "641c405009483144cfe4f498817d20b2c3dab9cb2b0772a6f4174352d0584d8b",
+      "png": "results/selectivity_h200_powered_gpt_oss_20b/figures/token_role_retention_heatmap.png",
+      "png_sha256": "5a7cf2f50b7337137391e6e9c061e6f984b6492afb7a12fe4c03743e1fbd9ad3",
+      "svg": "results/selectivity_h200_powered_gpt_oss_20b/figures/token_role_retention_heatmap.svg",
+      "svg_sha256": "44aee8b704bfd04f768ad33d681c90785dd58f823e6ae00907c1dd9f946a7f71"
+    },
+    {
+      "data_csv": "results/selectivity_h200_powered_gpt_oss_20b/figures/safety_state_atlas.csv",
+      "data_csv_sha256": "71892cef812fe54265065aa090952bd09912bfb74ce4ab124335d9fdba8c5bc4",
+      "data_row_count": 5,
+      "name": "safety_state_atlas",
+      "pdf": "results/selectivity_h200_powered_gpt_oss_20b/figures/safety_state_atlas.pdf",
+      "pdf_sha256": "5a43163c8565dde2a6ca6550e0a2c7340306b3b7591e4219fcb492638d54cfc6",
+      "png": "results/selectivity_h200_powered_gpt_oss_20b/figures/safety_state_atlas.png",
+      "png_sha256": "62e02b53c349bc525147f5894960b4e1e99ef98775bc2cf08625ea08e441250c",
+      "svg": "results/selectivity_h200_powered_gpt_oss_20b/figures/safety_state_atlas.svg",
+      "svg_sha256": "dc53b7addfc41590e3c26b133372845964ba1859a57a23a872bbd290f3144b54"
+    },
+    {
+      "data_csv": "results/selectivity_h200_powered_gpt_oss_20b/figures/cache_state_fingerprint.csv",
+      "data_csv_sha256": "b1aab609167ba7dd1feb5d526cea3bc2a3e16a0d7a5baedcde58af98668c9594",
+      "data_row_count": 522,
+      "name": "cache_state_fingerprint",
+      "pdf": "results/selectivity_h200_powered_gpt_oss_20b/figures/cache_state_fingerprint.pdf",
+      "pdf_sha256": "8afb2fda5817e15fc58ef53b1c0f5575fe6eba66acd95e37a75e0863a19332fe",
+      "png": "results/selectivity_h200_powered_gpt_oss_20b/figures/cache_state_fingerprint.png",
+      "png_sha256": "0cad72a58bc6d2fe51670f99ad27cc400a7026c10d0f7fcabf8a14eeef0d6010",
+      "svg": "results/selectivity_h200_powered_gpt_oss_20b/figures/cache_state_fingerprint.svg",
+      "svg_sha256": "587f35cf0f11314eab244439bd71c43f09deb935dd34028ea55c0a7b25d71213"
+    }
+  ],
+  "schema_version": 1,
+  "source_artifacts": {
+    "cache_stats.parquet": {
+      "bytes": 3466358,
+      "path": "results/selectivity_h200_powered_gpt_oss_20b/cache_stats.parquet",
+      "sha256": "335f921edb1adb9a66a69852fa59ae0f81586d0685a568bb8a6dc97628e2b4ea"
+    },
+    "generations.jsonl": {
+      "bytes": 89640507,
+      "path": "results/selectivity_h200_powered_gpt_oss_20b/generations.jsonl",
+      "sha256": "1c6a27e754b9e0deb1f9c3a06ffe5140528915ec93fb1c03bf3cd2c5f72f56ea"
+    },
+    "manifest.json": {
+      "bytes": 244236,
+      "path": "results/selectivity_h200_powered_gpt_oss_20b/manifest.json",
+      "sha256": "1e8c80c2c5d9d082a11ea3dbc97ecef99562bfc8478f9e49189f95851b889950"
+    },
+    "metrics.json": {
+      "bytes": 164498,
+      "path": "results/selectivity_h200_powered_gpt_oss_20b/metrics.json",
+      "sha256": "f5d1a2fa5f9d837b64b88b75be9c94366b3b29be6cd84bfc8dcd0a367782f9f3"
+    }
+  }
+}
