@@ -252,7 +252,8 @@ def test_h200_selectivity_launcher_commits_results_with_paper_assets() -> None:
     assert 'commit_artifacts "$results_dir" "$generated_dir"' in launcher
     assert 'commit_artifacts "$output_dir" "$generated_dir"' in launcher
     assert "paper/generated/selectivity_panel_phase0_ci_power.json" in launcher
-    assert "git add -f -- \"${paths[@]}\"" in commit_script
+    assert "stage_artifact_path()" in commit_script
+    assert 'git add -f -- "$path"' in commit_script
     assert '--branch "$branch"' in launcher
 
 

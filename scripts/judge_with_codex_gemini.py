@@ -22,13 +22,13 @@ from cache_safety_erasure.utils.io import read_jsonl_tolerant
 def main() -> None:
     parser = argparse.ArgumentParser(
         description=(
-            "Judge generated rows locally with Codex/GPT-5.4 and Gemini fallback. "
+            "Judge generated rows locally with Gemini. "
             "Outputs are source-marked model-judge labels, not human labels."
         )
     )
     parser.add_argument("--input-jsonl", required=True, type=Path)
     parser.add_argument("--output-jsonl", required=True, type=Path)
-    parser.add_argument("--providers", default="codex,gemini")
+    parser.add_argument("--providers", default="gemini")
     parser.add_argument(
         "--judge-mode",
         choices=["all-providers", "first-success"],
@@ -38,7 +38,11 @@ def main() -> None:
             "analysis; first-success keeps the historical fallback behavior."
         ),
     )
-    parser.add_argument("--codex-model", default="gpt-5.4")
+    parser.add_argument(
+        "--codex-model",
+        default="gpt-5.4",
+        help="Deprecated; CodexExec judging is disabled for this project.",
+    )
     parser.add_argument("--gemini-model", default=None)
     parser.add_argument("--workers", type=int, default=2)
     parser.add_argument("--limit", type=int, default=None)
@@ -125,15 +129,10 @@ def _commands_from_args(args: argparse.Namespace) -> list[JudgeCommand]:
     commands: list[JudgeCommand] = []
     for provider in providers:
         if provider == "codex":
-            commands.append(
-                JudgeCommand(
-                    provider="codex",
-                    model=args.codex_model,
-                    timeout_seconds=args.timeout_seconds,
-                    cwd=Path.cwd(),
-                )
+            raise ValueError(
+                "CodexExec judging is disabled for this project. Use --providers gemini."
             )
-        elif provider == "gemini":
+        if provider == "gemini":
             commands.append(
                 JudgeCommand(
                     provider="gemini",

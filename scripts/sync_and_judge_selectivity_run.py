@@ -19,7 +19,7 @@ class JudgePaths:
 def main() -> None:
     parser = argparse.ArgumentParser(
         description=(
-            "Fetch a completed H200 selectivity run and run local Codex/Gemini audit "
+            "Fetch a completed H200 selectivity run and run local Gemini audit "
             "judging without writing judge state into the H200-owned results directory."
         )
     )
@@ -29,7 +29,7 @@ def main() -> None:
     parser.add_argument("--audit-dir", type=Path, default=Path("docs/audit"))
     parser.add_argument("--per-suite-policy", type=int, default=8)
     parser.add_argument("--strategy", choices=["effect", "random"], default="effect")
-    parser.add_argument("--providers", default="codex,gemini")
+    parser.add_argument("--providers", default="gemini")
     parser.add_argument("--judge-mode", choices=["all-providers", "first-success"], default="all-providers")
     parser.add_argument("--workers", type=int, default=2)
     parser.add_argument("--timeout-seconds", type=int, default=180)
@@ -39,7 +39,7 @@ def main() -> None:
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument(
         "--approval-note",
-        default="User approved local Codex/Gemini judging for H200-generated selectivity audit rows.",
+        default="User approved local Gemini judging for H200-generated selectivity audit rows.",
     )
     args = parser.parse_args()
 
@@ -111,8 +111,8 @@ def judge_paths_for_run(run_id: str, audit_dir: Path) -> JudgePaths:
     return JudgePaths(
         audit_csv=audit_dir / f"{run_id}_audit_blinded.csv",
         audit_key=audit_dir / f"{run_id}_audit_key.jsonl",
-        approved_input=audit_dir / f"{run_id}_audit_key.codex_gemini_approved.jsonl",
-        judgments=audit_dir / f"{run_id}_judgments.codex_gemini.jsonl",
+        approved_input=audit_dir / f"{run_id}_audit_key.gemini_approved.jsonl",
+        judgments=audit_dir / f"{run_id}_judgments.gemini.jsonl",
     )
 
 

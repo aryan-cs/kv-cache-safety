@@ -141,7 +141,7 @@ uv run python scripts/aggregate_human_audit.py \
 
 Open/local judge labels are diagnostic. If you run them, preserve the output source separately and do not present them as human evidence.
 
-External Codex/Gemini judge diagnostics require explicit egress approval on the blinded audit JSONL:
+External Gemini judge diagnostics require explicit egress approval on the blinded audit JSONL. CodexExec judging is disabled for this project.
 
 ```bash
 uv run python scripts/approve_judge_egress.py \
@@ -151,7 +151,8 @@ uv run python scripts/approve_judge_egress.py \
 
 uv run python scripts/judge_with_codex_gemini.py \
   --input-jsonl paper/audit/selectivity_h200_powered_combined_audit_sample_egress_approved.jsonl \
-  --output-jsonl paper/audit/selectivity_h200_powered_combined_codex_gemini_judge.jsonl \
+  --output-jsonl paper/audit/selectivity_h200_powered_combined_gemini_judge.jsonl \
+  --providers gemini \
   --judge-mode all-providers \
   --allow-data-egress \
   --resume

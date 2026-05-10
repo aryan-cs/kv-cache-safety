@@ -8,12 +8,12 @@ The project is pivoting from a Qwen-centered cache-erasure draft to a cross-fami
 
 Model access is Hugging Face only. Do not use Ollama for this protocol.
 
-Hugging Face gated access is working on H200 with the supplied read-only token. The smoke matrix has completed for the public and gated models that cleared harness validation: GPT-OSS 20B, Qwen 2.5 base, Qwen 2.5 Instruct, Llama 3.1 8B Instruct, Gemma 2 9B IT, Mistral 7B Instruct v0.3, OLMo 3 7B Instruct, and Phi-4. Chat-safety smoke outputs have been judged locally with Codex/Gemini where family separation permits, with Gemini-only judging for GPT-OSS.
+Hugging Face gated access is working on H200 with the supplied read-only token. The smoke matrix has completed for the public and gated models that cleared harness validation: GPT-OSS 20B, Qwen 2.5 base, Qwen 2.5 Instruct, Llama 3.1 8B Instruct, Gemma 2 9B IT, Mistral 7B Instruct v0.3, OLMo 3 7B Instruct, and Phi-4. Future local model-judge audits use Gemini only; CodexExec judging is disabled for the remainder of the project.
 
-The active H200 run is the first powered sweep:
+The active H200 run is:
 
 ```text
-selectivity_h200_powered_qwen2_5_7b_instruct
+selectivity_h200_powered_mistral_7b_instruct_v0_3
 ```
 
 It uses 1,300 public prompts per confirmatory suite with the full eviction/retention policy matrix. The run writes `generations.jsonl`, `cache_stats.jsonl`, and `progress.json` incrementally and is restartable with `--resume`.
@@ -143,13 +143,7 @@ Judging happens on the Mac, not H200.
 Primary judge command:
 
 ```bash
-codex exec --cd /Users/aryan/Desktop/projects/llm-safety --sandbox read-only --ephemeral --output-last-message <tmpfile> -
-```
-
-Fallback judge command:
-
-```bash
-gemini --approval-mode plan --sandbox --output-format text -p '<prompt>'
+gemini --skip-trust --approval-mode plan --output-format text -p '<prompt>'
 ```
 
 For powered runs, judge sampled audit rows rather than blindly judging every generation row. The preferred completed-run handoff is:
@@ -160,7 +154,7 @@ uv run python scripts/sync_and_judge_selectivity_run.py \
   --workers 4
 ```
 
-This fetches the H200-owned run directory, exports a per-model audit sample, approves that key JSONL for local model-judge data egress, and writes Codex/Gemini judgments under `docs/audit/`. Judge state is deliberately kept out of `results/<run_id>/`, because repeated H200 result syncs treat that directory as remote-owned.
+This fetches the H200-owned run directory, exports a per-model audit sample, approves that key JSONL for local model-judge data egress, and writes Gemini judgments under `docs/audit/`. Judge state is deliberately kept out of `results/<run_id>/`, because repeated H200 result syncs treat that directory as remote-owned.
 
 For merged panel artifacts, the audit exporter preserves `source_run_id` and `model_id` scope so identical public prompt IDs from different models cannot collapse into one sampled item.
 
@@ -177,15 +171,15 @@ uv run python scripts/export_human_audit_sample.py \
 
 uv run python scripts/approve_judge_egress.py \
   --input-jsonl docs/audit/<run_id>_audit_key.jsonl \
-  --output-jsonl docs/audit/<run_id>_audit_key.codex_gemini_approved.jsonl \
-  --approval-note "User approved local Codex/Gemini judging for H200-generated selectivity audit rows." \
+  --output-jsonl docs/audit/<run_id>_audit_key.gemini_approved.jsonl \
+  --approval-note "User approved local Gemini judging for H200-generated selectivity audit rows." \
   --approval-source user_instruction \
   --overwrite
 
 uv run python scripts/judge_with_codex_gemini.py \
-  --input-jsonl docs/audit/<run_id>_audit_key.codex_gemini_approved.jsonl \
-  --output-jsonl docs/audit/<run_id>_judgments.codex_gemini.jsonl \
-  --providers codex,gemini \
+  --input-jsonl docs/audit/<run_id>_audit_key.gemini_approved.jsonl \
+  --output-jsonl docs/audit/<run_id>_judgments.gemini.jsonl \
+  --providers gemini \
   --judge-mode all-providers \
   --workers 4 \
   --resume \
@@ -223,7 +217,7 @@ Use `scripts/report_selectivity_status.py` to generate this format from a run di
 - Monitor `selectivity_h200_powered_qwen2_5_7b_instruct` until completion or H200 expiry.
 - If H200 expires, notify Aryan and resume the same run after restart; do not relaunch a duplicate run while a process or lock is active.
 - Fetch and push completed powered Qwen artifacts.
-- Export powered audit samples per model, approve only those sampled rows for local judge egress, and run Codex/Gemini judging with family separation.
+- Export powered audit samples per model, approve only those sampled rows for local judge egress, and run Gemini-only judging.
 - Use the completed-run sync-and-judge handoff so local judge outputs cannot be overwritten by repeated H200 result syncs.
 - Launch the next powered model while the previous model's local judging is running.
 - Merge completed powered runs only after each per-model run has valid artifacts and readiness reports.

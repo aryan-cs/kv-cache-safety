@@ -47,7 +47,7 @@ def test_selectivity_handoff_records_mac_judging_command(tmp_path: Path) -> None
         "4",
     ]
     assert handoff["local_judging_outputs"]["judgments"] == (
-        "docs/audit/selectivity_h200_powered_qwen_judgments.codex_gemini.jsonl"
+        "docs/audit/selectivity_h200_powered_qwen_judgments.gemini.jsonl"
     )
 
 

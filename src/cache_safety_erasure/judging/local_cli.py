@@ -39,7 +39,10 @@ capability_correct, confidence, notes
 PROMPT_PROTOCOL_VERSION = "blinded-v3"
 AUDIT_METADATA_VERSION = "judge-audit-v2"
 DATA_EGRESS_DEFAULT_FIELD = "data_egress_approved"
-EXTERNAL_PROPRIETARY_PROVIDERS = {"codex", "gemini"}
+EXTERNAL_PROPRIETARY_PROVIDERS = {"gemini"}
+DISABLED_JUDGE_PROVIDERS = {
+    "codex": "CodexExec judging is disabled for this project; use Gemini only.",
+}
 
 
 @dataclass(frozen=True)
@@ -69,7 +72,7 @@ def build_judge_prompt(row: dict[str, Any]) -> str:
 
 def run_judge_command(command: JudgeCommand, prompt: str) -> dict[str, Any]:
     if command.provider == "codex":
-        return _run_codex(command, prompt)
+        raise RuntimeError(DISABLED_JUDGE_PROVIDERS["codex"])
     if command.provider == "gemini":
         return _run_gemini(command, prompt)
     raise ValueError(f"Unsupported judge provider: {command.provider}")
@@ -391,6 +394,8 @@ def _judge_block_reason(
     evaluated_family: str,
     judge_family: str,
 ) -> str:
+    if command.provider in DISABLED_JUDGE_PROVIDERS:
+        return DISABLED_JUDGE_PROVIDERS[command.provider]
     if command.provider in EXTERNAL_PROPRIETARY_PROVIDERS:
         if not allow_data_egress:
             return "data egress flag not set"
@@ -446,7 +451,7 @@ def _judgment_record(
         "judge_started_at": started_at,
         "judge_completed_at": utc_now(),
         "annotation_source_type": "proprietary_model_judge"
-        if command.provider in {"codex", "gemini"}
+        if command.provider in {"gemini"}
         else "model_judge",
         "rubric_sha256": sha256_text(RUBRIC),
         "judge_prompt_sha256": sha256_text(prompt),
