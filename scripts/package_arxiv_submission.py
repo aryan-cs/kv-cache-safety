@@ -22,16 +22,16 @@ from cache_safety_erasure.utils.io import file_sha256, write_json
 
 DEFAULT_PRIMARY_RESULTS_DIR = Path("results/h200_qwen_full_sweep")
 DEFAULT_CAUSAL_RESULTS_DIR = Path("results/h200_causal_patch_qwen7b")
-DEFAULT_PRIMARY_GENERATED_DIR = Path("paper/generated/h200_qwen_full_sweep")
-DEFAULT_CAUSAL_GENERATED_DIR = Path("paper/generated/h200_causal_patch_qwen7b")
-DEFAULT_ACTIVE_PRIMARY_GENERATED_DIR = Path("paper/generated/active_primary")
-DEFAULT_ACTIVE_CAUSAL_GENERATED_DIR = Path("paper/generated/active_causal")
-DEFAULT_CLAIM_GENERATED_DIR = Path("paper/generated/claim_assessment")
-DEFAULT_QWEN32_GENERATED_DIR = Path("paper/generated/h200_qwen32b_public_followup")
-DEFAULT_PRIMARY_AUDIT_DIR = Path("paper/audit/h200_qwen_full_sweep_summary")
-DEFAULT_CAUSAL_AUDIT_DIR = Path("paper/audit/h200_causal_patch_qwen7b_summary")
-DEFAULT_ACTIVE_PRIMARY_AUDIT_DIR = Path("paper/audit/active_primary_summary")
-DEFAULT_ACTIVE_CAUSAL_AUDIT_DIR = Path("paper/audit/active_causal_summary")
+DEFAULT_PRIMARY_GENERATED_DIR = Path("docs/generated/h200_qwen_full_sweep")
+DEFAULT_CAUSAL_GENERATED_DIR = Path("docs/generated/h200_causal_patch_qwen7b")
+DEFAULT_ACTIVE_PRIMARY_GENERATED_DIR = Path("docs/generated/active_primary")
+DEFAULT_ACTIVE_CAUSAL_GENERATED_DIR = Path("docs/generated/active_causal")
+DEFAULT_CLAIM_GENERATED_DIR = Path("docs/generated/claim_assessment")
+DEFAULT_QWEN32_GENERATED_DIR = Path("docs/generated/h200_qwen32b_public_followup")
+DEFAULT_PRIMARY_AUDIT_DIR = Path("docs/audit/h200_qwen_full_sweep_summary")
+DEFAULT_CAUSAL_AUDIT_DIR = Path("docs/audit/h200_causal_patch_qwen7b_summary")
+DEFAULT_ACTIVE_PRIMARY_AUDIT_DIR = Path("docs/audit/active_primary_summary")
+DEFAULT_ACTIVE_CAUSAL_AUDIT_DIR = Path("docs/audit/active_causal_summary")
 
 
 def build_figure_sources(
@@ -133,8 +133,8 @@ STRICT_PUBLICATION_COMMAND_BLOCK = r"""\newcommand{\todoresult}[1]{%
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Build an arXiv-friendly LaTeX source bundle.")
-    parser.add_argument("--output-dir", type=Path, default=Path("paper/build/arxiv_source"))
-    parser.add_argument("--archive", type=Path, default=Path("paper/build/arxiv_source.tar.gz"))
+    parser.add_argument("--output-dir", type=Path, default=Path("docs/build/arxiv_source"))
+    parser.add_argument("--archive", type=Path, default=Path("docs/build/arxiv_source.tar.gz"))
     parser.add_argument("--primary-results-dir", type=Path, default=DEFAULT_PRIMARY_RESULTS_DIR)
     parser.add_argument("--causal-results-dir", type=Path, default=DEFAULT_CAUSAL_RESULTS_DIR)
     parser.add_argument("--primary-generated-dir", type=Path, default=DEFAULT_PRIMARY_GENERATED_DIR)
@@ -178,7 +178,7 @@ def main() -> None:
         shutil.rmtree(source_dir)
     (source_dir / "figures").mkdir(parents=True)
 
-    main_tex = Path("paper/latex/main.tex").read_text(encoding="utf-8")
+    main_tex = Path("docs/latex/main.tex").read_text(encoding="utf-8")
     rewritten_main_tex = _rewrite_main_tex_for_arxiv(
         main_tex,
         figure_sources=figure_sources,
@@ -195,7 +195,7 @@ def main() -> None:
             print(f"Final LaTeX source failure: {failure}")
         raise SystemExit("Refusing to package arXiv source with draft fallback text in main.tex.")
     (source_dir / "main.tex").write_text(rewritten_main_tex, encoding="utf-8")
-    shutil.copyfile("paper/references.bib", source_dir / "references.bib")
+    shutil.copyfile("docs/references.bib", source_dir / "references.bib")
     citation_check_failures = citation_failures(
         source_dir / "main.tex",
         source_dir / "references.bib",
@@ -208,7 +208,7 @@ def main() -> None:
     copied_file_provenance = [
         _file_provenance(
             kind="latex_main",
-            source_path=Path("paper/latex/main.tex"),
+            source_path=Path("docs/latex/main.tex"),
             bundle_path=source_dir / "main.tex",
             bundle_root=source_dir,
             direct_copy=False,
@@ -216,7 +216,7 @@ def main() -> None:
         ),
         _file_provenance(
             kind="bibliography",
-            source_path=Path("paper/references.bib"),
+            source_path=Path("docs/references.bib"),
             bundle_path=source_dir / "references.bib",
             bundle_root=source_dir,
         ),

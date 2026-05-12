@@ -44,7 +44,7 @@ def main() -> None:
     parser.add_argument("--key-jsonl", "--key", required=True, type=Path)
     parser.add_argument("--results-dir", type=Path, default=None)
     parser.add_argument("--export-manifest", type=Path, default=None)
-    parser.add_argument("--output-dir", type=Path, default=Path("paper/audit"))
+    parser.add_argument("--output-dir", type=Path, default=Path("docs/audit"))
     args = parser.parse_args()
 
     result = aggregate_human_audit(args.audit_csv, args.key_jsonl)
@@ -136,6 +136,8 @@ def _joined_row(annotation: dict[str, str], key: dict[str, Any]) -> dict[str, An
     labels = _annotation_labels(annotation, str(annotation_source_type))
     system_text = str(key.get("system") or "")
     hidden_system_text = str(key.get("hidden_system") or "")
+    response_text = str(key.get("generated_text") or "")
+    response_word_count = _response_word_count(key.get("generated_word_count"), response_text)
     return {
         "audit_id": key["audit_id"],
         "annotator_id": annotator_id,
@@ -157,6 +159,8 @@ def _joined_row(annotation: dict[str, str], key: dict[str, Any]) -> dict[str, An
         "auto_exact_leakage": key.get("exact_leakage"),
         "auto_rouge_l_leakage_recall": key.get("rouge_l_leakage_recall"),
         "auto_capability_score": key.get("capability_score"),
+        "response_word_count": response_word_count,
+        "response_char_count": len(response_text) if response_text else None,
         "system_reference_required": bool(system_text),
         "hidden_system_reference_required": bool(hidden_system_text),
         "audit_system_reference_available": bool(annotation.get("system_or_policy_text")),
@@ -283,6 +287,7 @@ def _audit_metrics(
         "label_context": _label_context(joined_rows),
         "automated_label_disagreement": _automated_disagreement(consensus_rows),
         "automated_label_confusion": _automated_confusion(consensus_rows),
+        "response_length_calibration": _response_length_calibration(joined_rows),
         "baseline_policy_deltas": _baseline_policy_deltas(consensus_rows),
         "annotation_baseline_policy_deltas": _baseline_policy_deltas(joined_rows),
         "inter_annotator": {
@@ -337,6 +342,17 @@ def _annotation_source_description(source_type: str, rows: list[dict[str, Any]])
     if source_type == "mixed":
         return "Mixed human and open local judge labels"
     return "Human labels"
+
+
+def _response_word_count(raw_count: Any, response_text: str) -> int | None:
+    if raw_count not in {None, ""}:
+        try:
+            return int(float(raw_count))
+        except (TypeError, ValueError):
+            pass
+    if response_text:
+        return len(response_text.split())
+    return None
 
 
 def _consensus_rows(rows: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], dict[str, list[str]]]:
@@ -400,6 +416,58 @@ def _label_context(rows: list[dict[str, Any]]) -> dict[str, Any]:
             "mismatched_reference_count": len(set(mismatched)),
             "mismatched_reference_audit_ids": sorted(set(mismatched)),
         }
+    }
+
+
+def _response_length_calibration(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    usable = [
+        row
+        for row in rows
+        if row.get("response_word_count") is not None
+        and any(row.get(field) is not None for field in BOOLEAN_LABELS)
+    ]
+    if not usable:
+        return {
+            "available": False,
+            "reason": "missing_response_lengths",
+            "n": 0,
+            "bucket_count": 0,
+            "buckets": [],
+            "max_abs_rate_gap": {},
+        }
+    usable.sort(key=lambda row: (int(row["response_word_count"]), str(row.get("audit_id"))))
+    bucket_count = min(3, len(usable))
+    buckets = []
+    for bucket_idx in range(bucket_count):
+        start = bucket_idx * len(usable) // bucket_count
+        end = (bucket_idx + 1) * len(usable) // bucket_count
+        bucket_rows = usable[start:end]
+        word_counts = [int(row["response_word_count"]) for row in bucket_rows]
+        buckets.append(
+            {
+                "bucket": bucket_idx + 1,
+                "n": len(bucket_rows),
+                "min_response_words": min(word_counts),
+                "max_response_words": max(word_counts),
+                "mean_response_words": float(mean(word_counts)),
+                "label_rates": {field: _rate(bucket_rows, field) for field in BOOLEAN_LABELS},
+            }
+        )
+    gaps: dict[str, float | None] = {}
+    for field in BOOLEAN_LABELS:
+        means = [
+            bucket["label_rates"][field]["mean"]
+            for bucket in buckets
+            if bucket["label_rates"][field]["mean"] is not None
+        ]
+        gaps[field] = float(max(means) - min(means)) if len(means) >= 2 else None
+    return {
+        "available": bucket_count >= 2,
+        "reason": None if bucket_count >= 2 else "fewer_than_two_length_buckets",
+        "n": len(usable),
+        "bucket_count": bucket_count,
+        "buckets": buckets,
+        "max_abs_rate_gap": gaps,
     }
 
 
@@ -716,6 +784,49 @@ def render_summary_markdown(metrics: dict[str, Any]) -> str:
             )
             + " |"
         )
+    calibration = metrics.get("response_length_calibration") or {}
+    if metrics.get("annotation_source_type") == "open_local_judge":
+        lines.extend(
+            [
+                "",
+                "## Open-Judge Response-Length Calibration",
+                "",
+            ]
+        )
+        if calibration.get("available"):
+            lines.extend(
+                [
+                    "| bucket | response words | n | unsafe compliance | refusal correct | system leakage |",
+                    "| --- | --- | --- | --- | --- | --- |",
+                ]
+            )
+            for bucket in calibration.get("buckets", []):
+                label_rates = bucket.get("label_rates", {})
+                lines.append(
+                    "| "
+                    + " | ".join(
+                        [
+                            str(bucket.get("bucket")),
+                            f"{bucket.get('min_response_words')}-{bucket.get('max_response_words')}",
+                            str(bucket.get("n")),
+                            _format_float(
+                                (label_rates.get("human_unsafe_compliance") or {}).get("mean")
+                            ),
+                            _format_float(
+                                (label_rates.get("human_refusal_correct") or {}).get("mean")
+                            ),
+                            _format_float(
+                                (label_rates.get("human_system_leakage") or {}).get("mean")
+                            ),
+                        ]
+                    )
+                    + " |"
+                )
+        else:
+            lines.append(
+                "Response-length calibration unavailable: "
+                + str(calibration.get("reason") or "unknown")
+            )
     lines.append("")
     return "\n".join(lines)
 

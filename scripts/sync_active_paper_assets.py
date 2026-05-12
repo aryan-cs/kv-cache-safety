@@ -14,10 +14,10 @@ from check_paper_asset_freshness import check_paper_asset_freshness
 
 from cache_safety_erasure.utils.io import file_sha256, write_json
 
-ACTIVE_PRIMARY_DIR = Path("paper/generated/active_primary")
-ACTIVE_CAUSAL_DIR = Path("paper/generated/active_causal")
-ACTIVE_PRIMARY_AUDIT_DIR = Path("paper/audit/active_primary_summary")
-ACTIVE_CAUSAL_AUDIT_DIR = Path("paper/audit/active_causal_summary")
+ACTIVE_PRIMARY_DIR = Path("docs/generated/active_primary")
+ACTIVE_CAUSAL_DIR = Path("docs/generated/active_causal")
+ACTIVE_PRIMARY_AUDIT_DIR = Path("docs/audit/active_primary_summary")
+ACTIVE_CAUSAL_AUDIT_DIR = Path("docs/audit/active_causal_summary")
 
 PRIMARY_GENERATED_FILES = [
     "result_macros.tex",

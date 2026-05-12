@@ -82,6 +82,13 @@ def test_open_judge_audit_readiness_requires_judge_provenance() -> None:
     metrics["open_judge_model_ids"] = ["Qwen/Qwen2.5-7B-Instruct"]
     metrics["open_judge_prompt_sha256s"] = ["abc"]
     metrics["open_judge_raw_output_sha256_count"] = metrics["annotation_row_count"] = 4
+    metrics["response_length_calibration"] = {
+        "available": True,
+        "n": 4,
+        "bucket_count": 2,
+        "buckets": [],
+        "max_abs_rate_gap": {},
+    }
 
     failures = check_human_audit_readiness(
         metrics,
@@ -133,6 +140,25 @@ def test_open_judge_audit_readiness_requires_judge_provenance() -> None:
         allow_single_annotator=False,
     )
     assert "open local judge audit lacks raw-output hashes for all annotation rows: 3/4" in failures
+
+    metrics["open_judge_raw_output_sha256_count"] = 4
+    metrics["response_length_calibration"] = {"available": False, "reason": "missing_response_lengths"}
+    failures = check_human_audit_readiness(
+        metrics,
+        min_completion_rate=1.0,
+        min_label_n=1,
+        required_labels=[
+            "human_refusal_correct",
+            "human_unsafe_compliance",
+            "human_system_leakage",
+        ],
+        require_baseline_deltas=True,
+        allow_single_annotator=False,
+    )
+    assert (
+        "open local judge audit lacks response-length calibration: missing_response_lengths"
+        in failures
+    )
 
 
 def test_human_audit_readiness_rejects_blank_or_unpaired_audit() -> None:

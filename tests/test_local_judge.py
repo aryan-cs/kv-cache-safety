@@ -1,3 +1,11 @@
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path("scripts").resolve()))
+
+from approve_judge_egress import approve_rows
+from judge_with_codex_gemini import _done_key, _judging_tasks
+
 from cache_safety_erasure.judging.local_cli import (
     JudgeCommand,
     _judgment_record,
@@ -9,6 +17,7 @@ from cache_safety_erasure.judging.local_cli import (
     judgment_key,
     parse_judge_json,
     response_length_bucket,
+    run_judge_command,
     sha256_text,
 )
 
@@ -58,6 +67,23 @@ def test_build_judge_prompt_blinds_protocol_fields_by_default() -> None:
     assert judgment_key(row) == "Qwen/Qwen2.5-7B-Instruct::refusal_safety::p1::none::0"
 
 
+def test_judgment_key_preserves_audit_and_source_scope() -> None:
+    row = {
+        "audit_id": "audit-a",
+        "source_run_id": "qwen-run",
+        "model_id": "Qwen/Qwen2.5-7B-Instruct",
+        "suite": "public_refusal_safety",
+        "prompt_id": "p1",
+        "policy": "sliding_window__budget128",
+        "seed": 0,
+    }
+
+    assert (
+        judgment_key(row)
+        == "audit::audit-a::qwen-run::Qwen/Qwen2.5-7B-Instruct::public_refusal_safety::p1::sliding_window__budget128::0"
+    )
+
+
 def test_judgment_record_preserves_flat_and_nested_labels() -> None:
     row = {
         "model_id": "m",
@@ -99,6 +125,8 @@ def test_judgment_record_preserves_flat_and_nested_labels() -> None:
     assert record["judge_tool_version"] == "codex-cli 1.2.3"
     assert record["judge_prompt_protocol_version"] == "blinded-v2"
     assert record["response_length_bucket"] == "empty"
+    assert "audit_id" in record
+    assert "source_run_id" in record
 
 
 def test_family_inference_blocks_codex_for_openai_family() -> None:
@@ -139,6 +167,23 @@ def test_external_judging_requires_run_flag_and_row_approval() -> None:
     assert "row lacks data_egress_approved=true" in missing_row_approval["parse_error"]
 
 
+def test_approve_judge_egress_marks_rows_with_provenance() -> None:
+    rows = [{"prompt_id": "p1", "generated_text": "answer"}]
+
+    approved = approve_rows(
+        rows,
+        approval_note="approved for local model judging",
+        approval_source="user_instruction",
+        approved_at="2026-05-07T00:00:00Z",
+    )
+
+    assert approved[0]["prompt_id"] == "p1"
+    assert approved[0]["data_egress_approved"] is True
+    assert approved[0]["data_egress_approval_source"] == "user_instruction"
+    assert approved[0]["data_egress_approval_note"] == "approved for local model judging"
+    assert approved[0]["data_egress_approved_at"] == "2026-05-07T00:00:00Z"
+
+
 def test_parse_failure_preserves_raw_output_hash_and_status(monkeypatch) -> None:
     raw_output = "not json"
 
@@ -176,3 +221,70 @@ def test_response_length_bucket_boundaries() -> None:
     assert response_length_bucket("") == "empty"
     assert response_length_bucket("word " * 50) == "short_1_50_words"
     assert response_length_bucket("word " * 51) == "medium_51_200_words"
+
+
+def test_judge_script_all_provider_tasks_preserve_disagreement_channels() -> None:
+    row = {"model_id": "m", "suite": "s", "prompt_id": "p", "policy": "none", "seed": 0}
+    commands = [
+        JudgeCommand(provider="codex", model="gpt-5.5"),
+        JudgeCommand(provider="gemini", model="gemini-3.1"),
+    ]
+
+    tasks = _judging_tasks([row], commands, set(), mode="all-providers")
+
+    assert [task["commands"][0].provider for task in tasks] == ["codex", "gemini"]
+    existing = {
+        "judgment_key": judgment_key(row),
+        "judge_provider": "codex",
+        "judge_model": "gpt-5.5",
+    }
+    remaining = _judging_tasks([row], commands, {_done_key(existing, mode="all-providers")}, mode="all-providers")
+    assert [task["commands"][0].provider for task in remaining] == ["gemini"]
+
+
+def test_judge_script_deduplicates_duplicate_input_rows() -> None:
+    row = {"model_id": "m", "suite": "s", "prompt_id": "p", "policy": "none", "seed": 0}
+    commands = [
+        JudgeCommand(provider="codex", model="gpt-5.5"),
+        JudgeCommand(provider="gemini", model="gemini-3.1"),
+    ]
+
+    all_provider_tasks = _judging_tasks([row, dict(row)], commands, set(), mode="all-providers")
+    first_success_tasks = _judging_tasks([row, dict(row)], commands, set(), mode="first-success")
+
+    assert [task["commands"][0].provider for task in all_provider_tasks] == ["codex", "gemini"]
+    assert len(first_success_tasks) == 1
+
+
+def test_gemini_command_uses_headless_plan_sandbox(monkeypatch, tmp_path: Path) -> None:
+    calls = []
+
+    class Completed:
+        returncode = 0
+        stdout = '{"ok": true}'
+        stderr = ""
+
+    def fake_run(args, **kwargs):
+        calls.append((args, kwargs))
+        return Completed()
+
+    monkeypatch.setattr("cache_safety_erasure.judging.local_cli.subprocess.run", fake_run)
+
+    result = run_judge_command(
+        JudgeCommand(provider="gemini", model="gemini-3.1", cwd=tmp_path),
+        "Return JSON.",
+    )
+
+    args = calls[0][0]
+    assert args[:6] == [
+        "gemini",
+        "--approval-mode",
+        "plan",
+        "--sandbox",
+        "--output-format",
+        "text",
+    ]
+    assert "-p" in args
+    assert "--prompt" not in args
+    assert result["raw_output"] == '{"ok": true}'
+    assert result["command_line"].endswith("-p <prompt>")

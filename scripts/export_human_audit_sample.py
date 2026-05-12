@@ -24,7 +24,7 @@ from cache_safety_erasure.utils.io import (
 def main() -> None:
     parser = argparse.ArgumentParser(description="Export a stratified human-audit sheet from generations.")
     parser.add_argument("--results-dir", required=True, type=Path)
-    parser.add_argument("--output-dir", type=Path, default=Path("paper/audit"))
+    parser.add_argument("--output-dir", type=Path, default=Path("docs/audit"))
     parser.add_argument("--per-suite-policy", type=int, default=3)
     parser.add_argument(
         "--strategy",

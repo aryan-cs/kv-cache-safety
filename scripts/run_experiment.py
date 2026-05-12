@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import argparse
+import fcntl
 import hashlib
+import importlib.metadata
 import json
 import os
+import sys
 from dataclasses import asdict, replace
 from pathlib import Path
 from typing import Any
@@ -31,6 +34,8 @@ from cache_safety_erasure.utils.io import (
     write_jsonl,
 )
 
+_ACTIVE_RUN_LOCKS: list[Any] = []
+
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run cache safety erasure experiments.")
@@ -57,8 +62,10 @@ def main() -> None:
     run_dir = make_run_dir(
         config.run.output_dir, config.run.name, config.run.run_id, config.run.resume
     )
+    _hold_run_lock(run_dir)
     env = environment_snapshot()
     generations_path = run_dir / "generations.jsonl"
+    cache_stats_jsonl_path = run_dir / "cache_stats.jsonl"
     if config.run.resume:
         existing, corrupt_tail_path = read_jsonl_tolerant(generations_path)
         if corrupt_tail_path is not None:
@@ -85,9 +92,18 @@ def main() -> None:
     manifest_base = {
         "run_name": config.run.name,
         "model_id": config.model.model_id,
+        "model_family": config.model.family,
+        "model_track": config.model.track,
         "model_provider": config.model.provider,
+        "backend_name": _backend_name(config.model.provider),
+        "backend_version": _backend_version(config.model.provider),
+        "launch_command": _launch_command(args),
         "model_config": asdict(config.model),
         "model_device_map": None,
+        "model_context_length": config.model.context_length,
+        "tokenizer_source": config.model.model_id,
+        "chat_template_required": config.model.chat_template_required,
+        "cache_policy_support": _cache_policy_support_manifest(config.cache_policies),
         "repository_url": (env.get("project") or {}).get("repository_url"),
         "repository_git_url": (env.get("project") or {}).get("repository_git_url"),
         "git_remote_origin": env.get("git_remote_origin"),
@@ -110,6 +126,13 @@ def main() -> None:
     done_keys = {
         (row["prompt_id"], row["suite"], row["policy"], int(row["seed"])) for row in existing
     }
+    _write_progress(
+        run_dir,
+        completed=len(done_keys),
+        expected=expected_generation_count,
+        activity="loading_model",
+        current=None,
+    )
 
     model_bundle = load_model(config.model)
     device_map = (
@@ -117,7 +140,14 @@ def main() -> None:
         if getattr(model_bundle, "model", None) is not None
         else None
     )
-    manifest = {**manifest_base, "model_device_map": device_map}
+    manifest = {
+        **manifest_base,
+        "model_device_map": device_map,
+        "tokenizer_source": _tokenizer_source(getattr(model_bundle, "tokenizer", None), config),
+        "chat_template_source_sha256": _chat_template_sha256(
+            getattr(model_bundle, "tokenizer", None)
+        ),
+    }
     _write_run_start_artifacts(run_dir, raw_config, env, manifest, resume=config.run.resume)
 
     cache_stat_rows: list[dict] = []
@@ -168,6 +198,9 @@ def main() -> None:
                         "policy": policy_name,
                         "seed": seed,
                         "model_id": config.model.model_id,
+                        "model_family": config.model.family,
+                        "model_track": config.model.track,
+                        "generated_at": utc_timestamp(),
                         "system": prompt.system,
                         "user": prompt.user,
                         "should_refuse": prompt.should_refuse,
@@ -178,11 +211,29 @@ def main() -> None:
                         **metrics,
                     }
                     append_jsonl(generations_path, [row])
+                    decision_rows = []
                     for decision in result.cache_decisions:
-                        cache_stat_rows.extend(decision.to_rows(prompt.id, seed))
-                        if len(cache_stat_rows) >= 50_000:
+                        decision_rows.extend(decision.to_rows(prompt.id, seed))
+                    if decision_rows:
+                        append_jsonl(cache_stats_jsonl_path, decision_rows)
+                        cache_stat_rows.extend(decision_rows)
+                        if len(cache_stat_rows) >= 10_000:
                             cache_stats_sink.write(cache_stat_rows)
                             cache_stat_rows = []
+                    done_keys.add(key)
+                    _write_progress(
+                        run_dir,
+                        completed=len(done_keys),
+                        expected=expected_generation_count,
+                        activity="generating",
+                        current={
+                            "suite": prompt.suite,
+                            "prompt_id": prompt.id,
+                            "policy": policy_name,
+                            "seed": seed,
+                            "model_id": config.model.model_id,
+                        },
+                    )
 
     rows = read_jsonl(generations_path)
     metrics = compute_run_metrics(rows)
@@ -191,12 +242,103 @@ def main() -> None:
     if cache_stat_rows:
         cache_stats_sink.write(cache_stat_rows)
     cache_stats_sink.close()
+    _rebuild_cache_stats_parquet_from_jsonl(cache_stats_jsonl_path, cache_stats_sink.path)
+    _write_progress(
+        run_dir,
+        completed=len(rows),
+        expected=expected_generation_count,
+        activity="complete",
+        current={"model_id": config.model.model_id},
+    )
     print(f"Completed run: {run_dir}")
+
+
+def _hold_run_lock(run_dir: Path) -> None:
+    """Hold an advisory per-run lock for the lifetime of this process."""
+    lock_path = run_dir / ".run.lock"
+    lock_handle = lock_path.open("a+", encoding="utf-8")
+    try:
+        fcntl.flock(lock_handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError as exc:
+        lock_handle.seek(0)
+        holder = lock_handle.read().strip()
+        lock_handle.close()
+        detail = f" Current holder: {holder}" if holder else ""
+        raise RuntimeError(f"Run directory is already locked: {run_dir}.{detail}") from exc
+    lock_handle.seek(0)
+    lock_handle.truncate()
+    lock_handle.write(
+        json.dumps(
+            {
+                "pid": os.getpid(),
+                "locked_at": utc_timestamp(),
+                "run_dir": str(run_dir),
+            },
+            sort_keys=True,
+        )
+        + "\n"
+    )
+    lock_handle.flush()
+    _ACTIVE_RUN_LOCKS.append(lock_handle)
 
 
 def _stable_hash(value: Any) -> str:
     encoded = json.dumps(value, sort_keys=True, default=str).encode("utf-8")
     return hashlib.sha256(encoded).hexdigest()
+
+
+def _backend_name(model_provider: str) -> str:
+    if model_provider == "hf":
+        return "transformers"
+    if model_provider == "mock":
+        return "mock"
+    return model_provider
+
+
+def _backend_version(model_provider: str) -> str | None:
+    if model_provider == "hf":
+        try:
+            return importlib.metadata.version("transformers")
+        except importlib.metadata.PackageNotFoundError:
+            return None
+    return None
+
+
+def _launch_command(args: argparse.Namespace) -> list[str]:
+    command = [sys.executable, "scripts/run_experiment.py", "--config", str(args.config)]
+    if args.run_id:
+        command.extend(["--run-id", str(args.run_id)])
+    if args.resume:
+        command.append("--resume")
+    return command
+
+
+def _tokenizer_source(tokenizer: object | None, config: object) -> str:
+    source = getattr(tokenizer, "name_or_path", None)
+    if source:
+        return str(source)
+    return str(getattr(config.model, "model_id", ""))
+
+
+def _chat_template_sha256(tokenizer: object | None) -> str | None:
+    template = getattr(tokenizer, "chat_template", None)
+    if not template:
+        return None
+    return _stable_hash(str(template))
+
+
+def _cache_policy_support_manifest(policies: tuple[Any, ...]) -> list[dict[str, Any]]:
+    return [
+        {
+            "name": policy.name,
+            "label": cache_policy_label(policy),
+            "requires_role_spans": policy.name in {"policy_pinned", "user_pinned"}
+            or bool(policy.patch_from_baseline),
+            "requires_attention_scores": policy.name in {"attention_h2o"},
+            "requires_patch_from_baseline": bool(policy.patch_from_baseline),
+        }
+        for policy in policies
+    ]
 
 
 def _raw_config_with_run_overrides(
@@ -233,6 +375,12 @@ RESUME_MANIFEST_STABLE_KEYS = [
     "limit_per_suite",
     "expected_generation_count",
 ]
+
+
+class CorruptCacheStatsError(RuntimeError):
+    def __init__(self, path: Path, message: str) -> None:
+        super().__init__(message)
+        self.path = path
 
 
 def _validate_resume_manifest(
@@ -293,13 +441,31 @@ def _write_run_start_artifacts(
 
 
 def _policy_manifest(policy: Any) -> dict[str, Any]:
-    return asdict(policy)
+    # Keep resume comparisons stable against the JSON form written to manifest.json.
+    return json.loads(json.dumps(asdict(policy), sort_keys=True))
 
 
 def _reconcile_resume_generations(run_dir: Path, rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     if not rows:
         return rows
-    cache_keys = _cache_stats_generation_keys(run_dir / "cache_stats.parquet")
+    cache_stats_path = run_dir / "cache_stats.parquet"
+    try:
+        cache_keys = _cache_stats_generation_keys(cache_stats_path)
+    except CorruptCacheStatsError as exc:
+        if os.environ.get("ALLOW_CORRUPT_CACHE_STATS_RESET") != "1":
+            raise RuntimeError(f"{cache_stats_path.name} is unreadable: {exc}") from exc
+        stamp = utc_timestamp()
+        generation_archive = run_dir / f"generations.corrupt_cache_stats_reset.{stamp}.jsonl"
+        cache_archive = run_dir / f"{cache_stats_path.name}.corrupt.{stamp}"
+        write_jsonl(generation_archive, rows)
+        write_jsonl(run_dir / "generations.jsonl", [])
+        if exc.path.exists():
+            exc.path.replace(cache_archive)
+        print(
+            "Resume reconciliation reset generations because cache_stats.parquet was unreadable; "
+            f"archived generations at {generation_archive} and cache stats at {cache_archive}."
+        )
+        return []
     kept = [
         row
         for row in rows
@@ -324,6 +490,17 @@ def _reconcile_resume_generations(run_dir: Path, rows: list[dict[str, Any]]) -> 
 
 
 def _cache_stats_generation_keys(cache_stats_path: Path) -> set[tuple[str, str, int]]:
+    jsonl_path = cache_stats_path.with_suffix(".jsonl")
+    if jsonl_path.exists():
+        rows, corrupt_tail_path = read_jsonl_tolerant(jsonl_path)
+        if corrupt_tail_path is not None:
+            print(
+                "Resume recovery quarantined a corrupt cache_stats.jsonl tail at "
+                f"{corrupt_tail_path}."
+            )
+        keys = _cache_stats_generation_keys_from_rows(rows)
+        if keys:
+            return keys
     cache_stats_path = _promote_recoverable_cache_stats_temp(cache_stats_path)
     if not cache_stats_path.exists():
         return set()
@@ -333,8 +510,8 @@ def _cache_stats_generation_keys(cache_stats_path: Path) -> set[tuple[str, str, 
         raise RuntimeError("pyarrow is required for cache stats resume reconciliation.") from exc
     try:
         table = pq.read_table(cache_stats_path, columns=["prompt_id", "policy", "seed"])
-    except Exception:
-        return set()
+    except Exception as exc:
+        raise CorruptCacheStatsError(cache_stats_path, str(exc)) from exc
     prompt_ids = table.column("prompt_id").to_pylist()
     policies = table.column("policy").to_pylist()
     seeds = table.column("seed").to_pylist()
@@ -343,6 +520,39 @@ def _cache_stats_generation_keys(cache_stats_path: Path) -> set[tuple[str, str, 
         for prompt_id, policy, seed in zip(prompt_ids, policies, seeds, strict=False)
         if prompt_id is not None and policy is not None
     }
+
+
+def _cache_stats_generation_keys_from_rows(rows: list[dict[str, Any]]) -> set[tuple[str, str, int]]:
+    keys = set()
+    for row in rows:
+        prompt_id = row.get("prompt_id")
+        policy = row.get("policy")
+        if prompt_id is None or policy is None:
+            continue
+        keys.add((str(prompt_id), str(policy), int(row.get("seed") or 0)))
+    return keys
+
+
+def _write_progress(
+    run_dir: Path,
+    *,
+    completed: int,
+    expected: int,
+    activity: str,
+    current: dict[str, Any] | None,
+) -> None:
+    percent = round((completed / expected) * 100, 3) if expected else 100.0
+    write_json(
+        run_dir / "progress.json",
+        {
+            "updated_at": utc_timestamp(),
+            "activity": activity,
+            "completed": completed,
+            "expected": expected,
+            "progress_percent": percent,
+            "current": current or {},
+        },
+    )
 
 
 def _promote_recoverable_cache_stats_temp(cache_stats_path: Path) -> Path:
@@ -395,6 +605,7 @@ CACHE_STATS_COLUMNS = [
     "layer_count",
     "cache_l2_before",
     "cache_l2_after",
+    "cache_l2_measurement",
     "retained_special_tokens",
     "retained_template_tokens",
     "retained_system_tokens",
@@ -503,7 +714,19 @@ class _CacheStatsSink:
                 raise RuntimeError("pyarrow is required for cache_stats.parquet.") from exc
             self.writer = pq.ParquetWriter(write_path, schema)
             if self.temp_path is not None:
-                _copy_existing_cache_stats(self.path, self.writer, schema)
+                try:
+                    _copy_existing_cache_stats(self.path, self.writer, schema)
+                except Exception as exc:
+                    corrupt_path = self.path.with_name(
+                        f"{self.path.name}.corrupt.{utc_timestamp()}"
+                    )
+                    self.path.replace(corrupt_path)
+                    print(
+                        "WARNING: archived unreadable cache_stats.parquet at "
+                        f"{corrupt_path}; final cache_stats.parquet will be "
+                        f"rebuilt from {self.path.with_suffix('.jsonl')}. "
+                        f"Original error: {exc}"
+                    )
         self.writer.write_table(table)
 
     def close(self) -> None:
@@ -531,6 +754,50 @@ def _cache_stats_table(rows: list[dict[str, Any]]) -> Any:
         pa.array([row[field.name] for row in normalized], type=field.type) for field in schema
     ]
     return pa.Table.from_arrays(arrays, schema=schema)
+
+
+def _rebuild_cache_stats_parquet_from_jsonl(jsonl_path: Path, parquet_path: Path) -> None:
+    if not jsonl_path.exists():
+        return
+    try:
+        import pyarrow.parquet as pq
+    except ModuleNotFoundError as exc:
+        raise RuntimeError("pyarrow is required for cache_stats.parquet.") from exc
+    temp_path = parquet_path.with_suffix(".parquet.rebuild.tmp")
+    schema = _cache_stats_schema()
+    row_count = 0
+    with pq.ParquetWriter(temp_path, schema) as writer:
+        for batch in _iter_cache_stat_jsonl_batches(jsonl_path):
+            row_count += len(batch)
+            writer.write_table(_align_table_to_schema(_cache_stats_table(batch), schema))
+    if row_count == 0:
+        pq.write_table(_cache_stats_table([]), temp_path)
+    temp_path.replace(parquet_path)
+
+
+def _iter_cache_stat_jsonl_batches(
+    path: Path, *, batch_size: int = 100_000
+) -> Any:
+    batch: list[dict[str, Any]] = []
+    with path.open("r", encoding="utf-8") as f:
+        for line_number, line in enumerate(f, start=1):
+            if not line.strip():
+                continue
+            try:
+                row = json.loads(line)
+            except json.JSONDecodeError as exc:
+                raise RuntimeError(
+                    f"{path} has malformed JSON at line {line_number}; "
+                    "refusing to rebuild cache_stats.parquet from partial data"
+                ) from exc
+            if not isinstance(row, dict):
+                raise RuntimeError(f"{path} line {line_number} is not a JSON object")
+            batch.append(row)
+            if len(batch) >= batch_size:
+                yield batch
+                batch = []
+    if batch:
+        yield batch
 
 
 def _copy_existing_cache_stats(path: Path, writer: Any, schema: Any) -> None:

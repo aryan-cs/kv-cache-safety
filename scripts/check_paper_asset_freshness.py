@@ -28,7 +28,7 @@ def main() -> None:
         "--pair",
         action="append",
         required=True,
-        help="Paper/results pair in the form paper/generated/run=results/run.",
+        help="Paper/results pair in the form docs/generated/run=results/run.",
     )
     parser.add_argument(
         "--required-table",
@@ -310,7 +310,7 @@ def _current_git_head() -> str | None:
 
 def _parse_pair(value: str) -> tuple[Path, Path]:
     if "=" not in value:
-        raise SystemExit(f"Expected --pair value like paper/generated/run=results/run, got `{value}`")
+        raise SystemExit(f"Expected --pair value like docs/generated/run=results/run, got `{value}`")
     paper_dir, results_dir = value.split("=", 1)
     return Path(paper_dir), Path(results_dir)
 

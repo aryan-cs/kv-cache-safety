@@ -58,15 +58,16 @@ uv run python scripts/aggregate_results.py --results-dir "$latest"
 uv run python scripts/make_figures.py --results-dir "$latest"
 uv run python scripts/export_paper_assets.py \
   --results-dir "$latest" \
-  --paper-dir paper/generated/h200_qwen32b_public_followup \
+  --paper-dir docs/generated/h200_qwen32b_public_followup \
   --macro-prefix QwenThirtyTwo
 uv run python scripts/check_publication_readiness.py \
   --results-dir "$latest" \
-  --paper-dir paper/generated/h200_qwen32b_public_followup \
+  --paper-dir docs/generated/h200_qwen32b_public_followup \
   --min-prompts-per-suite 600 \
   --suite-min-prompts system_leakage=2 \
   --suite-min-prompts public_xstest_safe=200 \
   --max-ci-width 0.10 \
+  --ci-width-exempt-suite system_leakage \
   --required-suite system_leakage \
   --required-suite public_system_leakage \
   --required-suite public_refusal_safety \

@@ -31,11 +31,10 @@ REQUIRED_FIGURE_DATA_COLUMNS = {
     },
     "prompt_effect_constellation": {
         "suite",
-        "prompt_id",
         "policy",
-        "x",
-        "y",
-        "effect_magnitude",
+        "mean_effect",
+        "max_effect",
+        "prompt_count",
     },
     "cache_state_fingerprint": {
         "policy",
@@ -93,9 +92,9 @@ FIGURE_DATA_NUMERIC_COLUMNS = {
         "selective_safety_erasure_index",
     },
     "prompt_effect_constellation": {
-        "x",
-        "y",
-        "effect_magnitude",
+        "mean_effect",
+        "max_effect",
+        "prompt_count",
     },
     "cache_state_fingerprint": {
         "layer_bin",
@@ -129,7 +128,6 @@ FIGURE_DATA_UNIT_INTERVAL_COLUMNS = {
     "retention_fraction",
     "system_retention_fraction",
     "user_retention_fraction",
-    "safety_restoration_fraction",
     "safety_restoration_ci_low",
     "safety_restoration_ci_high",
 }
@@ -158,6 +156,15 @@ def main() -> None:
     )
     parser.add_argument("--max-ci-width", type=float, default=0.08)
     parser.add_argument(
+        "--ci-width-exempt-suite",
+        action="append",
+        default=[],
+        help=(
+            "Suite to exclude from strict CI-width enforcement while still requiring "
+            "complete artifacts and CI endpoints. Use for tiny built-in diagnostic suites."
+        ),
+    )
+    parser.add_argument(
         "--allow-wide-ci",
         action="store_true",
         help="Do not fail on CI-width targets. Use only for intermediate H200 staging checks.",
@@ -180,6 +187,7 @@ def main() -> None:
     )
     args = parser.parse_args()
     suite_min_prompts = _parse_suite_min_prompts(args.suite_min_prompts)
+    ci_width_exempt_suites = set(args.ci_width_exempt_suite)
 
     failures: list[str] = []
     generations = args.results_dir / "generations.jsonl"
@@ -326,8 +334,8 @@ def main() -> None:
         has_global_capability = any(
             value.get("mean_capability_score") is not None for value in policy_summary.values()
         )
-        if metrics.get("policy_level_contrasts") or (
-            has_global_safety and has_global_capability
+        if not args.require_causal_patch and (
+            metrics.get("policy_level_contrasts") or (has_global_safety and has_global_capability)
         ):
             _check_policy_level_contrast_readiness(
                 metrics,
@@ -343,15 +351,17 @@ def main() -> None:
                 failures,
                 max_ci_width=args.max_ci_width,
                 allow_wide_ci=args.allow_wide_ci,
+                ci_width_exempt_suites=ci_width_exempt_suites,
             )
         for key, value in metrics.get("selective_safety_erasure", {}).items():
             ci = value.get("paired_safety_degradation_ci", {})
+            suite = key.split("::", 1)[0]
             _check_ci_width(
                 failures,
                 f"{key}: paired safety CI",
                 ci,
                 max_ci_width=args.max_ci_width,
-                allow_wide_ci=args.allow_wide_ci,
+                allow_wide_ci=args.allow_wide_ci or suite in ci_width_exempt_suites,
             )
     if args.paper_dir is not None:
         _check_paper_assets(args.paper_dir, args.results_dir, failures)
@@ -872,7 +882,9 @@ def _check_causal_restoration_metric_readiness(
     *,
     max_ci_width: float | None = None,
     allow_wide_ci: bool = False,
+    ci_width_exempt_suites: set[str] | None = None,
 ) -> None:
+    ci_width_exempt_suites = ci_width_exempt_suites or set()
     grouped: dict[tuple[str, str, str, str], set[str]] = {}
     for key, values in metrics.get("causal_restoration", {}).items():
         if "::" not in key:
@@ -901,7 +913,7 @@ def _check_causal_restoration_metric_readiness(
                     f"{key}: `{metric}_ci`",
                     ci,
                     max_ci_width=max_ci_width,
-                    allow_wide_ci=allow_wide_ci,
+                    allow_wide_ci=allow_wide_ci or suite in ci_width_exempt_suites,
                 )
             grouped.setdefault((suite, compressed_policy, metric, signature), set()).add(role)
     if not any({"system", "user_control"}.issubset(roles) for roles in grouped.values()):

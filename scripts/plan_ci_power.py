@@ -15,6 +15,9 @@ add_src_to_path()
 from cache_safety_erasure.utils.io import read_jsonl, write_json
 
 Z_95 = 1.96
+MAX_BERNOULLI_SD = 0.5
+SSEI_TWO_COMPONENT_SD = math.sqrt((MAX_BERNOULLI_SD**2) + (MAX_BERNOULLI_SD**2))
+MAX_PAIRED_DELTA_SD = 1.0
 
 
 def main() -> None:
@@ -41,8 +44,16 @@ def main() -> None:
 
 
 def build_ci_power_plan(rows: list[dict[str, Any]], *, target_ci_width: float) -> dict[str, Any]:
-    conservative_n = required_cluster_count(
-        sample_sd=0.5,
+    bernoulli_n = required_cluster_count(
+        sample_sd=MAX_BERNOULLI_SD,
+        target_ci_width=target_ci_width,
+    )
+    ssei_n = required_cluster_count(
+        sample_sd=SSEI_TWO_COMPONENT_SD,
+        target_ci_width=target_ci_width,
+    )
+    paired_delta_n = required_cluster_count(
+        sample_sd=MAX_PAIRED_DELTA_SD,
         target_ci_width=target_ci_width,
     )
     estimates = []
@@ -69,10 +80,16 @@ def build_ci_power_plan(rows: list[dict[str, Any]], *, target_ci_width: float) -
     return {
         "schema_version": 1,
         "target_ci_width": target_ci_width,
-        "conservative_bernoulli_required_cluster_n": conservative_n,
+        "conservative_bernoulli_required_cluster_n": bernoulli_n,
+        "conservative_ssei_two_component_required_cluster_n": ssei_n,
+        "max_paired_delta_required_cluster_n": paired_delta_n,
         "pilot_estimates": estimates,
         "note": (
-            "Conservative count assumes the maximum Bernoulli standard deviation of 0.5. "
+            "The Bernoulli count assumes the maximum single binary-outcome standard "
+            "deviation of 0.5. The SSEI count assumes independent safety and capability "
+            "Bernoulli components and is the minimum confirmatory powered-run planning "
+            "target. The max paired-delta count is a worst-case bound for paired deltas "
+            "that may be overly conservative for deterministic LLM prompt clusters. "
             "Pilot estimates use prompt-cluster deltas from generations.jsonl and should be "
             "treated as planning guidance, not final inference."
         ),
@@ -136,8 +153,14 @@ def render_markdown(plan: dict[str, Any]) -> str:
         "",
         f"Target full CI width: `{plan['target_ci_width']:.3f}`",
         "",
-        "Conservative Bernoulli prompt-cluster count: "
+        "Conservative single-outcome Bernoulli prompt-cluster count: "
         f"`{plan['conservative_bernoulli_required_cluster_n']}`",
+        "",
+        "Conservative two-component SSEI prompt-cluster count: "
+        f"`{plan['conservative_ssei_two_component_required_cluster_n']}`",
+        "",
+        "Worst-case paired-delta prompt-cluster count: "
+        f"`{plan['max_paired_delta_required_cluster_n']}`",
         "",
         "| suite | policy | metric | current clusters | sd | required clusters |",
         "| --- | --- | --- | --- | --- | --- |",

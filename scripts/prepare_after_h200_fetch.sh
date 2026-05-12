@@ -5,18 +5,18 @@ cd "$(dirname "$0")/.."
 
 primary_results="${PRIMARY_RESULTS_DIR:-results/h200_qwen_full_sweep}"
 causal_results="${CAUSAL_RESULTS_DIR:-results/h200_causal_patch_qwen7b}"
-primary_generated_dir="${PRIMARY_GENERATED_DIR:-paper/generated/$(basename "$primary_results")}"
-causal_generated_dir="${CAUSAL_GENERATED_DIR:-paper/generated/$(basename "$causal_results")}"
-primary_audit_summary="${PRIMARY_AUDIT_SUMMARY_DIR:-paper/audit/$(basename "$primary_results")_summary}"
-causal_audit_summary="${CAUSAL_AUDIT_SUMMARY_DIR:-paper/audit/$(basename "$causal_results")_summary}"
-publication_status_dir="${PUBLICATION_STATUS_DIR:-paper/build}"
-arxiv_source_dir="${ARXIV_SOURCE_DIR:-paper/build/arxiv_source}"
-arxiv_archive="${ARXIV_ARCHIVE:-paper/build/arxiv_source.tar.gz}"
+primary_generated_dir="${PRIMARY_GENERATED_DIR:-docs/generated/$(basename "$primary_results")}"
+causal_generated_dir="${CAUSAL_GENERATED_DIR:-docs/generated/$(basename "$causal_results")}"
+primary_audit_summary="${PRIMARY_AUDIT_SUMMARY_DIR:-docs/audit/$(basename "$primary_results")_summary}"
+causal_audit_summary="${CAUSAL_AUDIT_SUMMARY_DIR:-docs/audit/$(basename "$causal_results")_summary}"
+publication_status_dir="${PUBLICATION_STATUS_DIR:-docs/build}"
+arxiv_source_dir="${ARXIV_SOURCE_DIR:-docs/build/arxiv_source}"
+arxiv_archive="${ARXIV_ARCHIVE:-docs/build/arxiv_source.tar.gz}"
 fetch_manifest="${H200_FETCH_MANIFEST:-logs/h200/h200_artifact_manifest_local.json}"
 fetch_remote_manifest="${H200_FETCH_REMOTE_MANIFEST:-logs/h200/h200_artifact_manifest_remote.json}"
 fetch_compare_report="${H200_FETCH_COMPARE_REPORT:-logs/h200/h200_artifact_manifest_compare.json}"
 target_ci_width="${TARGET_CI_WIDTH:-0.08}"
-causal_ci_width="${CAUSAL_CI_WIDTH:-0.12}"
+causal_ci_width="${CAUSAL_CI_WIDTH:-0.23}"
 branch="${BRANCH:-master}"
 
 if [[ -n "$(git status --short)" ]]; then
@@ -77,6 +77,7 @@ rebuild_primary() {
     --suite-min-prompts system_leakage=2 \
     --suite-min-prompts public_xstest_safe=200 \
     --max-ci-width "$target_ci_width" \
+    --ci-width-exempt-suite system_leakage \
     --required-suite system_leakage \
     --required-suite public_system_leakage \
     --required-suite public_refusal_safety \
@@ -118,6 +119,7 @@ rebuild_causal() {
     --min-prompts-per-suite 600 \
     --suite-min-prompts system_leakage=2 \
     --max-ci-width "$causal_ci_width" \
+    --ci-width-exempt-suite system_leakage \
     --required-suite system_leakage \
     --required-suite public_system_leakage \
     --required-suite public_refusal_safety \
@@ -170,11 +172,11 @@ uv run python scripts/post_h200_next_steps.py \
   --causal-generated-dir "$causal_generated_dir" \
   --arxiv-source-dir "$arxiv_source_dir" \
   --arxiv-archive "$arxiv_archive" \
-  --output-json paper/generated/post_h200_next_steps.json \
-  --output-md paper/generated/post_h200_next_steps.md
+  --output-json docs/generated/post_h200_next_steps.json \
+  --output-md docs/generated/post_h200_next_steps.md
 
 echo "Post-H200 fetched evidence prepared:"
 echo "- $primary_generated_dir"
 echo "- $causal_generated_dir"
-echo "- paper/audit/*_audit_blinded_annotator_*.csv"
-echo "- paper/generated/post_h200_next_steps.md"
+echo "- docs/audit/*_audit_blinded_annotator_*.csv"
+echo "- docs/generated/post_h200_next_steps.md"

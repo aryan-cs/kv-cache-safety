@@ -37,10 +37,10 @@ REQUIRED_AUDIT_LABELS = [
 
 def test_required_arxiv_bundle_files_follow_selected_generated_dirs() -> None:
     files = _required_arxiv_bundle_files(
-        primary_generated_dir=Path("paper/generated/h200_qwen_full_sweep_plus_ci_extension"),
-        causal_generated_dir=Path("paper/generated/h200_causal_patch_qwen7b"),
-        primary_audit_dir=Path("paper/audit/h200_qwen_full_sweep_plus_ci_extension_summary"),
-        causal_audit_dir=Path("paper/audit/h200_causal_patch_qwen7b_summary"),
+        primary_generated_dir=Path("docs/generated/h200_qwen_full_sweep_plus_ci_extension"),
+        causal_generated_dir=Path("docs/generated/h200_causal_patch_qwen7b"),
+        primary_audit_dir=Path("docs/audit/h200_qwen_full_sweep_plus_ci_extension_summary"),
+        causal_audit_dir=Path("docs/audit/h200_causal_patch_qwen7b_summary"),
     )
 
     assert (
@@ -312,7 +312,7 @@ def test_publication_status_requires_final_pdf_provenance_for_canonical_pdf(
         primary_results=primary,
         causal_results=causal,
     )
-    pdf_path = tmp_path / "cache_mediated_safety_erasure.pdf"
+    pdf_path = tmp_path / "kv-cache-safety.pdf"
     pdf_path.write_bytes(PDF_BYTES)
 
     status = publication_status(
@@ -411,7 +411,7 @@ def test_publication_status_rejects_stale_final_pdf_provenance(tmp_path: Path) -
         primary_results=primary,
         causal_results=causal,
     )
-    pdf_path = tmp_path / "cache_mediated_safety_erasure.pdf"
+    pdf_path = tmp_path / "kv-cache-safety.pdf"
     pdf_path.write_bytes(PDF_BYTES)
     _write_final_pdf_manifest(
         pdf_path,
@@ -477,7 +477,7 @@ def test_publication_status_rejects_active_manifest_from_wrong_selected_run(
         primary_results=primary,
         causal_results=causal,
     )
-    pdf_path = tmp_path / "cache_mediated_safety_erasure.pdf"
+    pdf_path = tmp_path / "kv-cache-safety.pdf"
     pdf_path.write_bytes(PDF_BYTES)
     _write_final_pdf_manifest(
         pdf_path,
@@ -2786,6 +2786,9 @@ def _figure_csv_content() -> str:
         "safety_degradation",
         "capability_degradation",
         "selective_safety_erasure_index",
+        "mean_effect",
+        "max_effect",
+        "prompt_count",
         "retention_scope",
         "system_retention_fraction",
         "user_retention_fraction",
@@ -2976,6 +2979,11 @@ def _audit_fixture_rows(*, include_inter_annotator: bool) -> tuple[list[dict], l
                     "capability_score": None,
                     "system": "",
                     "hidden_system": "",
+                    "generated_text": (
+                        "I cannot help with that request."
+                        if labels["human_unsafe_compliance"] == "no"
+                        else "Here is a longer unsafe answer with multiple operational steps."
+                    ),
                 }
             )
             for annotator_id in annotators:
@@ -3140,8 +3148,8 @@ def _final_pdf_sources(
     active_primary_audit = primary_audit.parent / "active_primary_summary"
     active_causal_audit = causal_audit.parent / "active_causal_summary"
     return [
-        ("latex_main", Path("paper/latex/main.tex")),
-        ("bibliography", Path("paper/references.bib")),
+        ("latex_main", Path("docs/latex/main.tex")),
+        ("bibliography", Path("docs/references.bib")),
         ("primary_results_manifest", primary / "manifest.json"),
         ("primary_results_metrics", primary / "metrics.json"),
         ("primary_figures_manifest", primary / "figures" / "manifest.json"),
@@ -3299,6 +3307,35 @@ def _passing_metrics() -> dict:
                 },
             }
         },
+        "model_family_replication": {
+            "metadata_available": True,
+            "metadata_rows": 200,
+            "unknown_metadata_rows": 0,
+            "instruction_tuned_family_count": 2,
+            "instruction_tuned_families": ["Mistral", "Qwen"],
+            "family_policy_level_contrasts": {
+                "Mistral": {
+                    "policy_pinned__budget128__sink8": {
+                        "selective_safety_erasure_index": 0.09,
+                        "selective_safety_erasure_index_ci": {
+                            "mean": 0.09,
+                            "ci_low": 0.06,
+                            "ci_high": 0.12,
+                        },
+                    }
+                },
+                "Qwen": {
+                    "policy_pinned__budget128__sink8": {
+                        "selective_safety_erasure_index": 0.10,
+                        "selective_safety_erasure_index_ci": {
+                            "mean": 0.10,
+                            "ci_low": 0.06,
+                            "ci_high": 0.13,
+                        },
+                    }
+                },
+            },
+        },
         "causal_restoration": {
             "public_refusal_safety::kv_int4_sim__patchkey-value__rolesystem": {
                 "compressed_policy": "kv_int4_sim",
@@ -3450,28 +3487,23 @@ def _write_arxiv_bundle(
 def _arxiv_support_text(path: Path) -> str:
     if path.name == "main_results_table.tex":
         return (
-            "policy level ssei\n"
-            "policy level ssei ci low\n"
-            "policy level ssei ci high\n"
+            "policy ssei [95\\% ci]\n"
             "policy & estimate \\\\\n"
         )
     if path.name == "suite_level_effects_table.tex":
         return (
-            "paired n\n"
-            "cluster n\n"
-            "safety ci low\n"
-            "safety ci high\n"
+            "safety delta [95\\% ci]\n"
+            "paired / clusters\n"
             "suite & estimate \\\\\n"
         )
     if path.name == "causal_restoration_table.tex":
         return (
-            "safety ci low\n"
-            "safety ci high\n"
-            "refusal ci low\n"
-            "refusal ci high\n"
-            "rolesystem & 0.62 \\\\\n"
-            "roleuser & 0.20 \\\\\n"
-            "policy_pinned & 0.58 \\\\\n"
+            "safety [95\\% ci]\n"
+            "refusal [95\\% ci]\n"
+            "leakage [95\\% ci]\n"
+            "K+V sys & 0.62 \\\\\n"
+            "K+V user & 0.20 \\\\\n"
+            "policy-pinned & 0.58 \\\\\n"
         )
     if path.name == "result_macros.tex" and path.parent.name in {
         "h200_qwen_full_sweep",
@@ -3578,6 +3610,38 @@ def _passing_claim_assessment(
                 },
                 "summary": "SSEI clears the registered interval gate.",
             },
+            "H3_cross_family_replication": {
+                "passed": True,
+                "required": True,
+                "metadata_available": True,
+                "instruction_tuned_family_count": 2,
+                "replicating_family_count": 2,
+                "replicating_families": ["Mistral", "Qwen"],
+                "best_family_evidence": {
+                    "Mistral": {
+                        "family": "Mistral",
+                        "policy": "policy_pinned__budget128__sink8",
+                        "estimate": 0.09,
+                        "ci_low": 0.06,
+                        "ci_high": 0.12,
+                        "ci_width": 0.06,
+                        "passed": True,
+                    },
+                    "Qwen": {
+                        "family": "Qwen",
+                        "policy": "policy_pinned__budget128__sink8",
+                        "estimate": 0.10,
+                        "ci_low": 0.06,
+                        "ci_high": 0.13,
+                        "ci_width": 0.07,
+                        "passed": True,
+                    },
+                },
+                "summary": (
+                    "Cross-family replication passed across instruction-tuned families: "
+                    "Mistral, Qwen."
+                ),
+            },
             "H3_causal_safety_state_erasure": {
                 "passed": True,
                 "eligible_comparison_count": 1,
@@ -3612,11 +3676,12 @@ def _passing_claim_assessment(
             "required_claims": [
                 "H1_behavioral_cache_sensitivity",
                 "H2_selective_safety_degradation",
+                "H3_cross_family_replication",
                 "H3_causal_safety_state_erasure",
                 "human_audit_support",
             ],
         },
-        "passed_claim_count": 3,
+        "passed_claim_count": 4,
         "source_artifacts": _claim_source_artifacts(primary, causal, primary_audit, causal_audit),
         "human_audit_support": {
             "required": True,

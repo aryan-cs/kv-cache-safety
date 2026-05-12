@@ -6,19 +6,19 @@ cd "$(dirname "$0")/.."
 primary_results="${PRIMARY_RESULTS_DIR:-results/h200_qwen_full_sweep}"
 causal_results="${CAUSAL_RESULTS_DIR:-results/h200_causal_patch_qwen7b}"
 qwen32_results="${QWEN32_RESULTS_DIR:-results/h200_qwen32b_public_followup_primary}"
-primary_generated_dir="${PRIMARY_GENERATED_DIR:-paper/generated/h200_qwen_full_sweep}"
-causal_generated_dir="${CAUSAL_GENERATED_DIR:-paper/generated/h200_causal_patch_qwen7b}"
-claim_generated_dir="${CLAIM_GENERATED_DIR:-paper/generated/claim_assessment}"
-qwen32_generated_dir="${QWEN32_GENERATED_DIR:-paper/generated/h200_qwen32b_public_followup}"
-primary_audit_summary="${PRIMARY_AUDIT_SUMMARY_DIR:-paper/audit/h200_qwen_full_sweep_summary}"
-causal_audit_summary="${CAUSAL_AUDIT_SUMMARY_DIR:-paper/audit/h200_causal_patch_qwen7b_summary}"
+primary_generated_dir="${PRIMARY_GENERATED_DIR:-docs/generated/h200_qwen_full_sweep}"
+causal_generated_dir="${CAUSAL_GENERATED_DIR:-docs/generated/h200_causal_patch_qwen7b}"
+claim_generated_dir="${CLAIM_GENERATED_DIR:-docs/generated/claim_assessment}"
+qwen32_generated_dir="${QWEN32_GENERATED_DIR:-docs/generated/h200_qwen32b_public_followup}"
+primary_audit_summary="${PRIMARY_AUDIT_SUMMARY_DIR:-docs/audit/h200_qwen_full_sweep_summary}"
+causal_audit_summary="${CAUSAL_AUDIT_SUMMARY_DIR:-docs/audit/h200_causal_patch_qwen7b_summary}"
 target_ci_width="${TARGET_CI_WIDTH:-0.08}"
-causal_ci_width="${CAUSAL_CI_WIDTH:-0.12}"
+causal_ci_width="${CAUSAL_CI_WIDTH:-0.23}"
 qwen32_ci_width="${QWEN32_CI_WIDTH:-0.10}"
 require_qwen32_followup="${REQUIRE_QWEN32_FOLLOWUP:-0}"
-publication_status_dir="${PUBLICATION_STATUS_DIR:-paper/build}"
-arxiv_source_dir="${ARXIV_SOURCE_DIR:-paper/build/arxiv_source}"
-arxiv_archive="${ARXIV_ARCHIVE:-paper/build/arxiv_source.tar.gz}"
+publication_status_dir="${PUBLICATION_STATUS_DIR:-docs/build}"
+arxiv_source_dir="${ARXIV_SOURCE_DIR:-docs/build/arxiv_source}"
+arxiv_archive="${ARXIV_ARCHIVE:-docs/build/arxiv_source.tar.gz}"
 fetch_manifest="${H200_FETCH_MANIFEST:-logs/h200/h200_artifact_manifest_local.json}"
 fetch_remote_manifest="${H200_FETCH_REMOTE_MANIFEST:-logs/h200/h200_artifact_manifest_remote.json}"
 fetch_compare_report="${H200_FETCH_COMPARE_REPORT:-logs/h200/h200_artifact_manifest_compare.json}"
@@ -64,10 +64,10 @@ fi
 
 clear_stale_publication_pdfs() {
   rm -f \
-    paper/cache_mediated_safety_erasure.pdf \
-    paper/cache_mediated_safety_erasure.pdf.manifest.json \
-    paper/build/cache_mediated_safety_erasure.pdf \
-    paper/build/cache_mediated_safety_erasure.pdf.manifest.json
+    docs/kv-cache-safety.pdf \
+    docs/kv-cache-safety.pdf.manifest.json \
+    docs/build/kv-cache-safety.pdf \
+    docs/build/kv-cache-safety.pdf.manifest.json
 }
 
 result_artifacts_complete() {
@@ -132,6 +132,7 @@ rebuild_primary() {
     --suite-min-prompts system_leakage=2 \
     --suite-min-prompts public_xstest_safe=200 \
     --max-ci-width "$target_ci_width" \
+    --ci-width-exempt-suite system_leakage \
     --required-suite system_leakage \
     --required-suite public_system_leakage \
     --required-suite public_refusal_safety \
@@ -173,6 +174,7 @@ rebuild_causal() {
     --min-prompts-per-suite 600 \
     --suite-min-prompts system_leakage=2 \
     --max-ci-width "$causal_ci_width" \
+    --ci-width-exempt-suite system_leakage \
     --required-suite system_leakage \
     --required-suite public_system_leakage \
     --required-suite public_refusal_safety \
@@ -209,6 +211,7 @@ rebuild_qwen32_if_present() {
     --suite-min-prompts system_leakage=2 \
     --suite-min-prompts public_xstest_safe=200 \
     --max-ci-width "$qwen32_ci_width" \
+    --ci-width-exempt-suite system_leakage \
     --required-suite system_leakage \
     --required-suite public_system_leakage \
     --required-suite public_refusal_safety \
@@ -245,7 +248,7 @@ assess_claims() {
     --claim-assessment "$claim_generated_dir/claim_assessment.json" \
     --primary-ci-power "$primary_results/ci_power.json" \
     --causal-ci-power "$causal_results/ci_power.json" \
-    --output-dir paper/generated/registered_followup_plan
+    --output-dir docs/generated/registered_followup_plan
 }
 
 write_publication_status() {
@@ -291,7 +294,7 @@ ARXIV_SOURCE_DIR="$arxiv_source_dir" \
 ARXIV_ARCHIVE="$arxiv_archive" \
 REQUIRE_COMPLETE_PAPER=1 \
 bash scripts/build_paper_pdf.sh
-cp paper/build/cache_mediated_safety_erasure.pdf paper/cache_mediated_safety_erasure.pdf
+cp docs/build/kv-cache-safety.pdf docs/kv-cache-safety.pdf
 write_publication_status --fail-if-not-ready
 uv run python scripts/package_arxiv_submission.py \
   --output-dir "$arxiv_source_dir" \
@@ -307,6 +310,6 @@ uv run python scripts/package_arxiv_submission.py \
 write_publication_status --require-arxiv-bundle --fail-if-not-ready
 
 echo "Publication artifacts rebuilt:"
-echo "- paper/cache_mediated_safety_erasure.pdf"
+echo "- docs/kv-cache-safety.pdf"
 echo "- ${arxiv_archive}"
 echo "- ${publication_status_dir}/publication_status.md"

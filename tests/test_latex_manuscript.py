@@ -32,7 +32,7 @@ from sync_active_paper_assets import sync_active_paper_assets
 
 
 def test_latex_manuscript_is_formal_registered_protocol() -> None:
-    tex = Path("paper/latex/main.tex").read_text(encoding="utf-8")
+    tex = Path("docs/latex/main.tex").read_text(encoding="utf-8")
 
     assert r"\documentclass[11pt]{article}" in tex
     assert "Aryan Gupta" in tex
@@ -46,7 +46,7 @@ def test_latex_manuscript_is_formal_registered_protocol() -> None:
     assert "../generated/active_primary/result_macros.tex" in tex
     assert "../generated/active_causal/result_macros.tex" in tex
     assert "../generated/claim_assessment/abstract_status_sentence.tex" in tex
-    assert "Empirical result not yet reported" in tex
+    assert "Evidence gate not satisfied" in tex
     assert r"\maybeinputtable{../generated/active_primary/main_results_table.tex}" in tex
     assert r"\maybeinputtable{../generated/claim_assessment/claim_assessment_table.tex}" in tex
     assert r"\maybeinputtable{../generated/claim_assessment/claim_interpretation.tex}" in tex
@@ -73,7 +73,7 @@ def test_latex_manuscript_is_formal_registered_protocol() -> None:
 
 
 def test_latex_manuscript_uses_formal_publication_wording() -> None:
-    tex = Path("paper/latex/main.tex").read_text(encoding="utf-8")
+    tex = Path("docs/latex/main.tex").read_text(encoding="utf-8")
 
     for phrase in [
         "when budget permits",
@@ -89,7 +89,7 @@ def test_latex_manuscript_uses_formal_publication_wording() -> None:
 
 
 def test_paper_notes_avoid_internal_planning_language() -> None:
-    for path in [Path("paper/related_work.md"), Path("paper/outline.md")]:
+    for path in [Path("docs/related_work.md"), Path("docs/outline.md")]:
         text = path.read_text(encoding="utf-8").lower()
         for phrase in [
             "user's goal",
@@ -186,7 +186,7 @@ def test_final_pdf_text_checker_rejects_dirty_working_tree_language() -> None:
 
 
 def test_latex_references_cover_primary_model_and_cache_work() -> None:
-    bib = Path("paper/references.bib").read_text(encoding="utf-8")
+    bib = Path("docs/references.bib").read_text(encoding="utf-8")
 
     for key in [
         "qwen2024qwen25",
@@ -205,8 +205,8 @@ def test_latex_references_cover_primary_model_and_cache_work() -> None:
 
 
 def test_latex_citations_and_bibliography_are_consistent() -> None:
-    tex = Path("paper/latex/main.tex").read_text(encoding="utf-8")
-    bib = Path("paper/references.bib").read_text(encoding="utf-8")
+    tex = Path("docs/latex/main.tex").read_text(encoding="utf-8")
+    bib = Path("docs/references.bib").read_text(encoding="utf-8")
     bib_keys = set(re.findall(r"@\w+\{([^,]+),", bib))
     cited_keys = {
         key.strip()
@@ -286,7 +286,7 @@ def test_arxiv_rewrite_uses_local_bibliography_and_figures() -> None:
         "../../results/h200_causal_patch_qwen7b/figures/causal_restoration_fraction.pdf"
     )
     strict = _rewrite_main_tex_for_arxiv(
-        Path("paper/latex/main.tex").read_text(encoding="utf-8"),
+        Path("docs/latex/main.tex").read_text(encoding="utf-8"),
         strict_final=True,
     )
     assert _final_source_failures(strict) == []
@@ -306,11 +306,11 @@ def test_arxiv_rewrite_uses_local_bibliography_and_figures() -> None:
     assert "generated/active_causal" in _rewrite_main_tex_for_arxiv(
         "../generated/active_causal/result_macros.tex"
     )
-    assert Path("paper/generated/active_primary") in REQUIRED_GENERATED_DIRS
-    assert Path("paper/generated/active_causal") in REQUIRED_GENERATED_DIRS
-    assert Path("paper/generated/claim_assessment") in GENERATED_DIRS
-    assert Path("paper/generated/claim_assessment") in REQUIRED_GENERATED_DIRS
-    assert Path("paper/generated/h200_qwen32b_public_followup") in OPTIONAL_GENERATED_DIRS
+    assert Path("docs/generated/active_primary") in REQUIRED_GENERATED_DIRS
+    assert Path("docs/generated/active_causal") in REQUIRED_GENERATED_DIRS
+    assert Path("docs/generated/claim_assessment") in GENERATED_DIRS
+    assert Path("docs/generated/claim_assessment") in REQUIRED_GENERATED_DIRS
+    assert Path("docs/generated/h200_qwen32b_public_followup") in OPTIONAL_GENERATED_DIRS
     assert "audit/active_primary_summary" in _rewrite_main_tex_for_arxiv(
         "../audit/active_primary_summary/human_audit_summary_table.tex"
     )
@@ -347,7 +347,7 @@ def test_arxiv_packager_can_target_custom_result_figure_dirs(tmp_path: Path) -> 
 
 
 def test_arxiv_rewrite_current_manuscript_has_no_repo_local_paths() -> None:
-    tex = Path("paper/latex/main.tex").read_text(encoding="utf-8")
+    tex = Path("docs/latex/main.tex").read_text(encoding="utf-8")
 
     rewritten = _rewrite_main_tex_for_arxiv(tex)
 
@@ -361,14 +361,14 @@ def test_arxiv_rewrite_current_manuscript_has_no_repo_local_paths() -> None:
 def test_arxiv_packager_treats_missing_inputs_as_publication_blockers() -> None:
     manifest = {
         "missing_figures": ["missing_figure.pdf"],
-        "missing_generated": ["paper/generated/missing"],
-        "missing_audit": ["paper/audit/missing"],
+        "missing_generated": ["docs/generated/missing"],
+        "missing_audit": ["docs/audit/missing"],
     }
 
     assert _missing_inputs(manifest) == [
         "missing_figure.pdf",
-        "paper/generated/missing",
-        "paper/audit/missing",
+        "docs/generated/missing",
+        "docs/audit/missing",
     ]
 
 
@@ -787,7 +787,7 @@ def test_arxiv_packager_records_file_provenance(tmp_path: Path) -> None:
 
     assert archive.exists()
     assert any(row["kind"] == "latex_main" and row["direct_copy"] is False for row in provenance)
-    assert any(row["source_path"] == "paper/references.bib" for row in provenance)
+    assert any(row["source_path"] == "docs/references.bib" for row in provenance)
     assert all(not Path(row["bundle_path"]).is_absolute() for row in provenance)
     assert all(row.get("source_sha256") for row in provenance)
     assert all(row.get("bundle_sha256") for row in provenance)
@@ -929,7 +929,7 @@ def test_arxiv_packager_rejects_semantically_incomplete_generated_tex(tmp_path: 
     failures = _invalid_arxiv_support_files([macros, table])
 
     assert any("PrimaryTopSSEIPolicy" in failure for failure in failures)
-    assert any("policy level ssei" in failure for failure in failures)
+    assert any("policy ssei" in failure for failure in failures)
 
 
 def test_arxiv_packager_ignores_comments_for_semantic_markers(tmp_path: Path) -> None:
@@ -937,16 +937,14 @@ def test_arxiv_packager_ignores_comments_for_semantic_markers(tmp_path: Path) ->
     generated.mkdir(parents=True)
     table = generated / "main_results_table.tex"
     table.write_text(
-        "% policy level ssei\n"
-        "% policy level ssei ci low\n"
-        "% policy level ssei ci high\n"
+        "% policy ssei [95% ci]\n"
         "policy & estimate \\\\\n",
         encoding="utf-8",
     )
 
     failures = _invalid_arxiv_support_files([table])
 
-    assert f"{table}:missing required table marker in artifact: {table}::policy level ssei" in failures
+    assert f"{table}:missing required table marker in artifact: {table}::policy ssei [95% ci]" in failures
 
 
 def test_latex_placeholder_checker_reports_missing_artifacts(tmp_path: Path) -> None:
@@ -1117,10 +1115,10 @@ def test_latex_placeholder_checker_requires_ci_tables_and_causal_controls(
     tex = tmp_path / "main.tex"
     suite = tmp_path / "suite_level_effects_table.tex"
     causal = tmp_path / "causal_restoration_table.tex"
-    suite.write_text("suite & policy & paired n & cluster n \\\\\n", encoding="utf-8")
+    suite.write_text("suite & policy & paired / clusters \\\\\n", encoding="utf-8")
     causal.write_text(
-        "safety ci low & safety ci high & refusal ci low & refusal ci high \\\\\n"
-        "kv\\_int4\\_sim\\_\\_patchkey-value\\_\\_rolesystem \\\\\n",
+        "safety [95\\% ci] & refusal [95\\% ci] & leakage [95\\% ci] \\\\\n"
+        "K+V sys \\\\\n",
         encoding="utf-8",
     )
     tex.write_text(
@@ -1133,16 +1131,12 @@ def test_latex_placeholder_checker_requires_ci_tables_and_causal_controls(
     failures = placeholder_artifact_failures(tex)
 
     assert (
-        "missing required table marker in artifact: suite_level_effects_table.tex::safety ci low"
+        "missing required table marker in artifact: suite_level_effects_table.tex::safety delta [95% ci]"
         in failures
     )
+    assert "missing causal control row in artifact: causal_restoration_table.tex::k+v user" in failures
     assert (
-        "missing required table marker in artifact: suite_level_effects_table.tex::safety ci high"
-        in failures
-    )
-    assert "missing causal control row in artifact: causal_restoration_table.tex::roleuser" in failures
-    assert (
-        "missing causal control row in artifact: causal_restoration_table.tex::policy_pinned"
+        "missing causal control row in artifact: causal_restoration_table.tex::policy-pinned"
         in failures
     )
 

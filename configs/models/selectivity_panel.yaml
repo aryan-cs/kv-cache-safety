@@ -1,0 +1,163 @@
+models:
+  - key: gpt_oss_20b
+    family: GPT-OSS
+    track: chat_safety
+    role: primary_instruction
+    access: public
+    license: apache-2.0
+    model:
+      provider: hf
+      model_id: openai/gpt-oss-20b
+      revision: 6cee5e81ee83917806bbde320786a8fb61efebee
+      dtype: bfloat16
+      device_map: auto
+      trust_remote_code: false
+      low_cpu_mem_usage: true
+      chat_template_required: true
+      cache_position_mode: compact
+
+  - key: qwen2_5_7b_base
+    family: Qwen 2.5
+    track: base_model
+    role: alignment_contrast_base
+    access: public
+    license: apache-2.0
+    model:
+      provider: hf
+      model_id: Qwen/Qwen2.5-7B
+      revision: d149729398750b98c0af14eb82c78cfe92750796
+      dtype: bfloat16
+      device_map: auto
+      trust_remote_code: false
+      low_cpu_mem_usage: true
+      chat_template_required: false
+
+  - key: qwen2_5_7b_instruct
+    family: Qwen 2.5
+    track: chat_safety
+    role: primary_instruction
+    access: public
+    license: apache-2.0
+    model:
+      provider: hf
+      model_id: Qwen/Qwen2.5-7B-Instruct
+      revision: a09a35458c702b33eeacc393d103063234e8bc28
+      dtype: bfloat16
+      device_map: auto
+      trust_remote_code: false
+      low_cpu_mem_usage: true
+      chat_template_required: true
+
+  - key: qwen3_5_9b
+    family: Qwen 3
+    track: chat_safety
+    role: qwen3_text_generation_replacement_for_qwen3_5_vl
+    access: public
+    license: apache-2.0
+    model:
+      provider: hf
+      model_id: Qwen/Qwen3-8B
+      revision: b968826d9c46dd6066d109eabc6255188de91218
+      dtype: bfloat16
+      device_map: auto
+      trust_remote_code: false
+      low_cpu_mem_usage: true
+      chat_template_required: true
+
+  - key: llama3_1_8b_instruct
+    family: Llama
+    track: chat_safety
+    role: primary_instruction
+    access: gated
+    license: llama3.1
+    model:
+      provider: hf
+      model_id: meta-llama/Llama-3.1-8B-Instruct
+      revision: 0e9e39f249a16976918f6564b8830bc894c89659
+      dtype: bfloat16
+      device_map: auto
+      trust_remote_code: false
+      low_cpu_mem_usage: true
+      chat_template_required: true
+
+  - key: gemma2_9b_it
+    family: Gemma
+    track: chat_safety
+    role: primary_instruction_gated_revision_required
+    access: gated
+    license: gemma
+    model:
+      provider: hf
+      model_id: google/gemma-2-9b-it
+      revision: 11c9b309abf73637e4b6f9a3fa1e92e615547819
+      dtype: bfloat16
+      device_map: auto
+      trust_remote_code: false
+      low_cpu_mem_usage: true
+      chat_template_required: true
+
+  - key: mistral_7b_instruct_v0_3
+    family: Mistral
+    track: chat_safety
+    role: primary_instruction
+    access: public
+    license: apache-2.0
+    model:
+      provider: hf
+      model_id: mistralai/Mistral-7B-Instruct-v0.3
+      revision: c170c708c41dac9275d15a8fff4eca08d52bab71
+      dtype: bfloat16
+      device_map: auto
+      trust_remote_code: false
+      low_cpu_mem_usage: true
+      chat_template_required: true
+
+  - key: olmo3_7b_instruct
+    family: OLMo
+    track: chat_safety
+    role: primary_instruction
+    access: public
+    license: apache-2.0
+    model:
+      provider: hf
+      model_id: allenai/Olmo-3-7B-Instruct
+      revision: 096bb5469fe34348bc88d851a69edb3bf6f40df4
+      dtype: bfloat16
+      device_map: auto
+      trust_remote_code: false
+      low_cpu_mem_usage: true
+      chat_template_required: true
+
+  - key: phi4
+    family: Phi
+    track: chat_safety
+    role: primary_instruction
+    access: public
+    license: mit
+    model:
+      provider: hf
+      model_id: microsoft/phi-4
+      revision: 932b33c0ec9ca189badeb22480721a8de9d0e006
+      dtype: bfloat16
+      device_map: auto
+      trust_remote_code: false
+      low_cpu_mem_usage: true
+      chat_template_required: true
+
+fallbacks:
+  - key: phi4_mini_instruct
+    family: Phi
+    track: chat_safety
+    role: feasibility_fallback
+    access: public
+    license: mit
+    replaces: phi4
+    model:
+      provider: hf
+      model_id: microsoft/Phi-4-mini-instruct
+      revision: cfbefacb99257ffa30c83adab238a50856ac3083
+      dtype: bfloat16
+      device_map: auto
+      trust_remote_code: true
+      low_cpu_mem_usage: true
+      chat_template_required: true

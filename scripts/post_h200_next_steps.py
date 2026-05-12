@@ -47,12 +47,12 @@ def main() -> None:
     parser.add_argument(
         "--primary-audit-dir",
         type=Path,
-        default=Path("paper/audit/h200_qwen_full_sweep_summary"),
+        default=Path("docs/audit/h200_qwen_full_sweep_summary"),
     )
     parser.add_argument(
         "--causal-audit-dir",
         type=Path,
-        default=Path("paper/audit/h200_causal_patch_qwen7b_summary"),
+        default=Path("docs/audit/h200_causal_patch_qwen7b_summary"),
     )
     parser.add_argument(
         "--primary-generated-dir",
@@ -69,22 +69,22 @@ def main() -> None:
     parser.add_argument(
         "--claim-assessment",
         type=Path,
-        default=Path("paper/generated/claim_assessment/claim_assessment.json"),
+        default=Path("docs/generated/claim_assessment/claim_assessment.json"),
     )
     parser.add_argument(
         "--paper-pdf",
         type=Path,
-        default=Path("paper/cache_mediated_safety_erasure.pdf"),
+        default=Path("docs/kv-cache-safety.pdf"),
     )
     parser.add_argument(
         "--arxiv-source-dir",
         type=Path,
-        default=Path("paper/build/arxiv_source"),
+        default=Path("docs/build/arxiv_source"),
     )
     parser.add_argument(
         "--arxiv-archive",
         type=Path,
-        default=Path("paper/build/arxiv_source.tar.gz"),
+        default=Path("docs/build/arxiv_source.tar.gz"),
     )
     parser.add_argument("--output-json", type=Path, default=None)
     parser.add_argument("--output-md", type=Path, default=None)
@@ -92,10 +92,10 @@ def main() -> None:
     args = parser.parse_args()
 
     primary_generated_dir = (
-        args.primary_generated_dir or Path("paper/generated") / args.primary_results_dir.name
+        args.primary_generated_dir or Path("docs/generated") / args.primary_results_dir.name
     )
     causal_generated_dir = (
-        args.causal_generated_dir or Path("paper/generated") / args.causal_results_dir.name
+        args.causal_generated_dir or Path("docs/generated") / args.causal_results_dir.name
     )
     status = publication_status(
         primary_results_dir=args.primary_results_dir,
@@ -139,39 +139,39 @@ def post_h200_next_steps(status: dict[str, Any]) -> dict[str, Any]:
     primary_audit_path = _status_path(
         status,
         "primary_human_audit",
-        f"paper/audit/{Path(primary_results_path).name}_summary",
+        f"docs/audit/{Path(primary_results_path).name}_summary",
     )
     causal_audit_path = _status_path(
         status,
         "causal_human_audit",
-        f"paper/audit/{Path(causal_results_path).name}_summary",
+        f"docs/audit/{Path(causal_results_path).name}_summary",
     )
     claim_assessment_path = _status_path(
         status,
         "claim_assessment",
-        "paper/generated/claim_assessment/claim_assessment.json",
+        "docs/generated/claim_assessment/claim_assessment.json",
     )
     primary_generated_path = _status_path(
         status,
         "primary_generated",
-        f"paper/generated/{Path(primary_results_path).name}",
+        f"docs/generated/{Path(primary_results_path).name}",
     )
     causal_generated_path = _status_path(
         status,
         "causal_generated",
-        f"paper/generated/{Path(causal_results_path).name}",
+        f"docs/generated/{Path(causal_results_path).name}",
     )
     arxiv_source_path = _artifact_field(
         status,
         "arxiv_bundle",
         "source_dir",
-        "paper/build/arxiv_source",
+        "docs/build/arxiv_source",
     )
     arxiv_archive_path = _artifact_field(
         status,
         "arxiv_bundle",
         "archive",
-        "paper/build/arxiv_source.tar.gz",
+        "docs/build/arxiv_source.tar.gz",
     )
     claim_generated_path = str(Path(claim_assessment_path).parent)
     primary_raw_complete = bool(gates.get("primary_results_complete")) or _raw_result_available(

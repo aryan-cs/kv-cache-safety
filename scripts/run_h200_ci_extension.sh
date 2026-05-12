@@ -46,10 +46,10 @@ if [[ "$audit_include_hidden_reference" == "1" ]]; then
 fi
 
 uv run python scripts/prepare_data.py --suite all
-uv run python scripts/prepare_data.py --source hf --suite cyberec_prompt_injection_leakage --limit "$ci_prompt_limit" --offset "$ci_prompt_offset" --output-suite public_system_leakage
-uv run python scripts/prepare_data.py --source hf --suite public_refusal_ci_extension --limit "$ci_prompt_limit" --output-suite public_refusal_safety
-uv run python scripts/prepare_data.py --source hf --suite dolly_benign --limit "$ci_prompt_limit" --offset "$ci_prompt_offset" --output-suite public_benign_overrefusal
-uv run python scripts/prepare_data.py --source hf --suite arc_easy --limit "$ci_prompt_limit" --offset "$ci_prompt_offset" --output-suite public_capability_arc
+uv run python scripts/prepare_data.py --source hf --suite cyberec_prompt_injection_leakage --limit "$ci_prompt_limit" --offset "$ci_prompt_offset" --output-suite public_system_leakage --exclude-results-dir "$primary_results_dir"
+uv run python scripts/prepare_data.py --source hf --suite public_refusal_ci_extension --limit "$ci_prompt_limit" --output-suite public_refusal_safety --exclude-results-dir "$primary_results_dir"
+uv run python scripts/prepare_data.py --source hf --suite dolly_benign --limit "$ci_prompt_limit" --offset "$ci_prompt_offset" --output-suite public_benign_overrefusal --exclude-results-dir "$primary_results_dir"
+uv run python scripts/prepare_data.py --source hf --suite arc_easy --limit "$ci_prompt_limit" --offset "$ci_prompt_offset" --output-suite public_capability_arc --exclude-results-dir "$primary_results_dir"
 uv run python scripts/check_prepared_suites.py \
   --min-records 600 \
   --suite-min-records system_leakage=2 \
@@ -71,13 +71,20 @@ uv run python scripts/preflight_h200.py \
 
 run_id="${CI_EXTENSION_RUN_ID:-h200_qwen14b_ci_extension_primary}"
 merged_run_id="${MERGED_PRIMARY_RUN_ID:-h200_qwen_full_sweep_plus_ci_extension}"
-uv run python scripts/run_experiment.py \
-  --config configs/experiments/h200_qwen14b_ci_extension.yaml \
-  --run-id "$run_id" \
-  --resume
+if [[ "${CI_EXTENSION_ALLOW_RESUME_GIT_MISMATCH:-0}" == "1" ]]; then
+  ALLOW_RESUME_GIT_MISMATCH=1 uv run python scripts/run_experiment.py \
+    --config configs/experiments/h200_qwen14b_ci_extension.yaml \
+    --run-id "$run_id" \
+    --resume
+else
+  uv run python scripts/run_experiment.py \
+    --config configs/experiments/h200_qwen14b_ci_extension.yaml \
+    --run-id "$run_id" \
+    --resume
+fi
 
 latest="results/$run_id"
-paper_dir="paper/generated/h200_qwen14b_ci_extension"
+paper_dir="docs/generated/h200_qwen14b_ci_extension"
 uv run python scripts/aggregate_results.py --results-dir "$latest"
 uv run python scripts/make_figures.py --results-dir "$latest"
 uv run python scripts/export_paper_assets.py \
@@ -95,6 +102,7 @@ uv run python scripts/check_publication_readiness.py \
   --min-prompts-per-suite 600 \
   --suite-min-prompts system_leakage=2 \
   --max-ci-width "$target_ci_width" \
+  --ci-width-exempt-suite system_leakage \
   --required-suite system_leakage \
   --required-suite public_system_leakage \
   --required-suite public_refusal_safety \
@@ -115,7 +123,7 @@ uv run python scripts/export_human_audit_sample.py \
   "${audit_hidden_reference_args[@]}"
 
 merged="results/$merged_run_id"
-merged_paper_dir="paper/generated/$merged_run_id"
+merged_paper_dir="docs/generated/$merged_run_id"
 uv run python scripts/merge_ci_extension_results.py \
   --primary-results-dir "$primary_results_dir" \
   --extension-results-dir "$latest" \
@@ -138,6 +146,7 @@ uv run python scripts/check_publication_readiness.py \
   --suite-min-prompts system_leakage=2 \
   --suite-min-prompts public_xstest_safe=200 \
   --max-ci-width "$target_ci_width" \
+  --ci-width-exempt-suite system_leakage \
   --required-suite system_leakage \
   --required-suite public_system_leakage \
   --required-suite public_refusal_safety \

@@ -7,7 +7,7 @@ primary_results="${PRIMARY_RESULTS_DIR:-results/h200_qwen_full_sweep}"
 causal_results="${CAUSAL_RESULTS_DIR:-results/h200_causal_patch_qwen7b}"
 audit_per_suite_policy="${AUDIT_PER_SUITE_POLICY:-10}"
 audit_annotator_template_count="${AUDIT_ANNOTATOR_TEMPLATE_COUNT:-2}"
-audit_output_dir="${AUDIT_OUTPUT_DIR:-paper/audit}"
+audit_output_dir="${AUDIT_OUTPUT_DIR:-docs/audit}"
 
 require_completed_results() {
   local results_dir="$1"

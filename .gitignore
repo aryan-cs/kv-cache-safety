@@ -28,13 +28,13 @@ results/*
 !data/processed/.gitkeep
 !results/README.md
 
-# Paper build outputs
-paper/build/
-paper/generated/
-paper/audit/*.csv
-paper/audit/*.jsonl
-paper/audit/*_audit_export_manifest.json
-paper/audit/*_summary/
+# Paper/docs build outputs
+docs/build/
+docs/generated/
+docs/audit/*.csv
+docs/audit/*.jsonl
+docs/audit/*_audit_export_manifest.json
+docs/audit/*_summary/
 *.aux
 *.bbl
 *.blg
@@ -42,3 +42,5 @@ paper/audit/*_summary/
 *.out
 *.pdf
 *.pdf.manifest.json
+!docs/kv-cache-safety.pdf
+!docs/kv-cache-safety.pdf.manifest.json

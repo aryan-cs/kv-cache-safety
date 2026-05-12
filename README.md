@@ -10,7 +10,7 @@ The project is intentionally built around open models, local inference, and repr
 
 ## Why This Project Exists
 
-Earlier candidate work focused on safety-classifier supply-chain auditing. That is useful, but the closest prior work already covers much of the attack and audit surface: Anthropic's classifier poisoning post, Rapid Poison, AI-BOM/provenance work, and guardrail robustness benchmarks. This repository instead targets a more surprising mechanism: **deployment-time inference infrastructure itself may alter alignment behavior without changing model weights or prompts**.
+Earlier candidate work focused on safety-classifier supply-chain auditing. That is useful, but the closest prior work already covers much of the attack and audit surface: Anthropic's classifier poisoning post, Rapid Poison, AI-BOM/provenance work, and guardrail robustness benchmarks. This repository instead targets an under-tested mechanism: **deployment-time inference infrastructure itself may alter alignment behavior without changing model weights or prompts**.
 
 Closest adjacent work to cite and distinguish:
 
@@ -51,6 +51,35 @@ Optional targets if locally available and licensing/gating is resolved:
 - `meta-llama/Llama-3.1-8B-Instruct`
 - `google/gemma-2-9b-it` or a current open Gemma instruct model
 
+## Evidence Scope And Missing Validation
+
+The current registered core is intentionally conservative. Do not broaden the
+paper claim beyond artifacts that actually exist:
+
+- **Model family:** Qwen2.5 is the only registered primary family. A
+  model-family universality claim requires at least one completed non-Qwen open
+  instruct replication with its own readiness report.
+- **Production serving stacks:** the main generation loop uses Hugging Face so
+  cache interventions and cache stats are auditable. vLLM, TGI, PagedAttention
+  eviction, and server-native KV quantization remain deployment-validation
+  extensions until separate artifacts are produced.
+- **Attention-aware retention:** `attention_h2o` exists as a diagnostic policy
+  with `configs/experiments/h200_attention_diagnostic_qwen7b.yaml`, but H2O,
+  SnapKV, and StreamingLLM-style claims are out of scope unless attention-aware
+  artifacts pass readiness.
+- **Real quantization:** `kv_int8_sim` and `kv_int4_sim` are symmetric
+  simulation policies. Do not describe them as KIVI, KVQuant, group-wise,
+  per-channel, residual-window, or mixed-precision production kernels.
+- **Public benchmark contamination:** AdvBench, JailbreakBench, and related
+  public datasets may overlap with safety tuning. Stronger generalization needs
+  a disjoint public shard such as the HarmBench CI-extension shard or a
+  documented synthetic harmful-intent diagnostic that avoids procedural harmful
+  details in published text.
+- **Open-local-judge audits:** AI judge labels must stay source-marked as
+  `open_local_judge`, never human. Readiness requires judge model provenance,
+  prompt-template hashes, raw-output hashes, and response-length calibration so
+  response-length shifts cannot silently masquerade as safety-label shifts.
+
 ## Quickstart
 
 Install dependencies:
@@ -63,6 +92,27 @@ Prepare the built-in diagnostic prompt suites:
 
 ```bash
 uv run python scripts/prepare_data.py --suite all
+```
+
+For publication-scale public suites, validate provenance before spending H200
+time:
+
+```bash
+uv run python scripts/check_prepared_suites.py \
+  --suite public_system_leakage \
+  --suite public_refusal_safety \
+  --suite public_benign_overrefusal \
+  --suite public_capability_arc \
+  --require-public-provenance
+```
+
+For CI-extension shards, also verify that the new prompts are disjoint from the
+reference run:
+
+```bash
+uv run python scripts/check_prompt_disjointness.py \
+  --reference-results-dir results/h200_qwen_full_sweep \
+  --suite public_refusal_safety
 ```
 
 Run the local artifact smoke test with a deterministic mock model:
@@ -172,17 +222,17 @@ or git commit do not match the original run. Use
 unchanged and the newer code is a resume-only compatibility patch.
 
 If the H200 allocation expires and is not restarted for a while, keep the Mac
-working on a bounded Qwen 3B diagnostic instead of attempting the H200-only 14B
+working on a bounded Qwen 1.5B diagnostic instead of attempting the H200-only 14B
 or 32B sweeps locally:
 
 ```bash
 bash scripts/run_mac_fallback.sh
 ```
 
-This fallback is intentionally conservative for a 24 GB M4 Pro: it checks macOS
-and the PyTorch MPS backend, requires at least 22 GiB unified memory, uses
-`configs/experiments/mac_qwen3b_causal_fallback.yaml`, writes artifacts to
-`results/mac_qwen3b_causal_fallback`, and isolates model downloads under
+This fallback is intentionally conservative for a 24 GB M4 Pro: it checks macOS,
+requires at least 22 GiB unified memory, uses
+`configs/experiments/mac_qwen1_5b_causal_fallback.yaml`, writes artifacts to
+`results/mac_qwen1_5b_cpu_causal_fallback`, and isolates model downloads under
 `.cache/mac_fallback`. By default it deletes `.cache/mac_fallback/huggingface`
 and `.cache/mac_fallback/torch` when the script exits, even on failure or
 interruption. It is a fallback diagnostic, not a replacement for the registered
@@ -243,8 +293,8 @@ Build the current LaTeX paper draft as a readable PDF:
 bash scripts/build_paper_pdf.sh
 ```
 
-The draft PDF is refreshed in both `paper/build/cache_mediated_safety_erasure.pdf`
-and `paper/cache_mediated_safety_erasure.pdf`. It remains a pre-results draft until
+The draft PDF is refreshed in both `docs/build/kv-cache-safety.pdf`
+and `docs/kv-cache-safety.pdf`. It remains a pre-results draft until
 the publication-readiness gates pass.
 
 Package arXiv-style source files:
@@ -263,8 +313,8 @@ bash scripts/prepare_after_h200_fetch.sh
 ```
 
 This writes remote and local artifact manifests in `logs/h200/`, compares hashes
-and byte counts, and refuses paths outside `results/`, `paper/generated/`, and
-`paper/audit/`. It does not pull code or start jobs on the H200. The default
+and byte counts, and refuses paths outside `results/`, `docs/generated/`, and
+`docs/audit/`. It does not pull code or start jobs on the H200. The default
 fetch also includes remote diagnostic and audit-export files when the full
 launcher has finished. For the publication preparation handoff, use the explicit
 primary and causal result directories above; `prepare_after_h200_fetch.sh`
@@ -284,10 +334,10 @@ If you need only an intermediate run or want to archive remote-generated debug
 artifacts, pass explicit artifact paths, for example:
 
 ```bash
-bash scripts/fetch_h200_results.sh results/h200_qwen_full_sweep paper/generated/h200_qwen_full_sweep
+bash scripts/fetch_h200_results.sh results/h200_qwen_full_sweep docs/generated/h200_qwen_full_sweep
 ```
 
-To include all remote-generated H200 paper/debug artifacts in the default fetch,
+To include all remote-generated H200 docs/debug artifacts in the default fetch,
 set `FETCH_H200_REMOTE_GENERATED=1`; do this only when you are intentionally
 archiving those files rather than preparing final paper assets.
 
@@ -327,10 +377,10 @@ If early results are weak or mixed, do not silently search for a better framing.
 
 ```bash
 uv run python scripts/plan_registered_followups.py \
-  --claim-assessment paper/generated/preliminary_claim_assessment/claim_assessment.json \
+  --claim-assessment docs/generated/preliminary_claim_assessment/claim_assessment.json \
   --primary-ci-power results/h200_qwen_full_sweep/ci_power.json \
   --causal-ci-power results/h200_causal_patch_qwen7b/ci_power.json \
-  --output-dir paper/generated/preliminary_followup_plan
+  --output-dir docs/generated/preliminary_followup_plan
 ```
 
 The follow-up planner records whether the next legitimate step is a causal extension, a powered selectivity extension, a human-audit repair, a model-family replication, or a clearly preregistered pivot. It preserves the novelty search while preventing post-hoc threshold changes or unregistered suite/policy additions from becoming the main paper claim.
@@ -339,8 +389,8 @@ Human-audit summaries must also pass the audit-readiness gate:
 
 ```bash
 uv run python scripts/check_human_audit_readiness.py \
-  --summary-json paper/audit/h200_qwen_full_sweep_summary/human_audit_summary.json \
-  --audit-manifest paper/audit/h200_qwen_full_sweep_summary/audit_manifest.json \
+  --summary-json docs/audit/h200_qwen_full_sweep_summary/human_audit_summary.json \
+  --audit-manifest docs/audit/h200_qwen_full_sweep_summary/audit_manifest.json \
   --results-dir results/h200_qwen_full_sweep \
   --require-baseline-deltas \
   --require-result-source-match
@@ -409,11 +459,11 @@ Every run writes:
 - `prompts.jsonl`: raw prompt fields, rendered chat text, prompt hashes, token IDs, tokenizer offsets, and token-role spans
 - `generations.jsonl`: raw prompt metadata, generated text, and per-example metrics
 - `metrics.json`: aggregate suite/policy metrics, policy-level safety-vs-capability contrasts, and prompt-clustered intervals
-- `paper/generated/<run>/main_results_table.md`: paper-ready summary table with policy-level SSEI confidence intervals
-- `paper/generated/<run>/main_results_table.tex`: LaTeX version of the paper-ready summary table
-- `paper/generated/<run>/suite_level_effects_table.md`: suite-level effect table with paired CIs
-- `paper/generated/<run>/suite_level_effects_table.tex`: LaTeX version of the suite-level effect table
-- `paper/generated/claim_assessment/`: H1/H2/H3 claim-ladder assessment generated from primary and causal metrics
+- `docs/generated/<run>/main_results_table.md`: paper-ready summary table with policy-level SSEI confidence intervals
+- `docs/generated/<run>/main_results_table.tex`: LaTeX version of the paper-ready summary table
+- `docs/generated/<run>/suite_level_effects_table.md`: suite-level effect table with paired CIs
+- `docs/generated/<run>/suite_level_effects_table.tex`: LaTeX version of the suite-level effect table
+- `docs/generated/claim_assessment/`: H1/H2/H3 claim-ladder assessment generated from primary and causal metrics
 - `cache_stats.parquet`: retained/evicted cache-token stats by policy application, including layer count and role-level retained/evicted token counts
 - `figures/*.png`, `figures/*.svg`, and `figures/*.pdf`: generated by `scripts/make_figures.py`
 - `figures/*.csv` and `figures/manifest.json`: figure source data plus SHA256 hashes for every plotted artifact
@@ -439,19 +489,30 @@ Implemented cache policies:
 - `sliding_window`: keep last `N` cached tokens
 - `sink_recent`: keep first `S` plus last `N` cached tokens
 - `random_matched`: random eviction matched to the same budget
-- `attention_h2o`: keep sink/recent tokens plus high-attention historical tokens when attention scores are available
-- `kv_int8_sim`: symmetric per-tensor int8 quantize/dequantize simulation
-- `kv_int4_sim`: symmetric per-tensor int4 quantize/dequantize simulation
+- `attention_h2o`: diagnostic extension that keeps sink/recent tokens plus
+  high-attention historical tokens when attention scores are available; do not
+  use it for H2O/SnapKV/StreamingLLM-style claims unless its attention-score
+  artifacts and readiness gates pass
+- `kv_int8_sim`: symmetric per-tensor int8 quantize/dequantize simulation, not
+  a production KV-quantization kernel
+- `kv_int4_sim`: symmetric per-tensor int4 quantize/dequantize simulation, not
+  a production KV-quantization kernel
 - `policy_pinned`: mitigation policy that protects configured token roles, currently system-role spans, while evicting other tokens
 
 For causal diagnostics, `patch_from_baseline` supports role-derived token selection, for example patching `token_roles: [system]` and comparing it against `token_roles: [user]` with `match_token_count_to_roles: [system]`. Hard-coded token indices are kept only for low-level debugging.
+Patching copies key/value tensors into existing token positions from matched
+baseline/compressed runs; it must not be described as reinserting tokens,
+recomputing RoPE, or validating arbitrary non-length-preserving cache surgery.
 
 ## Paper And Visuals
 
-The manuscript lives in `paper/latex/main.tex` and builds to `paper/build/cache_mediated_safety_erasure.pdf`. The default format is an arXiv-friendly ML preprint because the target venue is not fixed. The planned paper visuals are documented in `paper/visuals.md`: cache-state fingerprints, safety-capability phase portraits, restoration flow diagrams, prompt-level effect constellations, and a safety-state atlas. These are designed to show structured cache-state patterns rather than only scatterplots and bar charts.
+The manuscript lives in `docs/latex/main.tex` and builds to `docs/build/kv-cache-safety.pdf`. The default format is an arXiv-friendly ML preprint because the target venue is not fixed. The planned paper visuals are documented in `docs/visuals.md`: cache-state fingerprints, safety-capability phase portraits, restoration flow diagrams, prompt-level effect constellations, and a safety-state atlas. These are designed to show structured cache-state patterns rather than only scatterplots and bar charts.
 
 ## Safety And Data Policy
 
 This repository is for safety evaluation. The built-in prompt suites intentionally avoid procedural harmful details. Publication-quality runs should use open public datasets through `scripts/prepare_data.py` or documented dataset ingestion configs, and every dataset source must be logged in the resolved config.
 
-Do not use closed-source model judges or paid endpoints. Use local metrics and open guard/classifier models only.
+Do not use closed-source model judges or paid endpoints. Use local metrics and
+open guard/classifier models only. Open local judges still require model
+provenance, prompt-template hashes, raw-output hashes, and response-length
+calibration before their labels can support claim assessment.

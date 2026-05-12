@@ -4,9 +4,9 @@ set -euo pipefail
 repo_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 cd "$repo_dir"
 
-config="${MAC_FALLBACK_CONFIG:-configs/experiments/mac_qwen3b_causal_fallback.yaml}"
-run_id="${MAC_FALLBACK_RUN_ID:-mac_qwen3b_causal_fallback}"
-paper_dir="${MAC_FALLBACK_PAPER_DIR:-paper/generated/mac_qwen3b_causal_fallback}"
+config="${MAC_FALLBACK_CONFIG:-configs/experiments/mac_qwen1_5b_causal_fallback.yaml}"
+run_id="${MAC_FALLBACK_RUN_ID:-mac_qwen1_5b_cpu_causal_fallback}"
+paper_dir="${MAC_FALLBACK_PAPER_DIR:-docs/generated/mac_qwen1_5b_cpu_causal_fallback}"
 cache_root="${MAC_FALLBACK_CACHE_ROOT:-$(pwd)/.cache/mac_fallback}"
 delete_models_after="${MAC_FALLBACK_DELETE_MODELS_AFTER:-1}"
 min_unified_memory_gb="${MAC_FALLBACK_MIN_UNIFIED_MEMORY_GB:-22}"
@@ -83,9 +83,7 @@ try:
     import torch
 except ModuleNotFoundError as exc:
     raise SystemExit("PyTorch is not installed; run `uv sync --extra dev` first.") from exc
-if not (getattr(torch.backends, "mps", None) and torch.backends.mps.is_available()):
-    raise SystemExit("Mac fallback requires an available PyTorch MPS backend.")
-print(f"Mac fallback preflight passed: macOS, {mem_gb:.1f} GiB unified memory, MPS available.")
+print(f"Mac fallback preflight passed: macOS, {mem_gb:.1f} GiB unified memory.")
 PY
 
 export TOKENIZERS_PARALLELISM=false

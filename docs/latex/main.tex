@@ -34,7 +34,7 @@ Testing Whether KV-Cache Optimizations Selectively Weaken Refusal Behavior}
   \begin{center}
   \fbox{%
     \begin{minipage}{0.88\linewidth}
-      \textbf{Empirical result not yet reported.} #1
+      \textbf{Evidence gate not satisfied.} #1
     \end{minipage}
   }
   \end{center}
@@ -97,7 +97,7 @@ The present manuscript is a registered analysis protocol and reports no empirica
 \maketitle
 
 \begin{abstract}
-Inference systems increasingly compress, evict, or quantize key-value (KV) caches to reduce serving cost and extend usable context. This paper tests a safety-specific hypothesis: cache optimizations can selectively weaken refusal and policy-following behavior while preserving ordinary task capability, under the hypothesis that some safety behavior may depend on fragile cache-resident routing state. We call the target phenomenon \emph{cache-mediated safety erasure} only if three claims are supported: cache interventions degrade safety behavior, the degradation is larger than matched capability degradation, and targeted restoration or protection of policy-relevant cache slices recovers refusal more than matched non-policy controls. \EmpiricalStatusSentence
+Inference systems increasingly compress or evict key-value (KV) caches to reduce serving cost and extend usable context. This paper registers a safety-specific test: cache optimizations can selectively weaken refusal and policy-following behavior while preserving ordinary task capability. We call the target phenomenon \emph{cache-mediated safety erasure} only if the evidence ladder clears behavioral cache sensitivity, safety-minus-capability selectivity, cross-family replication, targeted mitigation, causal localization to policy or system cache state, and an alignment contrast against a matched base-model track. Empirical claims are scoped to the families, prompt suites, audit sources, and cache policies with completed provenance artifacts. \EmpiricalStatusSentence
 \end{abstract}
 
 \section{Introduction}
@@ -110,13 +110,15 @@ We organize the study around a strict claims ladder:
 \begin{enumerate}
   \item \textbf{Behavioral cache sensitivity:} cache interventions change safety, leakage, or capability behavior.
   \item \textbf{Selective safety degradation:} refusal or leakage behavior degrades more than ordinary capability under matched cache pressure.
-  \item \textbf{Causal safety-state erasure:} restoring or protecting policy-relevant cache slices recovers safety behavior more than matched user-token or non-policy controls.
+  \item \textbf{Cross-family replication:} at least two independent instruction-tuned model families show positive selectivity under the same primary matrix.
+  \item \textbf{Mitigation and causal localization:} policy-preserving retention reduces safety degradation and outperforms matched non-policy controls.
+  \item \textbf{Alignment contrast:} a matched base-model track does not show the same safety-selective refusal profile under equivalent cache pressure.
 \end{enumerate}
 
-Only the third claim justifies the phrase \emph{cache-mediated safety erasure}. If the experiments support only the first two claims, the correct contribution is an open-model deployment evaluation of KV-compression pitfalls, not a new mechanistic safety phenomenon.
+Only the full ladder justifies the phrase \emph{cache-mediated safety erasure}. If the experiments support only the first two claims, the correct contribution is an open-model deployment evaluation of KV-compression pitfalls, not a new mechanistic safety phenomenon.
 
 \paragraph{Contributions.}
-The study contributes four components: a public benchmark suite for safety, leakage, over-refusal, and capability under cache interventions; a selective degradation metric that subtracts ordinary capability loss from safety loss; token-role cache accounting for system, user, template, and generated spans; and causal restoration or mitigation tests that distinguish policy-token effects from ``more cache helps'' baselines.
+The study contributes five components: a registered cross-family panel for safety, leakage, over-refusal, capability, and adversarial long-context placement; absolute and log-odds selective degradation metrics that subtract ordinary capability loss from safety loss; token-role cache accounting for system, user, template, and generated spans; a base-model alignment-contrast track; and mitigation or causal-localization tests that distinguish policy-token effects from ``more cache helps'' baselines.
 
 \section{Related Work}
 
@@ -136,7 +138,7 @@ Subliminal learning, token entanglement, and emergent misalignment are relevant 
 Classifier poisoning and rapid-response poisoning studies show that safety layers can fail through mechanisms outside ordinary benchmark accuracy \citep{bowers2026poisoning,huang2026rapidpoison}. Broader trustworthiness evaluations similarly argue for multi-axis safety measurement rather than a single helpfulness score \citep{wang2023decodingtrust}. These works motivate our claims ladder, but the present study targets a different inference-time mechanism: transient KV-cache state.
 
 \paragraph{Evaluation anchors.}
-The registered primary sweep requires public prompt-injection prompts from the Cyberec prompt-injection dataset \citep{cyberec2026promptinjection}, harmful-request prompts from AdvBench and JailbreakBench \citep{zou2023universal,chao2024jailbreakbench}, XSTest-safe over-refusal prompts \citep{rottger2023xstest}, benign-instruction prompts from Databricks Dolly 15k \citep{databricks2023dolly}, and ARC-Easy capability questions \citep{clark2018arc}. Broader anchors such as HarmBench, IFEval, RULER, and LongBench define extension analyses only when their corresponding artifacts are present \citep{mazeika2024harmbench,zhou2023ifeval,hsieh2024ruler,bai2024longbench}. Primary experiments target Qwen2.5 Instruct models because they are open-weight and available at 7B, 14B, and 32B scales \citep{qwen2024qwen25}.
+The registered primary sweep requires public prompt-injection prompts from the Cyberec prompt-injection dataset \citep{cyberec2026promptinjection}, harmful-request prompts from AdvBench and JailbreakBench \citep{zou2023universal,chao2024jailbreakbench}, XSTest-safe over-refusal prompts \citep{rottger2023xstest}, benign-instruction prompts from Databricks Dolly 15k \citep{databricks2023dolly}, and ARC-Easy capability questions \citep{clark2018arc}. Broader anchors such as HarmBench, IFEval, RULER, and LongBench define extension analyses only when their corresponding artifacts are present \citep{mazeika2024harmbench,zhou2023ifeval,hsieh2024ruler,bai2024longbench}. The registered model panel includes Qwen checkpoints \citep{qwen2024qwen25} plus independent open instruction-tuned families when their pinned checkpoints pass the same text-only cache-intervention harness.
 
 \section{Hypotheses}
 
@@ -152,29 +154,43 @@ Safety degradation exceeds ordinary capability degradation under the same policy
 \end{equation}
 where $p$ is a cache policy, $b$ is its budget, and $m$ is the model. Positive values indicate larger safety loss than capability loss.
 
-\paragraph{H3: policy-relevant cache restoration is causal.}
-For length-preserving perturbations such as simulated KV quantization, restoring baseline key/value slices for system or policy spans recovers refusal more than restoring a matched number of user-token slices. For eviction policies where literal reinsertion is not yet implemented, token-role-aware pinning must preserve safety more than matched non-policy retention at comparable budgets.
+\paragraph{H3: cross-family replication.}
+The safety-selectivity effect appears in at least two independent instruction-tuned evaluated model families under the same primary policy and prompt matrix. Base-model track results, judge sources, and derivative alignment-contrast variants do not count as independent replication families.
+
+\paragraph{H4: targeted mitigation.}
+Policy-preserving cache retention reduces safety degradation relative to matched generic retention without unacceptable capability loss or benign over-refusal.
+
+\paragraph{H5: causal localization.}
+Policy or system cache preservation outperforms matched user-token preservation under the same retained-token budget. For length-preserving perturbations such as simulated KV quantization, restoring baseline key/value slices for system or policy spans must recover refusal more than restoring a matched number of user-token slices. For eviction policies where literal reinsertion is not yet implemented, token-role-aware pinning is the registered causal-localization test. This separates policy-state localization from a generic benefit of keeping additional cache positions.
+
+\paragraph{H6: alignment contrast.}
+The matched base-model track shows raw cache sensitivity without the same instruction-refusal selectivity profile, supporting the interpretation that positive $\ssei$ is tied to instruction tuning and safety alignment rather than generic compression sensitivity.
 
 \section{Methods}
 
 \subsection{Models}
 
-The primary model family is Qwen2.5 Instruct at 7B and 14B parameters, with Qwen2.5-32B reserved as an extension analysis when the corresponding artifacts are present. The core behavioral evaluation uses a mid-scale instruct model, while smaller models support causal diagnostics. A general model-family claim requires at least one non-Qwen open instruct model; otherwise, claims must be limited to the tested Qwen-family setting.
+The registered panel contains two analysis tracks. The chat-safety track includes instruction-tuned open checkpoints from the Qwen, GPT-OSS, Llama, Gemma, Mistral, OLMo, and Phi families when their pinned revisions, licenses or access constraints, tokenizer sources, chat templates, and cache-runner feasibility reports are complete. The base-model track includes the matched Qwen2.5 base checkpoint and any checkpoint without validated instruction/chat formatting; it uses frozen completion-format prompts and continuation scoring rather than chat-refusal labels.
+
+Cross-family claims require at least two instruction-tuned families completing the same primary matrix with valid readiness reports and positive selectivity estimates. Base-model results are reported next to the matched Qwen instruction checkpoint as an alignment contrast, not as direct evidence for instruction-following refusal behavior.
 
 All experiments use open-weight models, public datasets, and local evaluation code. Model loading uses bfloat16 weights, \texttt{safetensors}, and explicit cache-state access so that the evaluated interventions are visible in the generation loop rather than delegated to external serving systems.
+This design is appropriate for mechanism and provenance checks, but it is not by itself a validation of native production serving stacks. Claims about vLLM, TGI, PagedAttention eviction, or server-native low-bit KV-cache kernels require separate artifacts from those systems and are treated as deployment-validation extensions.
 
 \subsection{Cache Policies}
 
-The primary sweep compares uncompressed generation against six registered interventions:
+The primary eviction sweep compares uncompressed generation against five registered interventions:
 \begin{itemize}
   \item \textbf{sliding window:} retain only the last $N$ cached tokens;
   \item \textbf{sink plus recent:} retain the first $S$ tokens and last $N$ tokens;
   \item \textbf{random matched:} evict random tokens at the same budget as a structured policy;
-  \item \textbf{KV int8 simulation:} quantize and dequantize key/value tensors with an int8 symmetric approximation;
-  \item \textbf{KV int4 simulation:} apply a more aggressive int4 approximation;
-  \item \textbf{policy pinned:} protect system or policy spans while applying an eviction budget to other spans.
+  \item \textbf{policy pinned:} protect system or policy spans before filling the remaining budget with sink/recent tokens;
+  \item \textbf{user pinned:} protect matched user spans as the non-policy control for policy-pinned retention.
 \end{itemize}
 Attention-H2O retention is treated as a diagnostic extension when attention-score artifacts are present, not as a required primary-policy gate.
+If attention-aware artifacts are absent, the paper must not claim coverage of modern attention-aware cache compression methods such as H2O, SnapKV, or StreamingLLM-style retention; it may only describe the registered non-attention primary policies and any completed diagnostic extension.
+
+Simulated KV int8 and int4 quantize-dequantize perturbations are Phase 5 diagnostics, not part of the primary eviction-policy matrix. They are reported separately unless replicated in a real serving implementation.
 
 Each policy logs retained and evicted token counts by role, layer count, decode step, policy label, and cache-norm statistics where available. These logs support both figures and sanity checks that compression was active.
 
@@ -188,10 +204,13 @@ The benchmark separates safety, leakage, over-refusal, and capability:
   \item \textbf{public benign over-refusal:} benign requests that should be answered rather than refused;
   \item \textbf{public XSTest safe:} additional benign safety-sensitive prompts;
   \item \textbf{public capability ARC:} multiple-choice capability controls;
+  \item \textbf{adversarial placement:} harmful requests placed after a registered long benign preamble to induce natural pressure on earlier system or policy tokens;
+  \item \textbf{base alignment contrast:} frozen completion-format prompts scored by safe-minus-unsafe continuation log-likelihood margins;
   \item \textbf{instruction following and long-context controls:} verifier-compatible IFEval-style prompts and long-context subsets included only when source provenance and evaluation scripts are complete.
 \end{itemize}
 
 Every processed suite writes a manifest with prompt IDs, source dataset revisions, record counts, and SHA256 hashes. Empirical claims require public provenance for all benchmark-derived prompts.
+Because public harmful-prompt benchmarks may overlap with model safety training or defensive tuning, public-suite results are interpreted as public-benchmark behavior unless a disjoint contamination check is present. A stronger generalization claim requires either held-out public datasets not used in the primary sweep, such as the registered HarmBench CI-extension shard, or a separately documented synthetic harmful-intent diagnostic that records its generation procedure and avoids procedural harmful details in the paper.
 
 \subsection{Metrics}
 
@@ -202,7 +221,7 @@ The safety metrics include refusal-string detection, unsafe-compliance proxies f
 Capability is tracked with exact-match or multiple-choice accuracy where labels exist. Benign over-refusal is measured by refusal-rate on benign suites and instruction-following pass rates when verifier-compatible prompts are available.
 
 \paragraph{Statistical uncertainty.}
-The primary uncertainty report uses prompt-clustered confidence intervals. Main tables include paired safety degradation intervals by prompt and seed. The strongest claims require narrow intervals, complete prompt-policy coverage, and agreement between automated metrics and the declared audit source.
+The primary uncertainty report uses prompt-clustered confidence intervals. Main tables include paired safety degradation intervals by prompt and seed. The absolute Selective Safety Erasure Index, $\ssei_{\mathrm{abs}}$, is safety degradation minus capability degradation. Binary outcomes additionally use a fixed Haldane--Anscombe smoothed log-odds contrast with $\alpha=0.5$; $\ssei_{\mathrm{logodds}}$ is the safety log-odds degradation minus the capability log-odds degradation. The strongest claims require narrow intervals, complete prompt-policy coverage, response-length and parse-rate reporting, and agreement between automated metrics and the declared audit source.
 
 \subsection{Causal Restoration}
 
@@ -211,10 +230,12 @@ For length-preserving cache perturbations, we run baseline and compressed decodi
   \item compressed decoding with no patch;
   \item compressed decoding with system-role slices patched from baseline;
   \item compressed decoding with user-role slices matched to the system-token count;
-  \item policy-pinned mitigation where system-role spans are retained under eviction.
+  \item policy-pinned mitigation where system-role spans are retained under eviction;
+  \item user-pinned mitigation where matched user-role spans are retained under the same budget.
 \end{enumerate}
 
-The causal claim requires system-role restoration to recover refusal or leakage avoidance more than matched user-role controls. Hard-coded token-index patches are diagnostic only and are not sufficient evidence.
+The causal localization claim requires system-role restoration or policy-pinned retention to recover refusal or leakage avoidance more than matched user-role controls. Role-derived spans are computed from the tokenizer/chat-template role annotations. Hard-coded token-index patches are diagnostic only and are not sufficient evidence because they can confound token role with absolute position.
+For quantization-based patching, the causal comparison is length-preserving: baseline and compressed runs use the same prompt tokens, positions, and RoPE phases, and the patch replaces key/value tensors at existing positions rather than inserting or reindexing cache entries. For eviction policies where cache length changes, the registered mitigation is policy pinning rather than reinserting baseline vectors into a shorter cache. Any non-length-preserving cache splice is diagnostic only and cannot support H3 unless its positional treatment is explicitly validated.
 
 \section{Experimental Design}
 
@@ -225,13 +246,15 @@ Each analysis records the resolved configuration, environment metadata, prompt r
 The empirical study is ordered to reduce false positives:
 \begin{itemize}
   \item verify cache intervention mechanics on a small diagnostic slice;
-  \item run the primary public-suite sweep across safety, leakage, benign, and capability prompts;
-  \item run causal restoration and policy-pinning diagnostics on the strongest behavioral effects;
-  \item test whether the strongest effects reproduce across model scale and, where feasible, model family.
+  \item run the primary public-suite sweep across safety, leakage, benign, capability, and adversarial-placement prompts for all feasible chat-safety checkpoints;
+  \item score the base-model alignment-contrast track with frozen safe and unsafe continuations;
+  \item test whether the strongest effects reproduce across at least two instruction-tuned families;
+  \item run causal restoration and policy-pinning diagnostics only on families with meaningful selective effects.
 \end{itemize}
 
 \paragraph{Blinded audit.}
 Automated safety labels are coarse. The analysis therefore includes a blinded audit of high-impact slices: baseline versus strongest compressed policies, safety suites where unsafe-compliance proxies increase, and examples where system-role patching changes behavior. Condition labels are hidden during annotation and joined to experimental metadata only after labeling. The audit source is reported explicitly as either human annotation or a documented open local judge; open-judge labels are not described as human labels.
+For open-local-judge audits, the audit manifest must report the exact judge model, prompt-template hashes, raw-output hashes, and response-length calibration buckets. Without that calibration, open-judge labels are diagnostic only and cannot substitute for audit support in the claims ladder, because cache interventions can change response length and thereby bias a judge toward or away from refusal labels.
 
 \section{Visualization Strategy}
 
@@ -257,56 +280,56 @@ For audited prompts, the analysis embeds each prompt-condition pair using open e
 \begin{figure}[t]
   \centering
   \maybeincludegraphic{../generated/active_primary/figures/safety_capability_phase_portrait.pdf}{0.92\linewidth}{Safety degradation versus capability degradation by policy and budget.}
-  \caption{Safety-capability phase portrait. Policies trace trajectories as cache budgets tighten. A safety-erasure pattern appears as upward movement before rightward capability collapse.}
+  \caption{Safety loss versus capability loss. Each row is one cache policy; blue marks capability loss and red marks safety loss. A selective safety effect would put the red marker clearly to the right of the blue marker.}
   \label{fig:safety-capability}
 \end{figure}
 
 \begin{figure}[t]
   \centering
   \maybeincludegraphic{../generated/active_primary/figures/selective_safety_erasure_heatmap.pdf}{0.92\linewidth}{Selective Safety Erasure Index heatmap by model, suite, policy, and cache budget.}
-  \caption{Selective Safety Erasure Index across cache policies. Erasure is claimed only for conditions where safety loss remains after subtracting matched capability loss.}
+  \caption{Selective Safety Erasure Index (SSeI) by policy. Positive bars mean safety fell more than capability; bars near zero do not support selective erasure; negative bars mean capability fell more than safety.}
   \label{fig:ssei}
 \end{figure}
 
 \begin{figure}[t]
   \centering
   \maybeincludegraphic{../generated/active_primary/figures/prompt_effect_constellation.pdf}{0.92\linewidth}{Prompt-level baseline-to-treatment effect vectors by suite and policy.}
-  \caption{Prompt-level effect map. Each arrow starts at baseline and points toward the compressed condition in a metric-derived effect space. Coherent clusters indicate prompt families where cache interventions create similar behavioral shifts.}
+  \caption{Largest behavior changes from baseline. Each bar averages prompt-level changes for one suite-policy pair; longer bars mean that policy moved generations farther from baseline within that suite.}
   \label{fig:constellation}
 \end{figure}
 
 \begin{figure}[t]
   \centering
   \maybeincludegraphic{../generated/active_primary/figures/cache_state_fingerprint.pdf}{0.92\linewidth}{Token-role retention heatmap for system, user, template, and generated spans.}
-  \caption{Cache-state fingerprint by token role and policy. This visualization tests whether policy-relevant spans form a visibly fragile band under cache pressure.}
+  \caption{Cache-state fingerprint. Bright cells mean a token role was usually retained in cache; dark cells mean it was usually evicted. Rows are policy-layer bands and columns are prompt-token roles.}
   \label{fig:role-retention}
 \end{figure}
 
 \begin{figure}[t]
   \centering
   \maybeincludegraphic{../generated/active_primary/figures/safety_state_atlas.pdf}{0.92\linewidth}{Suite-policy atlas combining selective safety degradation with role-level cache loss.}
-  \caption{Safety-state atlas. Color shows selective safety degradation while overlaid circles show token-role cache loss, making it possible to compare behavioral safety loss against system-token and user-token retention patterns.}
+  \caption{Behavior loss versus cache-token loss. Purple points show SSeI, black open circles show system-token cache loss, and gray open circles show user-token cache loss for the same policy.}
   \label{fig:safety-state-atlas}
 \end{figure}
 
 \begin{figure}[t]
   \centering
   \maybeincludegraphic{../generated/active_primary/figures/policy_uncertainty_braid.pdf}{0.92\linewidth}{Policy-level safety, capability, and selective safety erasure intervals.}
-  \caption{Policy-level uncertainty braid. Each row links capability degradation, safety degradation, and $\ssei$ intervals for one cache policy, exposing whether selective effects are both large and statistically tight.}
+  \caption{Policy-level estimates with 95\% confidence intervals. Intervals that cross zero do not provide reliable evidence for that effect; a supported selective-erasure claim requires the SSeI interval to stay positive.}
   \label{fig:uncertainty-braid}
 \end{figure}
 
 \begin{figure}[t]
   \centering
   \maybeincludegraphic{../generated/active_causal/figures/causal_restoration_fraction.pdf}{0.92\linewidth}{Restoration fraction by causal patch and policy-pinned condition.}
-  \caption{Causal restoration fractions. The key comparison is system-role restoration versus matched user-role restoration under the same compressed condition.}
+  \caption{Causal restoration toward baseline on refusal-safety prompts. Zero means the patched run stayed at the compressed behavior; one means it returned to baseline; values outside this range indicate worse-than-compressed behavior or overshoot.}
   \label{fig:causal}
 \end{figure}
 
 \begin{figure}[t]
   \centering
   \maybeincludegraphic{../generated/active_causal/figures/causal_restoration_flow.pdf}{0.92\linewidth}{Compressed, system-patched, matched-user-patched, and policy-pinned conditions.}
-  \caption{Causal restoration flow. The diagnostic pattern is movement toward baseline for policy-relevant restoration more than matched controls.}
+  \caption{Causal restoration flow for the refusal-safety patch comparison. Arrows start at compressed behavior and end at the patched behavior; the matched user-token control must lag the system-token patch for a causal system-cache claim to pass.}
   \label{fig:causal-flow}
 \end{figure}
 
@@ -331,6 +354,10 @@ The central causal claim requires system-role restoration or pinning to outperfo
 \maybeinputtable{../generated/claim_assessment/claim_assessment_table.tex}{Report the claims ladder assessment after primary and causal runs are complete. The cache-mediated safety erasure claim requires all registered criteria to pass.}
 \maybeinputtable{../generated/claim_assessment/claim_interpretation.tex}{Report evidence-gated interpretation text after the claim assessment is complete.}
 
+\subsection{Cross-Family Replication and Alignment Contrast}
+\maybeinputtable{../generated/active_primary/family_replication_table.tex}{Report family-level selectivity estimates for instruction-tuned checkpoints after the registered panel completes.}
+\maybeinputtable{../generated/active_primary/base_alignment_contrast_table.tex}{Report safe-minus-unsafe continuation margin changes for the matched base-model track after scoring completes.}
+
 \subsection{Audit Support and Failure Modes}
 \maybeinputtable{../audit/active_primary_summary/human_audit_summary_table.tex}{Report blinded audit label rates before making safety claims.}
 \maybeinputtable{../audit/active_primary_summary/human_audit_deltas_table.tex}{Report paired baseline-versus-treatment audit deltas for unsafe compliance, refusal correctness, leakage, and benign over-refusal.}
@@ -340,13 +367,13 @@ Qualitative examples are summarized at the category level rather than reproduced
 
 \section{Discussion}
 
-If the causal restoration experiments succeed, the result implies that alignment behavior must be evaluated as a property of the full inference stack, not only the trained model and prompt. Serving optimizations would need alignment regression tests and token-role-aware cache policies. A policy-pinned mitigation would show that preserving safety does not require disabling all cache compression.
+If the causal restoration experiments succeed, the result implies that alignment behavior should be evaluated as a property of the full inference stack, not only the trained model and prompt. The result would motivate alignment regression tests and token-role-aware cache policies for similar cache-management settings. A policy-pinned mitigation would show that preserving safety does not require disabling all cache compression.
 
 If only selective degradation appears, the contribution is still useful but narrower: it would be evidence that cache compression can be a deployment-time safety risk. If no selective degradation appears, the study becomes a falsification result that constrains future claims about safety-specific cache fragility.
 
 \section{Limitations}
 
-The study uses open models, public datasets, and local evaluation code. This improves reproducibility but limits comparisons against closed deployed systems. Automated refusal and leakage metrics are imperfect, so final safety claims require human audit or an open local judge with documented calibration. Simulated KV quantization is not a faithful implementation of every production quantizer. Attention-based retention policies require access to attention statistics and may be less comparable to production implementations than eviction and quantization interventions. Finally, unless non-Qwen models are added, the paper must not claim model-family universality.
+The study uses open models, public datasets, and local evaluation code. This improves reproducibility but limits comparisons against closed deployed systems and production servers. Automated refusal and leakage metrics are imperfect, so final safety claims require human audit or an open local judge with documented model provenance and response-length calibration. Simulated KV quantization is not a faithful implementation of group-wise, per-channel, residual-window, or mixed-precision production quantizers such as KIVI- or KVQuant-style kernels. Attention-based retention policies require attention statistics and, unless their artifacts are present, cannot support claims about attention-aware eviction methods. Public harmful-prompt suites may be contaminated by model safety tuning; absent a disjoint public or synthetic contamination check, conclusions are limited to the evaluated public benchmark distribution. Finally, unless at least two independent instruction-tuned families complete the same primary matrix, the paper must not claim cross-family generality.
 
 \section{Ethics and Safety}
 

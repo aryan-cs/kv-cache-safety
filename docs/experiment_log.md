@@ -15,6 +15,32 @@ Required fields for each entry:
 - main metrics
 - decision: keep, rerun, discard, or extend
 
+## Current Status Snapshot: 2026-05-06
+
+- date: 2026-05-06
+- commit hash: H200 checkout `474d1fb`; local checkout is dirty with paper/documentation and audit-gate edits, so do not cite local artifacts until committed and rebuilt from clean evidence
+- config path: `configs/experiments/h200_causal_patch_qwen7b_ci_extension.yaml`
+- run id: `h200_causal_patch_qwen7b_ci_extension`
+- machine / GPU: UIUC H200 notebook
+- model: `Qwen/Qwen2.5-7B-Instruct`
+- prompt suites: causal diagnostic suites from the registered causal CI-extension config
+- cache policies: causal quantization/patching and policy-pinned mitigation policies from the resolved config
+- main metrics: primary 14B CI extension `h200_qwen14b_ci_extension_primary` has a complete clean generation matrix at `23418 / 23418`; causal CI extension is active at `7765 / 9114` rows as of the latest status check; publication-ready claim assessment still depends on causal completion, audit support, and final readiness gates
+- decision: keep the H200 launcher running; do not start duplicates; after causal completion, aggregate/readiness/claim assessment must decide whether the paper supports H1/H2/H3 or should be framed as a partial/null result
+
+## 2026-05-07 Selectivity Panel Implementation
+
+- date: 2026-05-07
+- commit hash: local dirty tree during implementation; do not cite until pushed and rerun from a clean checkout
+- config path: `configs/models/selectivity_panel.yaml` and generated `configs/experiments/selectivity_h200_{smoke,powered}_*.yaml`
+- run id: not an empirical run; launcher targets `selectivity_h200_{stage}_{model_key}` plus `selectivity_h200_{stage}_combined`
+- machine / GPU: implementation validated locally; H200 execution still requires a clean remote checkout
+- model: registered cross-family panel with Qwen, GPT-OSS, Mistral, OLMo, Phi, and gated Llama/Gemma where access permits; Qwen3 uses the text-generation replacement `Qwen/Qwen3-8B`
+- prompt suites: chat-safety public suites, adversarial placement, base alignment contrast, instruction following, and capability controls
+- cache policies: `none`, `sliding_window`, `sink_recent`, `random_matched`, `policy_pinned`, and `user_pinned`; base track excludes chat-role pinned policies
+- main metrics: no powered evidence yet; code now records family/track metadata, explicit safety error-rate proxies, log-odds SSEI, combined cross-family metrics, source-marked judge channels, and base safe-minus-unsafe continuation margins
+- decision: treat as protocol/software implementation only; run H200 smoke/powered experiments from a clean pushed commit before citing any selectivity result
+
 ## 2026-05-03 Local Plumbing Runs
 
 - date: 2026-05-03

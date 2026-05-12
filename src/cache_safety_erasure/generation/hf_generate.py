@@ -8,7 +8,10 @@ from cache_safety_erasure.cache_policies.cache_utils import (
     cache_l2_norm,
     cache_layer_count,
     cache_seq_len,
+    evicted_from_retained,
     maybe_from_legacy_cache,
+    slice_legacy_cache,
+    to_legacy_cache,
 )
 from cache_safety_erasure.config import GenerationConfig
 from cache_safety_erasure.evals.prompt_record import PromptRecord
@@ -32,6 +35,7 @@ def hf_generate(
     prompt: PromptRecord,
     policy: Any,
     generation_config: GenerationConfig,
+    cache_position_mode: str = "absolute",
     patch_from_baseline: dict[str, Any] | None = None,
 ) -> GenerationResult:
     try:
@@ -50,6 +54,7 @@ def hf_generate(
     token_roles = token_roles_for_prompt(tokenizer, prompt, input_ids)
     cache_decisions: list[CachePolicyDecision] = []
     generated_ids: list[int] = []
+    native_cache_limit = _native_cache_limit(model, cache_position_mode)
 
     with torch.inference_mode():
         baseline_full_prompt_past = None
@@ -89,12 +94,23 @@ def hf_generate(
                     token_roles=token_roles[:-1],
                 )
                 decision.metadata.update(patch_metadata)
+            past = _restore_model_cache_type(past, model)
             cache_decisions.append(decision)
+            past, native_decision = _enforce_native_cache_limit(
+                past,
+                max_cache_len=native_cache_limit,
+                step=0,
+                token_roles=token_roles[:-1],
+            )
+            if native_decision is not None:
+                past = _restore_model_cache_type(past, model)
+                cache_decisions.append(native_decision)
             outputs = _forward_one_token(
                 model=model,
                 token_id=last_prompt_token,
                 past=past,
                 absolute_position=int(input_ids.shape[-1]) - 1,
+                cache_position_mode=cache_position_mode,
                 output_attentions=generation_config.capture_attentions,
             )
             past = outputs.past_key_values
@@ -114,7 +130,17 @@ def hf_generate(
                     token_roles=token_roles,
                 )
                 decision.metadata.update(patch_metadata)
+            past = _restore_model_cache_type(past, model)
             cache_decisions.append(decision)
+            past, native_decision = _enforce_native_cache_limit(
+                past,
+                max_cache_len=native_cache_limit,
+                step=1,
+                token_roles=token_roles,
+            )
+            if native_decision is not None:
+                past = _restore_model_cache_type(past, model)
+                cache_decisions.append(native_decision)
             absolute_position = int(input_ids.shape[-1])
             decode_step_start = 2
         else:
@@ -143,7 +169,17 @@ def hf_generate(
                     token_roles=token_roles,
                 )
                 decision.metadata.update(patch_metadata)
+            past = _restore_model_cache_type(past, model)
             cache_decisions.append(decision)
+            past, native_decision = _enforce_native_cache_limit(
+                past,
+                max_cache_len=native_cache_limit,
+                step=0,
+                token_roles=token_roles,
+            )
+            if native_decision is not None:
+                past = _restore_model_cache_type(past, model)
+                cache_decisions.append(native_decision)
             absolute_position = int(input_ids.shape[-1])
             decode_step_start = 1
         next_token = _sample_next_token(outputs.logits[:, -1, :], generation_config)
@@ -159,6 +195,7 @@ def hf_generate(
                 token_id=next_token.reshape(1, 1),
                 past=past,
                 absolute_position=absolute_position,
+                cache_position_mode=cache_position_mode,
                 output_attentions=generation_config.capture_attentions,
             )
             absolute_position += 1
@@ -180,6 +217,16 @@ def hf_generate(
                     token_roles=token_roles,
                 )
                 decision.metadata.update(patch_metadata)
+            past = _restore_model_cache_type(past, model)
+            past, native_decision = _enforce_native_cache_limit(
+                past,
+                max_cache_len=native_cache_limit,
+                step=step,
+                token_roles=extended_roles,
+            )
+            if native_decision is not None:
+                past = _restore_model_cache_type(past, model)
+                cache_decisions.append(native_decision)
             next_token = _sample_next_token(outputs.logits[:, -1, :], generation_config)
 
             if _has_stop_string(tokenizer, generated_ids, generation_config.stop_strings):
@@ -188,6 +235,75 @@ def hf_generate(
     decoded = tokenizer.decode(generated_ids, skip_special_tokens=True).strip()
     _ = cache_layer_count  # imported for downstream callers and import validation.
     return GenerationResult(text=decoded, cache_decisions=cache_decisions)
+
+
+def _restore_model_cache_type(past: Any, model: Any) -> Any:
+    config = getattr(model, "config", None)
+    if getattr(config, "sliding_window", None) is None:
+        return past
+    try:
+        from transformers.cache_utils import DynamicCache
+    except Exception:
+        return past
+    if not isinstance(past, DynamicCache):
+        return past
+    return DynamicCache(ddp_cache_data=to_legacy_cache(past), config=config)
+
+
+def _native_cache_limit(model: Any, cache_position_mode: str) -> int | None:
+    if cache_position_mode != "compact":
+        return None
+    window = getattr(getattr(model, "config", None), "sliding_window", None)
+    if window is None:
+        return None
+    window = int(window)
+    if window <= 1:
+        return None
+    return window - 1
+
+
+def _enforce_native_cache_limit(
+    past: Any,
+    *,
+    max_cache_len: int | None,
+    step: int,
+    token_roles: list[str] | None,
+) -> tuple[Any, CachePolicyDecision | None]:
+    if max_cache_len is None:
+        return past, None
+    seq_len = cache_seq_len(past)
+    if seq_len <= max_cache_len:
+        return past, None
+    before_norm = cache_l2_norm(past)
+    retained = tuple(range(seq_len - max_cache_len, seq_len))
+    sliced = slice_legacy_cache(past, retained)
+    after_norm = cache_l2_norm(sliced) if retained else 0.0
+    evicted = evicted_from_retained(seq_len, retained)
+    metadata = {
+        "cache_l2_before": before_norm,
+        "cache_l2_after": after_norm,
+        "native_sliding_window": max_cache_len + 1,
+        "native_cache_limit": max_cache_len,
+        "native_cache_enforced": True,
+    }
+    if token_roles:
+        for role in sorted(set(token_roles[:seq_len])):
+            retained_count = sum(
+                1 for idx in retained if idx < len(token_roles) and token_roles[idx] == role
+            )
+            evicted_count = sum(
+                1 for idx in evicted if idx < len(token_roles) and token_roles[idx] == role
+            )
+            metadata[f"retained_{role}_tokens"] = retained_count
+            metadata[f"evicted_{role}_tokens"] = evicted_count
+    return maybe_from_legacy_cache(sliced, past), CachePolicyDecision(
+        "native_sliding_window",
+        step,
+        seq_len,
+        retained,
+        evicted,
+        metadata,
+    )
 
 
 def patch_from_baseline_cache(
@@ -221,6 +337,7 @@ def _forward_one_token(
     token_id: Any,
     past: Any,
     absolute_position: int,
+    cache_position_mode: str,
     output_attentions: bool,
 ) -> Any:
     try:
@@ -239,8 +356,11 @@ def _forward_one_token(
         "return_dict": True,
         "position_ids": torch.tensor([[absolute_position]], dtype=torch.long, device=device),
     }
+    if cache_position_mode not in {"absolute", "compact"}:
+        raise ValueError("cache_position_mode must be `absolute` or `compact`")
+    cache_position = cache_len if cache_position_mode == "compact" else absolute_position
     try:
-        kwargs["cache_position"] = torch.tensor([absolute_position], dtype=torch.long, device=device)
+        kwargs["cache_position"] = torch.tensor([cache_position], dtype=torch.long, device=device)
         return model(**kwargs)
     except TypeError:
         kwargs.pop("cache_position", None)

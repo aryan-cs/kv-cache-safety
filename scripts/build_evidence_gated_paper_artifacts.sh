@@ -5,14 +5,14 @@ cd "$(dirname "$0")/.."
 
 primary_results="${PRIMARY_RESULTS_DIR:-results/h200_qwen_full_sweep}"
 causal_results="${CAUSAL_RESULTS_DIR:-results/h200_causal_patch_qwen7b}"
-primary_generated_dir="${PRIMARY_GENERATED_DIR:-paper/generated/h200_qwen_full_sweep}"
-causal_generated_dir="${CAUSAL_GENERATED_DIR:-paper/generated/h200_causal_patch_qwen7b}"
-claim_generated_dir="${CLAIM_GENERATED_DIR:-paper/generated/claim_assessment}"
-primary_audit_summary="${PRIMARY_AUDIT_SUMMARY_DIR:-paper/audit/h200_qwen_full_sweep_summary}"
-causal_audit_summary="${CAUSAL_AUDIT_SUMMARY_DIR:-paper/audit/h200_causal_patch_qwen7b_summary}"
-publication_status_dir="${PUBLICATION_STATUS_DIR:-paper/build}"
-arxiv_source_dir="${ARXIV_SOURCE_DIR:-paper/build/arxiv_source}"
-arxiv_archive="${ARXIV_ARCHIVE:-paper/build/arxiv_source.tar.gz}"
+primary_generated_dir="${PRIMARY_GENERATED_DIR:-docs/generated/h200_qwen_full_sweep}"
+causal_generated_dir="${CAUSAL_GENERATED_DIR:-docs/generated/h200_causal_patch_qwen7b}"
+claim_generated_dir="${CLAIM_GENERATED_DIR:-docs/generated/claim_assessment}"
+primary_audit_summary="${PRIMARY_AUDIT_SUMMARY_DIR:-docs/audit/h200_qwen_full_sweep_summary}"
+causal_audit_summary="${CAUSAL_AUDIT_SUMMARY_DIR:-docs/audit/h200_causal_patch_qwen7b_summary}"
+publication_status_dir="${PUBLICATION_STATUS_DIR:-docs/build}"
+arxiv_source_dir="${ARXIV_SOURCE_DIR:-docs/build/arxiv_source}"
+arxiv_archive="${ARXIV_ARCHIVE:-docs/build/arxiv_source.tar.gz}"
 branch="${BRANCH:-master}"
 
 if [[ -n "$(git status --short)" ]]; then
@@ -46,10 +46,10 @@ require_file() {
 
 clear_stale_publication_pdfs() {
   rm -f \
-    paper/cache_mediated_safety_erasure.pdf \
-    paper/cache_mediated_safety_erasure.pdf.manifest.json \
-    paper/build/cache_mediated_safety_erasure.pdf \
-    paper/build/cache_mediated_safety_erasure.pdf.manifest.json
+    docs/kv-cache-safety.pdf \
+    docs/kv-cache-safety.pdf.manifest.json \
+    docs/build/kv-cache-safety.pdf \
+    docs/build/kv-cache-safety.pdf.manifest.json
 }
 
 for path in \
@@ -85,7 +85,7 @@ uv run python scripts/sync_active_paper_assets.py \
   --causal-audit-dir "$causal_audit_summary" \
   --strict
 
-uv run python scripts/check_latex_placeholders.py --tex paper/latex/main.tex
+uv run python scripts/check_latex_placeholders.py --tex docs/latex/main.tex
 uv run python scripts/check_paper_asset_freshness.py \
   --pair "$primary_generated_dir=$primary_results" \
   --pair "$causal_generated_dir=$causal_results" \
@@ -133,6 +133,6 @@ uv run python scripts/report_publication_status.py \
   --output-md "$publication_status_dir/publication_status.md"
 
 echo "Evidence-gated paper artifacts rebuilt:"
-echo "- paper/cache_mediated_safety_erasure.pdf"
+echo "- docs/kv-cache-safety.pdf"
 echo "- $arxiv_archive"
 echo "- $publication_status_dir/publication_status.md"

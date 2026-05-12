@@ -3,21 +3,21 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-src_dir="paper/latex"
-build_dir="paper/build"
+src_dir="docs/latex"
+build_dir="docs/build"
 primary_results="${PRIMARY_RESULTS_DIR:-results/h200_qwen_full_sweep}"
 causal_results="${CAUSAL_RESULTS_DIR:-results/h200_causal_patch_qwen7b}"
-primary_paper_dir="${PRIMARY_PAPER_DIR:-paper/generated/h200_qwen_full_sweep}"
-causal_paper_dir="${CAUSAL_PAPER_DIR:-paper/generated/h200_causal_patch_qwen7b}"
-active_primary_dir="paper/generated/active_primary"
-active_causal_dir="paper/generated/active_causal"
-primary_audit_dir="${PRIMARY_AUDIT_SUMMARY_DIR:-paper/audit/h200_qwen_full_sweep_summary}"
-causal_audit_dir="${CAUSAL_AUDIT_SUMMARY_DIR:-paper/audit/h200_causal_patch_qwen7b_summary}"
-active_primary_audit_dir="paper/audit/active_primary_summary"
-active_causal_audit_dir="paper/audit/active_causal_summary"
-claim_assessment="${CLAIM_ASSESSMENT_PATH:-paper/generated/claim_assessment/claim_assessment.json}"
-arxiv_source_dir="${ARXIV_SOURCE_DIR:-paper/build/arxiv_source}"
-arxiv_archive="${ARXIV_ARCHIVE:-paper/build/arxiv_source.tar.gz}"
+primary_paper_dir="${PRIMARY_PAPER_DIR:-docs/generated/h200_qwen_full_sweep}"
+causal_paper_dir="${CAUSAL_PAPER_DIR:-docs/generated/h200_causal_patch_qwen7b}"
+active_primary_dir="docs/generated/active_primary"
+active_causal_dir="docs/generated/active_causal"
+primary_audit_dir="${PRIMARY_AUDIT_SUMMARY_DIR:-docs/audit/h200_qwen_full_sweep_summary}"
+causal_audit_dir="${CAUSAL_AUDIT_SUMMARY_DIR:-docs/audit/h200_causal_patch_qwen7b_summary}"
+active_primary_audit_dir="docs/audit/active_primary_summary"
+active_causal_audit_dir="docs/audit/active_causal_summary"
+claim_assessment="${CLAIM_ASSESSMENT_PATH:-docs/generated/claim_assessment/claim_assessment.json}"
+arxiv_source_dir="${ARXIV_SOURCE_DIR:-docs/build/arxiv_source}"
+arxiv_archive="${ARXIV_ARCHIVE:-docs/build/arxiv_source.tar.gz}"
 branch="${BRANCH:-master}"
 mkdir -p "$build_dir"
 
@@ -45,7 +45,7 @@ fi
 
 final_pdf_sources=(
   "latex_main=$src_dir/main.tex"
-  "bibliography=paper/references.bib"
+  "bibliography=docs/references.bib"
   "primary_results_manifest=$primary_results/manifest.json"
   "primary_results_metrics=$primary_results/metrics.json"
   "primary_figures_manifest=$primary_results/figures/manifest.json"
@@ -167,7 +167,7 @@ uv run python scripts/sync_active_paper_assets.py \
 if [[ "${REQUIRE_COMPLETE_PAPER:-0}" == "1" ]]; then
   uv run python scripts/check_latex_citations.py \
     --tex "$src_dir/main.tex" \
-    --bib paper/references.bib \
+    --bib docs/references.bib \
     --require-all-bib-used
   uv run python scripts/check_latex_placeholders.py --tex "$src_dir/main.tex"
   uv run python scripts/check_paper_asset_freshness.py \
@@ -178,12 +178,12 @@ if [[ "${REQUIRE_COMPLETE_PAPER:-0}" == "1" ]]; then
     --require-current-analysis-commit
   uv run python scripts/report_publication_status.py \
     "${publication_status_args[@]}" \
-    --paper-pdf "$build_dir/cache_mediated_safety_erasure.pdf" \
+    --paper-pdf "$build_dir/kv-cache-safety.pdf" \
     --allow-missing-paper-pdf \
     "${publication_status_fail_args[@]}"
 fi
 
-rm -f "$build_dir/main.pdf" "$build_dir/cache_mediated_safety_erasure.pdf"
+rm -f "$build_dir/main.pdf" "$build_dir/kv-cache-safety.pdf"
 rm -f \
   "$build_dir/main.aux" \
   "$build_dir/main.bbl" \
@@ -221,26 +221,26 @@ else
 fi
 
 require_valid_pdf "$build_dir/main.pdf"
-mv "$build_dir/main.pdf" "$build_dir/cache_mediated_safety_erasure.pdf"
-require_valid_pdf "$build_dir/cache_mediated_safety_erasure.pdf"
-check_final_pdf_text "$build_dir/cache_mediated_safety_erasure.pdf"
+mv "$build_dir/main.pdf" "$build_dir/kv-cache-safety.pdf"
+require_valid_pdf "$build_dir/kv-cache-safety.pdf"
+check_final_pdf_text "$build_dir/kv-cache-safety.pdf"
 write_final_pdf_manifest \
-  "$build_dir/cache_mediated_safety_erasure.pdf" \
-  "$build_dir/cache_mediated_safety_erasure.pdf.manifest.json"
+  "$build_dir/kv-cache-safety.pdf" \
+  "$build_dir/kv-cache-safety.pdf.manifest.json"
 
 if [[ "${REQUIRE_COMPLETE_PAPER:-0}" == "1" ]]; then
   uv run python scripts/report_publication_status.py \
     "${publication_status_args[@]}" \
-    --paper-pdf "$build_dir/cache_mediated_safety_erasure.pdf" \
+    --paper-pdf "$build_dir/kv-cache-safety.pdf" \
     "${publication_status_fail_args[@]}"
 fi
 
-cp "$build_dir/cache_mediated_safety_erasure.pdf" paper/cache_mediated_safety_erasure.pdf
-require_valid_pdf paper/cache_mediated_safety_erasure.pdf
-check_final_pdf_text paper/cache_mediated_safety_erasure.pdf
+cp "$build_dir/kv-cache-safety.pdf" docs/kv-cache-safety.pdf
+require_valid_pdf docs/kv-cache-safety.pdf
+check_final_pdf_text docs/kv-cache-safety.pdf
 write_final_pdf_manifest \
-  "paper/cache_mediated_safety_erasure.pdf" \
-  "paper/cache_mediated_safety_erasure.pdf.manifest.json"
+  "docs/kv-cache-safety.pdf" \
+  "docs/kv-cache-safety.pdf.manifest.json"
 
-echo "Wrote $build_dir/cache_mediated_safety_erasure.pdf"
-echo "Wrote paper/cache_mediated_safety_erasure.pdf"
+echo "Wrote $build_dir/kv-cache-safety.pdf"
+echo "Wrote docs/kv-cache-safety.pdf"

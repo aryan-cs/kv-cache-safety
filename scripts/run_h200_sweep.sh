@@ -66,7 +66,7 @@ uv run python scripts/run_experiment.py \
 latest_smoke="results/$smoke_run_id"
 uv run python scripts/aggregate_results.py --results-dir "$latest_smoke"
 uv run python scripts/make_figures.py --results-dir "$latest_smoke"
-uv run python scripts/export_paper_assets.py --results-dir "$latest_smoke" --paper-dir paper/generated/qwen7b_smoke
+uv run python scripts/export_paper_assets.py --results-dir "$latest_smoke" --paper-dir docs/generated/qwen7b_smoke
 
 echo "Waiting for GPU to clear after Qwen 7B smoke validation..."
 bash scripts/wait_for_h200_gpu.sh
@@ -82,20 +82,21 @@ uv run python scripts/aggregate_results.py --results-dir "$latest_full"
 uv run python scripts/make_figures.py --results-dir "$latest_full"
 uv run python scripts/export_paper_assets.py \
   --results-dir "$latest_full" \
-  --paper-dir paper/generated/h200_qwen_full_sweep \
+  --paper-dir docs/generated/h200_qwen_full_sweep \
   --macro-prefix Primary
 uv run python scripts/plan_ci_power.py \
   --results-dir "$latest_full" \
   --target-ci-width "$target_ci_width" \
   --output-json "$latest_full/ci_power.json" \
-  --output-md paper/generated/h200_qwen_full_sweep/ci_power.md
+  --output-md docs/generated/h200_qwen_full_sweep/ci_power.md
 uv run python scripts/check_publication_readiness.py \
   --results-dir "$latest_full" \
-  --paper-dir paper/generated/h200_qwen_full_sweep \
+  --paper-dir docs/generated/h200_qwen_full_sweep \
   --min-prompts-per-suite 600 \
   --suite-min-prompts system_leakage=2 \
   --suite-min-prompts public_xstest_safe=200 \
   --max-ci-width "$target_ci_width" \
+  --ci-width-exempt-suite system_leakage \
   --allow-wide-ci \
   --required-suite system_leakage \
   --required-suite public_system_leakage \
@@ -137,19 +138,20 @@ uv run python scripts/aggregate_results.py --results-dir "$latest_causal"
 uv run python scripts/make_figures.py --results-dir "$latest_causal"
 uv run python scripts/export_paper_assets.py \
   --results-dir "$latest_causal" \
-  --paper-dir paper/generated/h200_causal_patch_qwen7b \
+  --paper-dir docs/generated/h200_causal_patch_qwen7b \
   --macro-prefix Causal
 uv run python scripts/plan_ci_power.py \
   --results-dir "$latest_causal" \
   --target-ci-width 0.12 \
   --output-json "$latest_causal/ci_power.json" \
-  --output-md paper/generated/h200_causal_patch_qwen7b/ci_power.md
+  --output-md docs/generated/h200_causal_patch_qwen7b/ci_power.md
 uv run python scripts/check_publication_readiness.py \
   --results-dir "$latest_causal" \
-  --paper-dir paper/generated/h200_causal_patch_qwen7b \
+  --paper-dir docs/generated/h200_causal_patch_qwen7b \
   --min-prompts-per-suite 600 \
   --suite-min-prompts system_leakage=2 \
   --max-ci-width 0.12 \
+  --ci-width-exempt-suite system_leakage \
   --allow-wide-ci \
   --required-suite system_leakage \
   --required-suite public_system_leakage \
@@ -164,12 +166,12 @@ uv run python scripts/check_publication_readiness.py \
 uv run python scripts/assess_claims.py \
   --primary-results-dir "$latest_full" \
   --causal-results-dir "$latest_causal" \
-  --output-dir paper/generated/preliminary_claim_assessment
+  --output-dir docs/generated/preliminary_claim_assessment
 uv run python scripts/plan_registered_followups.py \
-  --claim-assessment paper/generated/preliminary_claim_assessment/claim_assessment.json \
+  --claim-assessment docs/generated/preliminary_claim_assessment/claim_assessment.json \
   --primary-ci-power "$latest_full/ci_power.json" \
   --causal-ci-power "$latest_causal/ci_power.json" \
-  --output-dir paper/generated/preliminary_followup_plan
+  --output-dir docs/generated/preliminary_followup_plan
 uv run python scripts/export_human_audit_sample.py \
   --results-dir "$latest_causal" \
   --per-suite-policy "$audit_per_suite_policy" \
@@ -188,14 +190,14 @@ uv run python scripts/run_experiment.py \
 latest_attention="results/$attention_run_id"
 uv run python scripts/aggregate_results.py --results-dir "$latest_attention"
 uv run python scripts/make_figures.py --results-dir "$latest_attention"
-uv run python scripts/export_paper_assets.py --results-dir "$latest_attention" --paper-dir paper/generated/h200_attention_diagnostic_qwen7b
+uv run python scripts/export_paper_assets.py --results-dir "$latest_attention" --paper-dir docs/generated/h200_attention_diagnostic_qwen7b
 
 uv run python scripts/post_h200_next_steps.py \
   --primary-results-dir "$latest_full" \
   --causal-results-dir "$latest_causal" \
-  --primary-generated-dir paper/generated/h200_qwen_full_sweep \
-  --causal-generated-dir paper/generated/h200_causal_patch_qwen7b \
-  --output-json paper/generated/post_h200_next_steps.json \
-  --output-md paper/generated/post_h200_next_steps.md
+  --primary-generated-dir docs/generated/h200_qwen_full_sweep \
+  --causal-generated-dir docs/generated/h200_causal_patch_qwen7b \
+  --output-json docs/generated/post_h200_next_steps.json \
+  --output-md docs/generated/post_h200_next_steps.md
 
 echo "Primary sweep complete: $latest_full"

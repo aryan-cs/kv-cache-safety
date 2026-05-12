@@ -13,6 +13,7 @@ add_src_to_path()
 from cache_safety_erasure.evals.io import write_prompt_suite
 from cache_safety_erasure.evals.prompt_record import PromptRecord
 from cache_safety_erasure.evals.seed_suites import BUILTIN_SUITES, SYSTEM_POLICY, load_builtin_suite
+from cache_safety_erasure.utils.io import read_jsonl
 
 PUBLIC_LEAKAGE_HIDDEN_SYSTEM = (
     "INTERNAL_POLICY_TOKEN: public-system-leakage-cache-safety. "
@@ -160,6 +161,24 @@ def main() -> None:
         default=None,
         help="Override the pinned HF dataset revision for --source hf.",
     )
+    parser.add_argument(
+        "--exclude-results-dir",
+        type=Path,
+        default=None,
+        help=(
+            "Completed result directory whose prompt text should be excluded from this prepared "
+            "suite. Used for disjoint CI-extension shards."
+        ),
+    )
+    parser.add_argument(
+        "--exclude-suite",
+        action="append",
+        default=[],
+        help=(
+            "Reference suite name to exclude from --exclude-results-dir. Defaults to the output "
+            "suite name when omitted."
+        ),
+    )
     args = parser.parse_args()
     if args.offset < 0:
         raise SystemExit("--offset must be non-negative.")
@@ -167,29 +186,59 @@ def main() -> None:
         raise SystemExit("--limit must be non-negative.")
 
     if args.source == "hf":
+        suite_name = str(
+            args.output_suite
+            or (
+                HF_COMPOSITE_PRESETS[args.suite]["suite"]
+                if args.suite in HF_COMPOSITE_PRESETS
+                else OPEN_DATASET_PRESETS[args.suite]["suite"]
+            )
+        )
+        exclude_suites = args.exclude_suite or [suite_name]
+        exclude_prompt_ids, exclude_user_hashes = load_excluded_prompts(
+            args.exclude_results_dir, exclude_suites
+        )
         if args.suite in HF_COMPOSITE_PRESETS:
             records = load_hf_composite(
-                args.suite, args.limit, args.output_suite, args.revision, args.offset
+                args.suite,
+                args.limit,
+                args.output_suite,
+                args.revision,
+                args.offset,
+                exclude_prompt_ids,
+                exclude_user_hashes,
             )
-            suite_name = args.output_suite or str(HF_COMPOSITE_PRESETS[args.suite]["suite"])
             source_args = {
                 "preset": args.suite,
                 "component_presets": HF_COMPOSITE_PRESETS[args.suite]["presets"],
                 "limit": args.limit,
                 "offset": args.offset,
                 "output_suite": args.output_suite,
+                "exclude_results_dir": str(args.exclude_results_dir)
+                if args.exclude_results_dir
+                else None,
+                "exclude_suites": exclude_suites,
             }
         else:
             records = load_hf_preset(
-                args.suite, args.limit, args.output_suite, args.revision, args.offset
+                args.suite,
+                args.limit,
+                args.output_suite,
+                args.revision,
+                args.offset,
+                exclude_prompt_ids,
+                exclude_user_hashes,
             )
-            suite_name = args.output_suite or OPEN_DATASET_PRESETS[args.suite]["suite"]
             source_args = {
                 "preset": args.suite,
                 "limit": args.limit,
                 "offset": args.offset,
                 "output_suite": args.output_suite,
                 "revision": args.revision or OPEN_DATASET_PRESETS[args.suite].get("revision"),
+                "exclude_results_dir": str(args.exclude_results_dir)
+                if args.exclude_results_dir
+                else None,
+                "exclude_suites": exclude_suites,
             }
         path = write_prompt_suite(suite_name, records, args.output_dir)
         manifest_path = write_suite_manifest(
@@ -228,6 +277,8 @@ def load_hf_preset(
     output_suite: str | None,
     revision: str | None = None,
     offset: int = 0,
+    exclude_prompt_ids: set[str] | None = None,
+    exclude_user_hashes: set[str] | None = None,
 ) -> list[PromptRecord]:
     if name not in OPEN_DATASET_PRESETS:
         raise SystemExit(
@@ -250,6 +301,8 @@ def load_hf_preset(
     dataset_metadata = _dataset_metadata(dataset, preset, resolved_revision)
     rows: list[PromptRecord] = []
     usable_seen = 0
+    exclude_prompt_ids = exclude_prompt_ids or set()
+    exclude_user_hashes = exclude_user_hashes or set()
     for idx, item in enumerate(dataset):
         row_metadata = _row_metadata(dataset_metadata, preset, idx, item)
         if preset.get("kind") == "multiple_choice":
@@ -277,6 +330,8 @@ def load_hf_preset(
                 should_refuse=bool(preset["should_refuse"]),
                 metadata=row_metadata,
             )
+        if record.id in exclude_prompt_ids or _normalized_user_hash(record.user) in exclude_user_hashes:
+            continue
         if usable_seen < offset:
             usable_seen += 1
             continue
@@ -295,6 +350,8 @@ def load_hf_composite(
     output_suite: str | None,
     revision: str | None = None,
     offset: int = 0,
+    exclude_prompt_ids: set[str] | None = None,
+    exclude_user_hashes: set[str] | None = None,
 ) -> list[PromptRecord]:
     if revision is not None:
         raise SystemExit("--revision is not supported for composite HF presets.")
@@ -306,7 +363,8 @@ def load_hf_composite(
     composite = HF_COMPOSITE_PRESETS[name]
     suite_name = str(output_suite or composite["suite"])
     records: list[PromptRecord] = []
-    seen_users: set[str] = set()
+    exclude_prompt_ids = exclude_prompt_ids or set()
+    seen_users: set[str] = set(exclude_user_hashes or set())
     target_count = None if limit is None else offset + limit
     for component in composite["presets"]:
         remaining = None if target_count is None else max(0, target_count - len(records))
@@ -318,9 +376,13 @@ def load_hf_composite(
             suite_name,
             OPEN_DATASET_PRESETS[str(component)].get("revision"),
             0,
+            exclude_prompt_ids,
+            exclude_user_hashes,
         )
         for record in component_records:
-            normalized_user = " ".join(record.user.lower().split())
+            if record.id in exclude_prompt_ids:
+                continue
+            normalized_user = _normalized_user_hash(record.user)
             if normalized_user in seen_users:
                 continue
             seen_users.add(normalized_user)
@@ -331,6 +393,53 @@ def load_hf_composite(
     if not records:
         raise RuntimeError(f"No usable prompt rows found for composite preset `{name}`.")
     return records
+
+
+def load_excluded_prompts(
+    exclude_results_dir: Path | None,
+    suites: list[str],
+) -> tuple[set[str], set[str]]:
+    if exclude_results_dir is None:
+        return set(), set()
+    rows = _load_reference_prompt_rows(exclude_results_dir)
+    suite_set = set(suites)
+    prompt_ids: set[str] = set()
+    hashes: set[str] = set()
+    for row in rows:
+        if str(row.get("suite") or "") not in suite_set:
+            continue
+        prompt_id = row.get("prompt_id", row.get("id"))
+        if prompt_id not in {None, ""}:
+            prompt_ids.add(str(prompt_id))
+        user = row.get("user")
+        if isinstance(user, str) and user.strip():
+            hashes.add(_normalized_user_hash(user))
+    return prompt_ids, hashes
+
+
+def _load_reference_prompt_rows(results_dir: Path) -> list[dict[str, Any]]:
+    prompts_path = results_dir / "prompts.jsonl"
+    if prompts_path.exists():
+        return read_jsonl(prompts_path)
+    generations_path = results_dir / "generations.jsonl"
+    if not generations_path.exists():
+        raise FileNotFoundError(
+            f"Cannot exclude reference prompts because neither {prompts_path} nor "
+            f"{generations_path} exists."
+        )
+    rows = read_jsonl(generations_path)
+    unique: dict[tuple[str, str], dict[str, Any]] = {}
+    for row in rows:
+        suite = str(row.get("suite") or "")
+        prompt_id = str(row.get("prompt_id") or "")
+        if suite and prompt_id:
+            unique.setdefault((suite, prompt_id), row)
+    return list(unique.values())
+
+
+def _normalized_user_hash(user: str) -> str:
+    normalized = " ".join(user.lower().split())
+    return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
 
 
 def _first_text(item: dict[str, Any], columns: list[str]) -> str | None:

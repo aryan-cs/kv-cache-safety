@@ -327,6 +327,42 @@ def test_resume_manifest_validation_requires_explicit_commit_mismatch(
     _validate_resume_manifest(run_dir, manifest, {"git_commit": "different"})
 
 
+def test_policy_manifest_uses_json_stable_defaults() -> None:
+    import sys
+
+    sys.path.insert(0, str(Path("scripts").resolve()))
+    from run_experiment import _policy_manifest
+
+    from cache_safety_erasure.config import CachePolicyConfig
+
+    manifest = _policy_manifest(CachePolicyConfig(name="none"))
+
+    assert manifest["protected_spans"] == ["system", "policy"]
+    assert isinstance(manifest["protected_spans"], list)
+
+
+def test_manifest_base_records_model_family_and_track() -> None:
+    import sys
+
+    sys.path.insert(0, str(Path("scripts").resolve()))
+    from run_experiment import RESUME_MANIFEST_STABLE_KEYS, _cache_policy_support_manifest
+
+    assert "model_config" in RESUME_MANIFEST_STABLE_KEYS
+    assert "model_family" not in RESUME_MANIFEST_STABLE_KEYS
+    assert "model_track" not in RESUME_MANIFEST_STABLE_KEYS
+
+    from cache_safety_erasure.config import CachePolicyConfig
+
+    support = _cache_policy_support_manifest(
+        (
+            CachePolicyConfig(name="policy_pinned"),
+            CachePolicyConfig(name="sliding_window", budget=64),
+        )
+    )
+    assert support[0]["requires_role_spans"] is True
+    assert support[1]["requires_role_spans"] is False
+
+
 def _minimal_resume_manifest() -> dict:
     return {
         "run_name": "run",
@@ -489,15 +525,14 @@ def test_export_paper_assets_writes_ci_bearing_tables(tmp_path: Path) -> None:
     suite_tex = (paper_dir / "suite_level_effects_table.tex").read_text(encoding="utf-8")
     causal_tex = (paper_dir / "causal_restoration_table.tex").read_text(encoding="utf-8")
 
-    assert "safety ci low" in suite_tex
-    assert "safety ci high" in suite_tex
+    assert "Safety delta [95\\% CI]" in suite_tex
     assert "0.050" in suite_tex
-    assert "safety ci low" in causal_tex
-    assert "refusal ci low" in causal_tex
-    assert "leakage avoidance ci high" in causal_tex
-    assert "rolesystem" in causal_tex
-    assert "roleuser" in causal_tex
-    assert "policy\\_pinned" in causal_tex
+    assert "Safety [95\\% CI]" in causal_tex
+    assert "Refusal [95\\% CI]" in causal_tex
+    assert "Leakage [95\\% CI]" in causal_tex
+    assert "K+V sys" in causal_tex
+    assert "K+V user" in causal_tex
+    assert "Policy-pinned cache" in causal_tex
     artifact_manifest = json.loads(
         (paper_dir / "artifact_manifest.json").read_text(encoding="utf-8")
     )

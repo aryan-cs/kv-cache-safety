@@ -88,7 +88,7 @@ def test_h200_ci_extension_uses_primary_policy_set_for_mergeable_intervals() -> 
 
 def test_h200_sweep_run_ids_match_paper_figure_paths() -> None:
     script = Path("scripts/run_h200_sweep.sh").read_text(encoding="utf-8")
-    tex = Path("paper/latex/main.tex").read_text(encoding="utf-8")
+    tex = Path("docs/latex/main.tex").read_text(encoding="utf-8")
 
     assert 'full_run_id="${FULL_RUN_ID:-h200_qwen_full_sweep}"' in script
     assert 'causal_run_id="${CAUSAL_RUN_ID:-h200_causal_patch_qwen7b}"' in script
@@ -105,8 +105,8 @@ def test_build_paper_pdf_status_checks_use_explicit_artifact_paths() -> None:
     script = Path("scripts/build_paper_pdf.sh").read_text(encoding="utf-8")
 
     assert 'primary_results="${PRIMARY_RESULTS_DIR:-results/h200_qwen_full_sweep}"' in script
-    assert 'primary_audit_dir="${PRIMARY_AUDIT_SUMMARY_DIR:-paper/audit/h200_qwen_full_sweep_summary}"' in script
-    assert 'claim_assessment="${CLAIM_ASSESSMENT_PATH:-paper/generated/claim_assessment/claim_assessment.json}"' in script
+    assert 'primary_audit_dir="${PRIMARY_AUDIT_SUMMARY_DIR:-docs/audit/h200_qwen_full_sweep_summary}"' in script
+    assert 'claim_assessment="${CLAIM_ASSESSMENT_PATH:-docs/generated/claim_assessment/claim_assessment.json}"' in script
     assert "--primary-results-dir \"$primary_results\"" in script
     assert "--causal-results-dir \"$causal_results\"" in script
     assert "scripts/sync_active_paper_assets.py" in script
@@ -139,10 +139,30 @@ def test_h200_launcher_revalidates_after_gpu_gate() -> None:
     assert 'sync_and_validate "Pre-gate"' in script
     assert 'sync_and_validate "Post-gate"' in script
     assert "scripts/wait_for_h200_gpu.sh" in script
+    assert "scripts/run_h200_selectivity_panel.sh" in script
     assert script.index('sync_and_validate "Post-gate"') > script.index(
         "bash scripts/wait_for_h200_gpu.sh"
     )
     assert "bash -n" in script
+
+
+def test_h200_selectivity_panel_script_runs_registered_model_configs() -> None:
+    script = Path("scripts/run_h200_selectivity_panel.sh").read_text(encoding="utf-8")
+
+    assert "scripts/generate_selectivity_configs.py --stage smoke --overwrite" in script
+    assert "scripts/generate_selectivity_configs.py --stage powered --overwrite" in script
+    assert "public_refusal_combo" in script
+    assert "adversarial_refusal_safety" in script
+    assert "selectivity_h200_${run_stage}_${key}.yaml" in script
+    assert "scripts/score_base_model_track.py" in script
+    assert "scripts/plan_ci_power.py" in script
+    assert "selectivity_panel_phase0_ci_power.json" in script
+    assert "scripts/merge_selectivity_panel_results.py" in script
+    assert "selectivity_h200_${run_stage}_combined" in script
+    assert "COMMIT_RUN_ARTIFACTS" in script
+    assert 'public_prompt_limit="${PUBLIC_PROMPT_LIMIT:-1300}"' in script
+    assert "--min-records 1200" in script
+    assert "--min-prompts-per-suite 1200" in script
 
 
 def test_h200_sweep_gates_gpu_between_model_stages() -> None:
@@ -205,11 +225,14 @@ def test_h200_readiness_uses_paper_grade_prompt_thresholds() -> None:
     for script in [primary, extension, qwen32, publication]:
         assert "--min-prompts-per-suite 600" in script
         assert "--suite-min-prompts system_leakage=2" in script
+        assert "--ci-width-exempt-suite system_leakage" in script
     for script in [primary, qwen32]:
         assert "--suite-min-prompts public_xstest_safe=200" in script
     assert "scripts/check_prompt_disjointness.py" in extension
     assert "scripts/merge_ci_extension_results.py" in extension
     assert "--offset \"$ci_prompt_offset\"" in extension
+    assert "CI_EXTENSION_ALLOW_RESUME_GIT_MISMATCH" in extension
+    assert "ALLOW_RESUME_GIT_MISMATCH=1 uv run python scripts/run_experiment.py" in extension
 
 
 def test_h200_scripts_export_multi_annotator_audit_templates() -> None:
@@ -240,7 +263,7 @@ def test_publication_human_audit_aggregation_has_fail_closed_wrapper() -> None:
     script = Path("scripts/aggregate_publication_human_audits.sh").read_text(encoding="utf-8")
     judge_script = Path("scripts/run_publication_open_judge_audits.sh").read_text(encoding="utf-8")
     readme = Path("README.md").read_text(encoding="utf-8")
-    audit_readme = Path("paper/audit/README.md").read_text(encoding="utf-8")
+    audit_readme = Path("docs/audit/README.md").read_text(encoding="utf-8")
 
     assert "PRIMARY_RUN_ID:-h200_qwen_full_sweep" in script
     assert "CAUSAL_RUN_ID:-h200_causal_patch_qwen7b" in script
@@ -252,8 +275,8 @@ def test_publication_human_audit_aggregation_has_fail_closed_wrapper() -> None:
     assert "scripts/aggregate_human_audit.py" in script
     assert "--require-result-source-match" in script
     assert "--require-baseline-deltas" in script
-    assert 'primary_generated_dir="${PRIMARY_GENERATED_DIR:-paper/generated/$primary_run_id}"' in script
-    assert 'causal_generated_dir="${CAUSAL_GENERATED_DIR:-paper/generated/$causal_run_id}"' in script
+    assert 'primary_generated_dir="${PRIMARY_GENERATED_DIR:-docs/generated/$primary_run_id}"' in script
+    assert 'causal_generated_dir="${CAUSAL_GENERATED_DIR:-docs/generated/$causal_run_id}"' in script
     assert '--primary-results-dir "$primary_results"' in script
     assert '--causal-results-dir "$causal_results"' in script
     assert '--primary-generated-dir "$primary_generated_dir"' in script
@@ -283,8 +306,8 @@ def test_prepare_after_h200_fetch_regenerates_assets_before_audits() -> None:
     assert "Refusing to prepare paper evidence from a dirty git working tree." in script
     assert "require_raw_result_artifacts" in script
     assert "config.resolved.yaml" in script
-    assert 'primary_generated_dir="${PRIMARY_GENERATED_DIR:-paper/generated/$(basename "$primary_results")}"' in script
-    assert 'causal_generated_dir="${CAUSAL_GENERATED_DIR:-paper/generated/$(basename "$causal_results")}"' in script
+    assert 'primary_generated_dir="${PRIMARY_GENERATED_DIR:-docs/generated/$(basename "$primary_results")}"' in script
+    assert 'causal_generated_dir="${CAUSAL_GENERATED_DIR:-docs/generated/$(basename "$causal_results")}"' in script
     assert "metrics.json" not in script.split("require_raw_result_artifacts", maxsplit=1)[1].split("rebuild_primary", maxsplit=1)[0]
     assert 'scripts/aggregate_results.py --results-dir "$primary_results"' in script
     assert 'scripts/make_figures.py --results-dir "$primary_results"' in script
@@ -311,8 +334,8 @@ def test_prepare_after_h200_fetch_regenerates_assets_before_audits() -> None:
 def test_generated_h200_audit_artifacts_are_ignored() -> None:
     gitignore = Path(".gitignore").read_text(encoding="utf-8")
 
-    assert "paper/audit/*_audit_export_manifest.json" in gitignore
-    assert "paper/audit/*_summary/" in gitignore
+    assert "docs/audit/*_audit_export_manifest.json" in gitignore
+    assert "docs/audit/*_summary/" in gitignore
 
 
 def test_publication_artifact_builder_fails_without_real_results() -> None:
@@ -331,7 +354,7 @@ def test_publication_artifact_builder_fails_without_real_results() -> None:
     assert "Missing required result artifact" in script
     assert "require_human_audit_artifacts" in script
     assert "Missing required audit-support artifact" in script
-    assert "paper/cache_mediated_safety_erasure.pdf" in script
+    assert "docs/kv-cache-safety.pdf" in script
     assert "scripts/package_arxiv_submission.py" in script
     assert "scripts/assess_claims.py" in script
     assert "scripts/plan_registered_followups.py" in script
@@ -345,7 +368,7 @@ def test_publication_artifact_builder_fails_without_real_results() -> None:
     assert "bash scripts/build_paper_pdf.sh" in script
     assert "publication_status.md" in script
     assert "clear_stale_publication_pdfs" in script
-    assert "paper/cache_mediated_safety_erasure.pdf.manifest.json" in script
+    assert "docs/kv-cache-safety.pdf.manifest.json" in script
     assert "--require-cache-mediated-claim" in script
     assert "--require-human-audit-support" in script
     assert (
@@ -413,9 +436,9 @@ def test_complete_paper_build_checks_publication_status_before_latex() -> None:
     assert script.count("scripts/report_publication_status.py") == 2
     assert "--allow-missing-paper-pdf" in script
     assert "--fail-if-not-ready" in script
-    copy_cmd = 'cp "$build_dir/cache_mediated_safety_erasure.pdf" paper/cache_mediated_safety_erasure.pdf'
+    copy_cmd = 'cp "$build_dir/kv-cache-safety.pdf" docs/kv-cache-safety.pdf'
     assert copy_cmd in script
-    assert 'rm -f "$build_dir/main.pdf" "$build_dir/cache_mediated_safety_erasure.pdf"' in script
+    assert 'rm -f "$build_dir/main.pdf" "$build_dir/kv-cache-safety.pdf"' in script
     assert '"$build_dir/main.aux"' in script
     assert '"$build_dir/main.bbl"' in script
     assert '"$build_dir/main.fdb_latexmk"' in script
@@ -423,15 +446,15 @@ def test_complete_paper_build_checks_publication_status_before_latex() -> None:
         "scripts/check_latex_placeholders.py"
     )
     assert script.index("scripts/check_latex_placeholders.py") < script.index(
-        'rm -f "$build_dir/main.pdf" "$build_dir/cache_mediated_safety_erasure.pdf"'
+        'rm -f "$build_dir/main.pdf" "$build_dir/kv-cache-safety.pdf"'
     )
     assert script.index(
-        'rm -f "$build_dir/main.pdf" "$build_dir/cache_mediated_safety_erasure.pdf"'
+        'rm -f "$build_dir/main.pdf" "$build_dir/kv-cache-safety.pdf"'
     ) < script.index("command -v tectonic")
     assert "require_valid_pdf \"$build_dir/main.pdf\"" in script
-    assert "require_valid_pdf \"$build_dir/cache_mediated_safety_erasure.pdf\"" in script
+    assert "require_valid_pdf \"$build_dir/kv-cache-safety.pdf\"" in script
     assert script.rindex("scripts/report_publication_status.py") < script.index(copy_cmd)
-    assert "require_valid_pdf paper/cache_mediated_safety_erasure.pdf" in script
+    assert "require_valid_pdf docs/kv-cache-safety.pdf" in script
     assert "cd \"$src_dir\"\n    latexmk" in script
 
 
@@ -442,7 +465,7 @@ def test_evidence_gated_paper_builder_allows_nonpassing_claim_pdf() -> None:
     assert "ALLOW_NONPASSING_CLAIM_PAPER=1" in script
     assert "REQUIRE_COMPLETE_PAPER=1" in script
     assert "clear_stale_publication_pdfs" in script
-    assert "paper/cache_mediated_safety_erasure.pdf.manifest.json" in script
+    assert "docs/kv-cache-safety.pdf.manifest.json" in script
     assert "scripts/package_arxiv_submission.py" in script
     assert "--strict" in script
     assert "--require-arxiv-bundle" in script

@@ -1,0 +1,56 @@
+run:
+  name: selectivity_h200_powered_llama3_1_8b_instruct
+  output_dir: results
+  resume: true
+model:
+  provider: hf
+  model_id: meta-llama/Llama-3.1-8B-Instruct
+  revision: 0e9e39f249a16976918f6564b8830bc894c89659
+  dtype: bfloat16
+  device_map: auto
+  trust_remote_code: false
+  low_cpu_mem_usage: true
+  chat_template_required: true
+  family: Llama
+  track: chat_safety
+  role: primary_instruction
+  access: gated
+  license: llama3.1
+generation:
+  max_new_tokens: 128
+  temperature: 0.0
+  top_p: 1.0
+  do_sample: false
+  capture_attentions: false
+prompt_suites:
+- system_leakage
+- public_system_leakage
+- public_refusal_safety
+- adversarial_refusal_safety
+- public_benign_overrefusal
+- public_xstest_safe
+- public_capability_arc
+cache_policies:
+- name: none
+- name: sliding_window
+  budget: 128
+- name: sink_recent
+  budget: 128
+  sink_tokens: 8
+- name: random_matched
+  budget: 128
+  seed: 991
+- name: policy_pinned
+  budget: 128
+  sink_tokens: 8
+  protected_spans:
+  - system
+  - policy
+- name: user_pinned
+  budget: 128
+  sink_tokens: 8
+  protected_spans:
+  - user
+seeds:
+- 0
+limit_per_suite: null

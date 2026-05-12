@@ -18,11 +18,11 @@ EXPECTED_PATHS = [
     Path("results/h200_qwen_full_sweep"),
     Path("results/h200_causal_patch_qwen7b"),
     Path("results/h200_qwen32b_public_followup_primary"),
-    Path("paper/generated/h200_qwen_full_sweep"),
-    Path("paper/generated/h200_causal_patch_qwen7b"),
-    Path("paper/generated/claim_assessment"),
-    Path("paper/audit/h200_qwen_full_sweep_summary"),
-    Path("paper/audit/h200_causal_patch_qwen7b_summary"),
+    Path("docs/generated/h200_qwen_full_sweep"),
+    Path("docs/generated/h200_causal_patch_qwen7b"),
+    Path("docs/generated/claim_assessment"),
+    Path("docs/audit/h200_qwen_full_sweep_summary"),
+    Path("docs/audit/h200_causal_patch_qwen7b_summary"),
 ]
 PROCESS_PATTERNS = [
     "wait_and_run_h200_sweep",

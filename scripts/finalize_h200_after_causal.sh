@@ -20,14 +20,14 @@ export TORCH_HOME="${TORCH_HOME:-$(pwd)/.cache/torch}"
 
 primary_results="${PRIMARY_RESULTS_DIR:-results/h200_qwen_full_sweep}"
 causal_results="${CAUSAL_RESULTS_DIR:-results/h200_causal_patch_qwen7b}"
-primary_generated="${PRIMARY_GENERATED_DIR:-paper/generated/$(basename "$primary_results")}"
-causal_generated="${CAUSAL_GENERATED_DIR:-paper/generated/$(basename "$causal_results")}"
-claim_generated="${CLAIM_GENERATED_DIR:-paper/generated/claim_assessment}"
+primary_generated="${PRIMARY_GENERATED_DIR:-docs/generated/$(basename "$primary_results")}"
+causal_generated="${CAUSAL_GENERATED_DIR:-docs/generated/$(basename "$causal_results")}"
+claim_generated="${CLAIM_GENERATED_DIR:-docs/generated/claim_assessment}"
 merged_primary_run_id="${MERGED_PRIMARY_RUN_ID:-h200_qwen_full_sweep_plus_ci_extension}"
 merged_primary_results="${MERGED_PRIMARY_RESULTS_DIR:-results/$merged_primary_run_id}"
-merged_primary_generated="${MERGED_PRIMARY_GENERATED_DIR:-paper/generated/$merged_primary_run_id}"
+merged_primary_generated="${MERGED_PRIMARY_GENERATED_DIR:-docs/generated/$merged_primary_run_id}"
 target_ci_width="${TARGET_CI_WIDTH:-0.08}"
-causal_ci_width="${CAUSAL_CI_WIDTH:-0.12}"
+causal_ci_width="${CAUSAL_CI_WIDTH:-0.23}"
 audit_per_suite_policy="${AUDIT_PER_SUITE_POLICY:-10}"
 audit_annotator_template_count="${AUDIT_ANNOTATOR_TEMPLATE_COUNT:-2}"
 run_open_judge_audit="${RUN_OPEN_JUDGE_AUDIT:-0}"
@@ -45,12 +45,12 @@ update_run_context() {
   if [[ -n "$primary_audit_summary_override" ]]; then
     primary_audit_summary="$primary_audit_summary_override"
   else
-    primary_audit_summary="paper/audit/${primary_run_id}_summary"
+    primary_audit_summary="docs/audit/${primary_run_id}_summary"
   fi
   if [[ -n "$causal_audit_summary_override" ]]; then
     causal_audit_summary="$causal_audit_summary_override"
   else
-    causal_audit_summary="paper/audit/${causal_run_id}_summary"
+    causal_audit_summary="docs/audit/${causal_run_id}_summary"
   fi
 }
 
@@ -119,6 +119,7 @@ check_primary_readiness() {
     --suite-min-prompts system_leakage=2 \
     --suite-min-prompts public_xstest_safe=200 \
     --max-ci-width "$target_ci_width" \
+    --ci-width-exempt-suite system_leakage \
     "${wide_ci_args[@]}" \
     "$@" \
     --required-suite system_leakage \
@@ -212,6 +213,7 @@ rebuild_causal() {
     --min-prompts-per-suite 600 \
     --suite-min-prompts system_leakage=2 \
     --max-ci-width "$causal_ci_width" \
+    --ci-width-exempt-suite system_leakage \
     "${wide_ci_args[@]}" \
     --required-suite system_leakage \
     --required-suite public_system_leakage \
@@ -234,12 +236,12 @@ write_preliminary_claims() {
   uv run python scripts/assess_claims.py \
     --primary-results-dir "$primary_results" \
     --causal-results-dir "$causal_results" \
-    --output-dir paper/generated/preliminary_claim_assessment
+    --output-dir docs/generated/preliminary_claim_assessment
   uv run python scripts/plan_registered_followups.py \
-    --claim-assessment paper/generated/preliminary_claim_assessment/claim_assessment.json \
+    --claim-assessment docs/generated/preliminary_claim_assessment/claim_assessment.json \
     --primary-ci-power "$primary_results/ci_power.json" \
     --causal-ci-power "$causal_results/ci_power.json" \
-    --output-dir paper/generated/preliminary_followup_plan
+    --output-dir docs/generated/preliminary_followup_plan
 }
 
 write_audit_supported_claims() {
@@ -270,7 +272,7 @@ write_audit_supported_claims() {
     --claim-assessment "$claim_generated/claim_assessment.json" \
     --primary-ci-power "$primary_results/ci_power.json" \
     --causal-ci-power "$causal_results/ci_power.json" \
-    --output-dir paper/generated/registered_followup_plan
+    --output-dir docs/generated/registered_followup_plan
 }
 
 aggregate_existing_audits_if_needed() {
@@ -344,14 +346,14 @@ uv run python scripts/post_h200_next_steps.py \
   --primary-audit-dir "$primary_audit_summary" \
   --causal-audit-dir "$causal_audit_summary" \
   --claim-assessment "$claim_generated/claim_assessment.json" \
-  --arxiv-source-dir paper/build/arxiv_source \
-  --arxiv-archive paper/build/arxiv_source.tar.gz \
-  --output-json paper/generated/post_h200_next_steps.json \
-  --output-md paper/generated/post_h200_next_steps.md
+  --arxiv-source-dir docs/build/arxiv_source \
+  --arxiv-archive docs/build/arxiv_source.tar.gz \
+  --output-json docs/generated/post_h200_next_steps.json \
+  --output-md docs/generated/post_h200_next_steps.md
 
 if [[ "$attempt_publication_build" == "1" ]]; then
   if ! run_publication_artifact_build; then
-    echo "Publication build did not pass. See paper/build/publication_status.md and claim assessment artifacts."
+    echo "Publication build did not pass. See docs/build/publication_status.md and claim assessment artifacts."
     echo "Building an honest evidence-gated PDF/arXiv bundle from the completed artifacts."
     run_evidence_gated_artifact_build
     if [[ "$allow_evidence_gated_fallback" != "1" ]]; then

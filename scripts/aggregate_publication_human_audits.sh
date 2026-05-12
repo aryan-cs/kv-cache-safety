@@ -7,14 +7,14 @@ primary_run_id="${PRIMARY_RUN_ID:-h200_qwen_full_sweep}"
 causal_run_id="${CAUSAL_RUN_ID:-h200_causal_patch_qwen7b}"
 primary_results="${PRIMARY_RESULTS_DIR:-results/$primary_run_id}"
 causal_results="${CAUSAL_RESULTS_DIR:-results/$causal_run_id}"
-primary_generated_dir="${PRIMARY_GENERATED_DIR:-paper/generated/$primary_run_id}"
-causal_generated_dir="${CAUSAL_GENERATED_DIR:-paper/generated/$causal_run_id}"
-audit_input_dir="${AUDIT_INPUT_DIR:-paper/audit}"
-primary_output_dir="${PRIMARY_AUDIT_SUMMARY_DIR:-paper/audit/${primary_run_id}_summary}"
-causal_output_dir="${CAUSAL_AUDIT_SUMMARY_DIR:-paper/audit/${causal_run_id}_summary}"
+primary_generated_dir="${PRIMARY_GENERATED_DIR:-docs/generated/$primary_run_id}"
+causal_generated_dir="${CAUSAL_GENERATED_DIR:-docs/generated/$causal_run_id}"
+audit_input_dir="${AUDIT_INPUT_DIR:-docs/audit}"
+primary_output_dir="${PRIMARY_AUDIT_SUMMARY_DIR:-docs/audit/${primary_run_id}_summary}"
+causal_output_dir="${CAUSAL_AUDIT_SUMMARY_DIR:-docs/audit/${causal_run_id}_summary}"
 audit_source="${AUDIT_SOURCE:-auto}"
-arxiv_source_dir="${ARXIV_SOURCE_DIR:-paper/build/arxiv_source}"
-arxiv_archive="${ARXIV_ARCHIVE:-paper/build/arxiv_source.tar.gz}"
+arxiv_source_dir="${ARXIV_SOURCE_DIR:-docs/build/arxiv_source}"
+arxiv_archive="${ARXIV_ARCHIVE:-docs/build/arxiv_source.tar.gz}"
 
 require_file() {
   local path="$1"
@@ -108,8 +108,8 @@ uv run python scripts/post_h200_next_steps.py \
   --causal-audit-dir "$causal_output_dir" \
   --arxiv-source-dir "$arxiv_source_dir" \
   --arxiv-archive "$arxiv_archive" \
-  --output-json paper/generated/post_h200_next_steps.json \
-  --output-md paper/generated/post_h200_next_steps.md
+  --output-json docs/generated/post_h200_next_steps.json \
+  --output-md docs/generated/post_h200_next_steps.md
 
 echo "Publication audit support aggregated:"
 echo "- $primary_output_dir"

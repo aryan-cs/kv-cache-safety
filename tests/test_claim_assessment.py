@@ -225,6 +225,88 @@ def test_claim_assessment_rejects_wide_primary_intervals() -> None:
     assert assessment["publication_gate"]["passed"] is False
 
 
+def test_claim_assessment_rejects_logodds_ssei_below_registered_threshold() -> None:
+    primary = _primary_positive_metrics()
+    primary["policy_level_contrasts"]["kv_int4_sim"]["selective_safety_erasure_logodds"] = 0.20
+    primary["policy_level_contrasts"]["kv_int4_sim"][
+        "selective_safety_erasure_logodds_ci"
+    ] = {"mean": 0.20, "ci_low": 0.10, "ci_high": 0.16}
+
+    assessment = assess_claims(primary, _causal_positive_metrics())
+
+    assert assessment["claims"]["H2_selective_safety_degradation"]["passed"] is False
+    assert "Log-odds SSEI" in assessment["claims"]["H2_selective_safety_degradation"]["summary"]
+    assert assessment["publication_gate"]["passed"] is False
+
+
+def test_claim_assessment_requires_two_replicating_instruction_tuned_families_when_available() -> None:
+    primary = _primary_positive_metrics()
+    primary["model_family_replication"] = {
+        "metadata_available": True,
+        "instruction_tuned_family_count": 1,
+        "family_policy_level_contrasts": {
+            "Qwen": {
+                "kv_int4_sim": {
+                    "selective_safety_erasure_index": 0.08,
+                    "selective_safety_erasure_index_ci": {
+                        "mean": 0.08,
+                        "ci_low": 0.05,
+                        "ci_high": 0.09,
+                    },
+                    "selective_safety_erasure_logodds": 0.32,
+                    "selective_safety_erasure_logodds_ci": {
+                        "mean": 0.32,
+                        "ci_low": 0.24,
+                        "ci_high": 0.30,
+                    },
+                }
+            }
+        },
+    }
+
+    assessment = assess_claims(primary, _causal_positive_metrics())
+
+    assert assessment["claims"]["H3_cross_family_replication"]["passed"] is False
+    assert assessment["publication_gate"]["passed"] is False
+    assert "need at least 2" in assessment["claims"]["H3_cross_family_replication"]["summary"]
+
+
+def test_claim_assessment_accepts_two_replicating_instruction_tuned_families() -> None:
+    primary = _primary_positive_metrics()
+    primary["model_family_replication"] = {
+        "metadata_available": True,
+        "instruction_tuned_family_count": 2,
+        "family_policy_level_contrasts": {
+            family: {
+                "kv_int4_sim": {
+                    "selective_safety_erasure_index": 0.08,
+                    "selective_safety_erasure_index_ci": {
+                        "mean": 0.08,
+                        "ci_low": 0.05,
+                        "ci_high": 0.09,
+                    },
+                    "selective_safety_erasure_logodds": 0.32,
+                    "selective_safety_erasure_logodds_ci": {
+                        "mean": 0.32,
+                        "ci_low": 0.24,
+                        "ci_high": 0.30,
+                    },
+                }
+            }
+            for family in ["Gemma", "Qwen"]
+        },
+    }
+
+    assessment = assess_claims(primary, _causal_positive_metrics())
+
+    assert assessment["claims"]["H3_cross_family_replication"]["passed"] is True
+    assert assessment["claims"]["H3_cross_family_replication"]["replicating_families"] == [
+        "Gemma",
+        "Qwen",
+    ]
+    assert assessment["publication_gate"]["passed"] is True
+
+
 def test_claim_assessment_rejects_wide_causal_intervals() -> None:
     causal = _causal_positive_metrics()
     causal["causal_restoration"][
@@ -478,7 +560,7 @@ def _primary_positive_metrics() -> dict:
                 "selective_safety_erasure_index": 0.08,
                 "selective_safety_erasure_index_ci": {
                     "mean": 0.08,
-                    "ci_low": 0.03,
+                    "ci_low": 0.05,
                     "ci_high": 0.09,
                     "n_safety": 100,
                     "n_capability": 100,

@@ -192,6 +192,22 @@ def _open_judge_provenance_failures(metrics: dict[str, Any]) -> list[str]:
             "open local judge audit lacks raw-output hashes for all annotation rows: "
             f"{raw_hash_count}/{annotation_row_count}"
         )
+    calibration = metrics.get("response_length_calibration")
+    if not isinstance(calibration, dict) or not calibration.get("available"):
+        reason = calibration.get("reason") if isinstance(calibration, dict) else "missing"
+        failures.append(f"open local judge audit lacks response-length calibration: {reason}")
+    else:
+        calibration_n = int(calibration.get("n") or 0)
+        bucket_count = int(calibration.get("bucket_count") or 0)
+        if annotation_row_count and calibration_n < annotation_row_count:
+            failures.append(
+                "open local judge response-length calibration does not cover all annotation rows: "
+                f"{calibration_n}/{annotation_row_count}"
+            )
+        if bucket_count < 2:
+            failures.append(
+                "open local judge response-length calibration needs at least two length buckets"
+            )
     return failures
 
 

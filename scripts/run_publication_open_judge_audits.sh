@@ -5,7 +5,7 @@ cd "$(dirname "$0")/.."
 
 primary_run_id="${PRIMARY_RUN_ID:-h200_qwen_full_sweep}"
 causal_run_id="${CAUSAL_RUN_ID:-h200_causal_patch_qwen7b}"
-audit_input_dir="${AUDIT_INPUT_DIR:-paper/audit}"
+audit_input_dir="${AUDIT_INPUT_DIR:-docs/audit}"
 judge_model_id="${OPEN_JUDGE_MODEL_ID:-Qwen/Qwen2.5-7B-Instruct}"
 judge_dtype="${OPEN_JUDGE_DTYPE:-bfloat16}"
 judge_device_map="${OPEN_JUDGE_DEVICE_MAP:-auto}"

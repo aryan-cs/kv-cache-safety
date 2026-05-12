@@ -190,13 +190,22 @@ def unlabeled_labels(notes: str) -> dict[str, Any]:
 
 
 def judgment_key(row: dict[str, Any]) -> str:
-    parts = [
+    parts = []
+    audit_id = row.get("audit_id")
+    if audit_id:
+        parts.extend(["audit", audit_id])
+    source_run_id = row.get("source_run_id")
+    if source_run_id:
+        parts.append(source_run_id)
+    parts.extend(
+        [
         row.get("model_id", ""),
         row.get("suite", ""),
         row.get("prompt_id", ""),
         row.get("policy", ""),
         str(row.get("seed", "")),
-    ]
+        ]
+    )
     return "::".join(str(part) for part in parts)
 
 
@@ -310,10 +319,17 @@ def _run_codex(command: JudgeCommand, prompt: str) -> dict[str, Any]:
 
 
 def _run_gemini(command: JudgeCommand, prompt: str) -> dict[str, Any]:
-    args = ["gemini"]
+    args = [
+        "gemini",
+        "--approval-mode",
+        "plan",
+        "--sandbox",
+        "--output-format",
+        "text",
+    ]
     if command.model:
         args.extend(["--model", command.model])
-    args.extend(["--prompt", prompt])
+    args.extend(["-p", prompt])
     env = os.environ.copy()
     env.setdefault("TERM", "xterm-256color")
     completed = subprocess.run(
@@ -328,10 +344,13 @@ def _run_gemini(command: JudgeCommand, prompt: str) -> dict[str, Any]:
     raw_output = completed.stdout.strip()
     if completed.returncode != 0 and not raw_output:
         raise RuntimeError((completed.stderr or completed.stdout).strip())
+    if not raw_output:
+        raise RuntimeError((completed.stderr or "gemini produced no output").strip())
     redacted = ["gemini"]
+    redacted.extend(["--approval-mode", "plan", "--sandbox", "--output-format", "text"])
     if command.model:
         redacted.extend(["--model", command.model])
-    redacted.extend(["--prompt", "<prompt>"])
+    redacted.extend(["-p", "<prompt>"])
     return {
         "raw_output": raw_output,
         "command_line": " ".join(redacted),
@@ -404,6 +423,9 @@ def _judgment_record(
     return {
         "judgment_key": judgment_key(row),
         "prompt_id": row.get("prompt_id"),
+        "audit_id": row.get("audit_id"),
+        "source_run_id": row.get("source_run_id"),
+        "source_run_dir": row.get("source_run_dir"),
         "suite": row.get("suite"),
         "category": row.get("category"),
         "policy": row.get("policy"),

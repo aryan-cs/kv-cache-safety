@@ -24,9 +24,9 @@ After annotation, aggregate the completed sheet:
 
 ```bash
 uv run python scripts/aggregate_human_audit.py \
-  --audit-csv paper/audit/<run_id>_audit_blinded.csv \
-  --key-jsonl paper/audit/<run_id>_audit_key.jsonl \
-  --output-dir paper/audit/<run_id>_summary
+  --audit-csv docs/audit/<run_id>_audit_blinded.csv \
+  --key-jsonl docs/audit/<run_id>_audit_key.jsonl \
+  --output-dir docs/audit/<run_id>_summary
 ```
 
 For the publication build, the expected summary directories are:
@@ -51,18 +51,18 @@ For one-off debugging, the equivalent per-run commands are:
 
 ```bash
 uv run python scripts/aggregate_human_audit.py \
-  --audit-csv paper/audit/h200_qwen_full_sweep_audit_blinded_annotator_*.csv \
-  --key-jsonl paper/audit/h200_qwen_full_sweep_audit_key.jsonl \
+  --audit-csv docs/audit/h200_qwen_full_sweep_audit_blinded_annotator_*.csv \
+  --key-jsonl docs/audit/h200_qwen_full_sweep_audit_key.jsonl \
   --results-dir results/h200_qwen_full_sweep \
-  --export-manifest paper/audit/h200_qwen_full_sweep_audit_export_manifest.json \
-  --output-dir paper/audit/h200_qwen_full_sweep_summary
+  --export-manifest docs/audit/h200_qwen_full_sweep_audit_export_manifest.json \
+  --output-dir docs/audit/h200_qwen_full_sweep_summary
 
 uv run python scripts/aggregate_human_audit.py \
-  --audit-csv paper/audit/h200_causal_patch_qwen7b_audit_blinded_annotator_*.csv \
-  --key-jsonl paper/audit/h200_causal_patch_qwen7b_audit_key.jsonl \
+  --audit-csv docs/audit/h200_causal_patch_qwen7b_audit_blinded_annotator_*.csv \
+  --key-jsonl docs/audit/h200_causal_patch_qwen7b_audit_key.jsonl \
   --results-dir results/h200_causal_patch_qwen7b \
-  --export-manifest paper/audit/h200_causal_patch_qwen7b_audit_export_manifest.json \
-  --output-dir paper/audit/h200_causal_patch_qwen7b_summary
+  --export-manifest docs/audit/h200_causal_patch_qwen7b_audit_export_manifest.json \
+  --output-dir docs/audit/h200_causal_patch_qwen7b_summary
 ```
 
 The completed CSV may include an optional `annotator_id` column. Multiple rows with the same `audit_id` are treated as multiple annotations only when they come from distinct annotator IDs. Duplicate `(audit_id, annotator_id)` rows are deduplicated, reported in the summary, and block publication readiness.
@@ -84,8 +84,8 @@ Before using the audit in the paper, run:
 
 ```bash
 uv run python scripts/check_human_audit_readiness.py \
-  --summary-json paper/audit/<run_id>_summary/human_audit_summary.json \
-  --audit-manifest paper/audit/<run_id>_summary/audit_manifest.json \
+  --summary-json docs/audit/<run_id>_summary/human_audit_summary.json \
+  --audit-manifest docs/audit/<run_id>_summary/audit_manifest.json \
   --results-dir results/<run_id> \
   --require-baseline-deltas \
   --require-result-source-match

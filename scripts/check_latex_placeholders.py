@@ -24,21 +24,16 @@ PLACEHOLDER_TEXT_MARKERS = [
 ]
 REQUIRED_TEX_MARKERS_BY_NAME = {
     "main_results_table.tex": [
-        "policy level ssei",
-        "policy level ssei ci low",
-        "policy level ssei ci high",
+        "policy ssei [95% ci]",
     ],
     "suite_level_effects_table.tex": [
-        "paired n",
-        "cluster n",
-        "safety ci low",
-        "safety ci high",
+        "safety delta [95% ci]",
+        "paired / clusters",
     ],
     "causal_restoration_table.tex": [
-        "safety ci low",
-        "safety ci high",
-        "refusal ci low",
-        "refusal ci high",
+        "safety [95% ci]",
+        "refusal [95% ci]",
+        "leakage [95% ci]",
     ],
 }
 REQUIRED_RESULT_MACROS = [
@@ -64,9 +59,9 @@ REQUIRED_RESULT_MACROS = [
     ),
 ]
 REQUIRED_CAUSAL_ROW_MARKERS = [
-    "rolesystem",
-    "roleuser",
-    "policy_pinned",
+    "k+v sys",
+    "k+v user",
+    "policy-pinned",
 ]
 
 
@@ -77,7 +72,7 @@ def main() -> None:
             "or required generated text."
         )
     )
-    parser.add_argument("--tex", type=Path, default=Path("paper/latex/main.tex"))
+    parser.add_argument("--tex", type=Path, default=Path("docs/latex/main.tex"))
     args = parser.parse_args()
 
     failures = placeholder_artifact_failures(args.tex)
@@ -195,7 +190,7 @@ def _strip_tex_comment_line(line: str) -> str:
 
 def _semantic_tex_failures(raw_path: str, name: str, text: str) -> list[str]:
     failures: list[str] = []
-    normalized = text.lower().replace(r"\_", "_")
+    normalized = text.lower().replace(r"\_", "_").replace(r"\%", "%")
     for marker in REQUIRED_TEX_MARKERS_BY_NAME.get(name, []):
         if marker not in normalized:
             failures.append(f"missing required table marker in artifact: {raw_path}::{marker}")
