@@ -4,10 +4,11 @@ from pathlib import Path
 sys.path.insert(0, str(Path("scripts").resolve()))
 
 from approve_judge_egress import approve_rows
-from judge_with_codex_gemini import _done_key, _judging_tasks
+from judge_with_codex_gemini import _done_key, _judging_tasks, _retry_statuses_from_args
 
 from cache_safety_erasure.judging.local_cli import (
     JudgeCommand,
+    PROMPT_PROTOCOL_VERSION,
     _judgment_record,
     build_judge_prompt,
     extract_first_json_object,
@@ -59,6 +60,8 @@ def test_build_judge_prompt_blinds_protocol_fields_by_default() -> None:
     assert "Harmful request" in prompt
     assert "I cannot help." in prompt
     assert "Required JSON keys" in prompt
+    assert "should_refuse_reference is the benchmark label" in prompt
+    assert "capability_correct: true/false when an expected answer" in prompt
     assert "Qwen/Qwen2.5-7B-Instruct" not in prompt
     assert "refusal_safety" not in prompt
     assert "policy: " not in prompt
@@ -105,16 +108,16 @@ def test_judgment_record_preserves_flat_and_nested_labels() -> None:
 
     record = _judgment_record(
         row,
-        command=JudgeCommand(provider="codex", model="gpt-5.5"),
+        command=JudgeCommand(provider="gemini", model="gemini-3.1"),
         prompt="prompt",
         raw_output="{}",
         started_at="2026-01-01T00:00:00Z",
         parser_status="parsed",
         labels=labels,
-        command_line="codex exec",
+        command_line="gemini -p <prompt>",
         parse_error="",
         retry_count=1,
-        judge_tool_version="codex-cli 1.2.3",
+        judge_tool_version="gemini 3.1",
     )
 
     assert record["labels"] == labels
@@ -122,8 +125,8 @@ def test_judgment_record_preserves_flat_and_nested_labels() -> None:
     assert record["raw_output_sha256"] == sha256_text("{}")
     assert record["parser_status"] == "parsed"
     assert record["retry_count"] == 1
-    assert record["judge_tool_version"] == "codex-cli 1.2.3"
-    assert record["judge_prompt_protocol_version"] == "blinded-v2"
+    assert record["judge_tool_version"] == "gemini 3.1"
+    assert record["judge_prompt_protocol_version"] == "blinded-v3"
     assert record["response_length_bucket"] == "empty"
     assert "audit_id" in record
     assert "source_run_id" in record
@@ -237,8 +240,55 @@ def test_judge_script_all_provider_tasks_preserve_disagreement_channels() -> Non
         "judgment_key": judgment_key(row),
         "judge_provider": "codex",
         "judge_model": "gpt-5.5",
+        "judge_prompt_protocol_version": PROMPT_PROTOCOL_VERSION,
     }
-    remaining = _judging_tasks([row], commands, {_done_key(existing, mode="all-providers")}, mode="all-providers")
+    remaining = _judging_tasks(
+        [row], commands, {_done_key(existing, mode="all-providers")}, mode="all-providers"
+    )
+    assert [task["commands"][0].provider for task in remaining] == ["gemini"]
+
+
+def test_judge_script_resume_is_protocol_aware() -> None:
+    row = {"model_id": "m", "suite": "s", "prompt_id": "p", "policy": "none", "seed": 0}
+    commands = [JudgeCommand(provider="gemini", model="gemini-3.1")]
+    old_protocol_existing = {
+        "judgment_key": judgment_key(row),
+        "judge_provider": "gemini",
+        "judge_model": "gemini-3.1",
+        "judge_prompt_protocol_version": "blinded-v2",
+    }
+
+    remaining = _judging_tasks(
+        [row],
+        commands,
+        {_done_key(old_protocol_existing, mode="all-providers")},
+        mode="all-providers",
+    )
+
+    assert [task["commands"][0].provider for task in remaining] == ["gemini"]
+
+
+def test_retry_statuses_exclude_failed_attempts_from_resume_done_set() -> None:
+    row = {"model_id": "m", "suite": "s", "prompt_id": "p", "policy": "none", "seed": 0}
+    failed_existing = {
+        "judgment_key": judgment_key(row),
+        "judge_provider": "gemini",
+        "judge_model": "gemini-3.1",
+        "parser_status": "blocked",
+    }
+    retry_statuses = _retry_statuses_from_args("blocked, parse_error,unlabeled")
+
+    done = {
+        _done_key(existing, mode="all-providers")
+        for existing in [failed_existing]
+        if existing["parser_status"] not in retry_statuses
+    }
+    commands = [
+        JudgeCommand(provider="gemini", model="gemini-3.1"),
+    ]
+
+    remaining = _judging_tasks([row], commands, done, mode="all-providers")
+
     assert [task["commands"][0].provider for task in remaining] == ["gemini"]
 
 
@@ -256,7 +306,40 @@ def test_judge_script_deduplicates_duplicate_input_rows() -> None:
     assert len(first_success_tasks) == 1
 
 
-def test_gemini_command_uses_headless_plan_sandbox(monkeypatch, tmp_path: Path) -> None:
+def test_judge_script_first_success_resume_is_protocol_aware() -> None:
+    row = {"model_id": "m", "suite": "s", "prompt_id": "p", "policy": "none", "seed": 0}
+    commands = [
+        JudgeCommand(provider="gemini", model="gemini-3.1"),
+    ]
+    parsed_existing = {
+        "judgment_key": judgment_key(row),
+        "judge_provider": "gemini",
+        "judge_model": "gemini-3.1",
+        "parser_status": "parsed",
+        "judge_prompt_protocol_version": PROMPT_PROTOCOL_VERSION,
+    }
+    old_protocol_existing = {**parsed_existing, "judge_prompt_protocol_version": "blinded-v2"}
+
+    assert (
+        _judging_tasks(
+            [row],
+            commands,
+            {_done_key(parsed_existing, mode="first-success")},
+            mode="first-success",
+        )
+        == []
+    )
+    assert len(
+        _judging_tasks(
+            [row],
+            commands,
+            {_done_key(old_protocol_existing, mode="first-success")},
+            mode="first-success",
+        )
+    ) == 1
+
+
+def test_gemini_command_uses_headless_plan_skip_trust(monkeypatch, tmp_path: Path) -> None:
     calls = []
 
     class Completed:
@@ -278,12 +361,13 @@ def test_gemini_command_uses_headless_plan_sandbox(monkeypatch, tmp_path: Path) 
     args = calls[0][0]
     assert args[:6] == [
         "gemini",
+        "--skip-trust",
         "--approval-mode",
         "plan",
-        "--sandbox",
         "--output-format",
         "text",
     ]
+    assert "--sandbox" not in args
     assert "-p" in args
     assert "--prompt" not in args
     assert result["raw_output"] == '{"ok": true}'

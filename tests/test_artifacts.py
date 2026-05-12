@@ -1,6 +1,8 @@
 import json
 from pathlib import Path
 
+import pytest
+
 from cache_safety_erasure.utils.io import (
     append_jsonl,
     file_sha256,
@@ -105,6 +107,58 @@ def test_resume_reconciliation_keeps_only_generations_with_cache_stats(
     assert read_jsonl(orphaned[0]) == rows
 
 
+def test_resume_reconciliation_refuses_corrupt_cache_stats_by_default(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import sys
+
+    sys.path.insert(0, str(Path("scripts").resolve()))
+    from run_experiment import _reconcile_resume_generations
+
+    monkeypatch.delenv("ALLOW_CORRUPT_CACHE_STATS_RESET", raising=False)
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    rows = [{"prompt_id": "p1", "suite": "suite", "policy": "none", "seed": 0}]
+    append_jsonl(run_dir / "generations.jsonl", rows)
+    (run_dir / "cache_stats.parquet").write_bytes(b"not a parquet file")
+
+    with pytest.raises(RuntimeError, match="cache_stats.parquet is unreadable"):
+        _reconcile_resume_generations(run_dir, rows)
+
+    assert read_jsonl(run_dir / "generations.jsonl") == rows
+    assert (run_dir / "cache_stats.parquet").exists()
+    assert not list(run_dir.glob("generations.orphaned_without_cache_stats.*.jsonl"))
+    assert not list(run_dir.glob("generations.corrupt_cache_stats_reset.*.jsonl"))
+
+
+def test_resume_reconciliation_can_explicitly_archive_corrupt_cache_stats(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import sys
+
+    sys.path.insert(0, str(Path("scripts").resolve()))
+    from run_experiment import _reconcile_resume_generations
+
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    rows = [{"prompt_id": "p1", "suite": "suite", "policy": "none", "seed": 0}]
+    append_jsonl(run_dir / "generations.jsonl", rows)
+    (run_dir / "cache_stats.parquet").write_bytes(b"not a parquet file")
+    monkeypatch.setenv("ALLOW_CORRUPT_CACHE_STATS_RESET", "1")
+
+    kept = _reconcile_resume_generations(run_dir, rows)
+
+    assert kept == []
+    assert read_jsonl(run_dir / "generations.jsonl") == []
+    generation_archives = list(run_dir.glob("generations.corrupt_cache_stats_reset.*.jsonl"))
+    cache_archives = list(run_dir.glob("cache_stats.parquet.corrupt.*"))
+    assert len(generation_archives) == 1
+    assert len(cache_archives) == 1
+    assert read_jsonl(generation_archives[0]) == rows
+    assert cache_archives[0].read_bytes() == b"not a parquet file"
+    assert not (run_dir / "cache_stats.parquet").exists()
+
+
 def test_cache_stats_sink_uses_stable_schema_for_sparse_batches(tmp_path: Path) -> None:
     import sys
 
@@ -170,6 +224,52 @@ def test_cache_stats_sink_uses_stable_schema_for_sparse_batches(tmp_path: Path) 
     assert str(schema.field("protected_spans").type) == "large_string"
     assert str(schema.field("sink_tokens").type) == "int64"
     assert str(schema.field("retained_generated_tokens").type) == "int64"
+
+
+def test_cache_stats_parquet_rebuild_uses_durable_jsonl_checkpoint(tmp_path: Path) -> None:
+    import sys
+
+    import pyarrow.parquet as pq
+
+    sys.path.insert(0, str(Path("scripts").resolve()))
+    from run_experiment import _CacheStatsSink, _rebuild_cache_stats_parquet_from_jsonl
+
+    parquet_path = tmp_path / "cache_stats.parquet"
+    jsonl_path = tmp_path / "cache_stats.jsonl"
+    sink = _CacheStatsSink(parquet_path, resume=False)
+    sink.write([{"prompt_id": "p1", "seed": 0, "policy": "none", "decode_step": 0}])
+    sink.close()
+    append_jsonl(
+        jsonl_path,
+        [
+            {"prompt_id": "p1", "seed": 0, "policy": "none", "decode_step": 0},
+            {"prompt_id": "p2", "seed": 0, "policy": "sliding_window", "decode_step": 0},
+        ],
+    )
+
+    _rebuild_cache_stats_parquet_from_jsonl(jsonl_path, parquet_path)
+
+    table = pq.read_table(parquet_path, columns=["prompt_id"])
+    assert table.column("prompt_id").to_pylist() == ["p1", "p2"]
+
+
+def test_cache_stats_sink_archives_corrupt_parquet_on_resume(tmp_path: Path) -> None:
+    import sys
+
+    import pyarrow.parquet as pq
+
+    sys.path.insert(0, str(Path("scripts").resolve()))
+    from run_experiment import _CacheStatsSink
+
+    parquet_path = tmp_path / "cache_stats.parquet"
+    parquet_path.write_bytes(b"not parquet")
+    sink = _CacheStatsSink(parquet_path, resume=True)
+    sink.write([{"prompt_id": "p2", "seed": 0, "policy": "sliding_window", "decode_step": 0}])
+    sink.close()
+
+    assert list(tmp_path.glob("cache_stats.parquet.corrupt.*"))
+    table = pq.read_table(parquet_path, columns=["prompt_id"])
+    assert table.column("prompt_id").to_pylist() == ["p2"]
 
 
 def test_empty_cache_stats_sink_writes_readable_schema(tmp_path: Path) -> None:
@@ -361,8 +461,6 @@ def test_manifest_base_records_model_family_and_track() -> None:
     )
     assert support[0]["requires_role_spans"] is True
     assert support[1]["requires_role_spans"] is False
-
-
 def _minimal_resume_manifest() -> dict:
     return {
         "run_name": "run",

@@ -1,0 +1,28 @@
+{
+  "all_rows_have_parsed_judge": true,
+  "corrupt_input_tail": "",
+  "corrupt_judgment_tail": "",
+  "input_rows": 349,
+  "judgment_attempt_rows": 809,
+  "provider_coverage": {
+    "codex": {
+      "attempted_rows": 349,
+      "missing_parsed_rows": 11,
+      "parsed_rows": 338
+    },
+    "gemini": {
+      "attempted_rows": 349,
+      "missing_parsed_rows": 0,
+      "parsed_rows": 349
+    }
+  },
+  "provider_status_counts": {
+    "codex:blocked": 11,
+    "codex:parsed": 338,
+    "gemini:blocked": 110,
+    "gemini:parse_error": 1,
+    "gemini:parsed": 349
+  },
+  "rows_with_any_parsed_judge": 349,
+  "rows_without_any_parsed_judge": 0
+}

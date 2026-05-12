@@ -43,9 +43,11 @@ def _load_hf_model(config: ModelConfig) -> ModelBundle:
     if dtype is None:
         raise ValueError(f"Unsupported dtype `{config.dtype}`. Use float32, float16, or bfloat16.")
 
+    tokenizer_source = config.tokenizer_id or config.model_id
+    tokenizer_revision = config.tokenizer_revision if config.tokenizer_id else config.revision
     tokenizer = AutoTokenizer.from_pretrained(
-        config.model_id,
-        revision=config.revision,
+        tokenizer_source,
+        revision=tokenizer_revision,
         trust_remote_code=config.trust_remote_code,
         local_files_only=config.local_files_only,
     )
@@ -63,6 +65,21 @@ def _load_hf_model(config: ModelConfig) -> ModelBundle:
     if config.attn_implementation:
         model_kwargs["attn_implementation"] = config.attn_implementation
     model = AutoModelForCausalLM.from_pretrained(config.model_id, **model_kwargs)
+    if config.adapter_id:
+        try:
+            from peft import PeftModel
+        except ModuleNotFoundError as exc:
+            raise RuntimeError(
+                "peft is required to load Hugging Face LoRA/PEFT adapters. "
+                "Run `uv sync --extra dev` in this repository."
+            ) from exc
+        model = PeftModel.from_pretrained(
+            model,
+            config.adapter_id,
+            revision=config.adapter_revision,
+            local_files_only=config.local_files_only,
+            is_trainable=False,
+        )
     hf_device_map = getattr(model, "hf_device_map", None)
     if not config.allow_cpu_offload and _device_map_has_cpu_or_disk(hf_device_map):
         raise RuntimeError(

@@ -1038,6 +1038,7 @@ def _figure_manifest_failures(results_dir: Path, *, profile: str) -> list[str]:
         failures,
         require_causal_patch=profile == "causal",
         required_figures=required_figures,
+        allowed_figures=set(required_figures),
     )
     return failures
 

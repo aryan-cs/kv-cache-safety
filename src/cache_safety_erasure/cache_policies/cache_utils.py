@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from typing import Any
 
 
@@ -95,6 +96,32 @@ def cache_l2_norm(past_key_values: Any) -> float:
         total = total + key.detach().float().pow(2).sum().cpu()
         total = total + value.detach().float().pow(2).sum().cpu()
     return float(total.sqrt().item())
+
+
+def cache_l2_norm_for_step(past_key_values: Any, step: int, *, empty_value: float = 0.0) -> float | None:
+    if not should_measure_cache_l2(step):
+        return None
+    if cache_seq_len(past_key_values) == 0:
+        return empty_value
+    return cache_l2_norm(past_key_values)
+
+
+def cache_l2_measurement_mode() -> str:
+    return os.environ.get("CACHE_SAFETY_CACHE_L2_STEPS", "prefill").strip().lower()
+
+
+def should_measure_cache_l2(step: int) -> bool:
+    mode = cache_l2_measurement_mode()
+    if mode in {"all", "1", "true", "yes"}:
+        return True
+    if mode in {"none", "0", "false", "no", "off"}:
+        return False
+    if mode in {"prefill", "pre_response", "pre-response", ""}:
+        return step <= 1
+    raise ValueError(
+        "CACHE_SAFETY_CACHE_L2_STEPS must be one of all, prefill, or none; "
+        f"got {mode!r}"
+    )
 
 
 def indices_for_budget(seq_len: int, budget: int | None) -> list[int]:

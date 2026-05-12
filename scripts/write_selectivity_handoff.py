@@ -83,6 +83,8 @@ def build_handoff(
             "audit_key": f"{audit_prefix}_audit_key.jsonl",
             "approved_input": f"{audit_prefix}_audit_key.codex_gemini_approved.jsonl",
             "judgments": f"{audit_prefix}_judgments.codex_gemini.jsonl",
+            "approved_input_gemini": f"{audit_prefix}_audit_key.gemini_approved.jsonl",
+            "judgments_gemini": f"{audit_prefix}_judgments.gemini.jsonl",
         },
     }
 

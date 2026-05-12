@@ -37,6 +37,38 @@ def test_random_policy_is_deterministic() -> None:
 
 
 @pytest.mark.skipif(torch_spec is None, reason="torch is not installed in the base interpreter")
+def test_cache_l2_defaults_to_prefill_steps_only(monkeypatch: pytest.MonkeyPatch) -> None:
+    import torch
+
+    from cache_safety_erasure.cache_policies.registry import build_cache_policy
+
+    monkeypatch.delenv("CACHE_SAFETY_CACHE_L2_STEPS", raising=False)
+    cache = ((torch.randn(1, 2, 10, 4), torch.randn(1, 2, 10, 4)),)
+    policy = build_cache_policy(CachePolicyConfig(name="sliding_window", budget=5), seed=0)
+    _, prefill_decision = policy.apply(cache, step=1)
+    _, decode_decision = policy.apply(cache, step=2)
+
+    assert prefill_decision.metadata["cache_l2_before"] is not None
+    assert prefill_decision.metadata["cache_l2_after"] is not None
+    assert prefill_decision.metadata["cache_l2_measurement"] == "prefill"
+    assert decode_decision.metadata["cache_l2_before"] is None
+    assert decode_decision.metadata["cache_l2_after"] is None
+
+
+@pytest.mark.skipif(torch_spec is None, reason="torch is not installed in the base interpreter")
+def test_none_policy_preserves_cache_object_identity() -> None:
+    import torch
+
+    from cache_safety_erasure.cache_policies.registry import build_cache_policy
+
+    cache = ((torch.randn(1, 2, 10, 4), torch.randn(1, 2, 10, 4)),)
+    policy = build_cache_policy(CachePolicyConfig(name="none"), seed=0)
+    returned, _decision = policy.apply(cache, step=2)
+
+    assert returned is cache
+
+
+@pytest.mark.skipif(torch_spec is None, reason="torch is not installed in the base interpreter")
 def test_quantize_dequantize_cache_roundtrip_shape() -> None:
     import torch
 

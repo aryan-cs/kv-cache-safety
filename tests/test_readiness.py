@@ -407,19 +407,20 @@ def test_causal_restoration_fraction_allows_over_and_under_correction() -> None:
     rows = [
         {
             "safety_restoration_fraction": "-1.25",
-            "safety_restoration_ci_low": "0.35",
-            "safety_restoration_ci_high": "0.55",
+            "safety_restoration_ci_low": "-1.45",
+            "safety_restoration_ci_high": "-1.05",
             "safety_restoration_ci_width": "0.20",
         },
         {
             "safety_restoration_fraction": "1.30",
-            "safety_restoration_ci_low": "0.52",
-            "safety_restoration_ci_high": "0.66",
+            "safety_restoration_ci_low": "1.12",
+            "safety_restoration_ci_high": "1.46",
             "safety_restoration_ci_width": "0.14",
         },
     ]
 
     assert _figure_numeric_data_failure("causal_restoration_flow", rows) == ""
+    assert _figure_numeric_data_failure("causal_restoration_fraction", rows) == ""
 
 
 def test_policy_level_contrast_readiness_rejects_wide_ssei_ci() -> None:

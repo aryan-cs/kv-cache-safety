@@ -10,7 +10,12 @@ from _path import add_src_to_path
 
 add_src_to_path()
 
-from cache_safety_erasure.judging.local_cli import JudgeCommand, judge_row, judgment_key
+from cache_safety_erasure.judging.local_cli import (
+    PROMPT_PROTOCOL_VERSION,
+    JudgeCommand,
+    judge_row,
+    judgment_key,
+)
 from cache_safety_erasure.utils.io import read_jsonl_tolerant
 
 
@@ -40,6 +45,16 @@ def main() -> None:
     parser.add_argument("--timeout-seconds", type=int, default=180)
     parser.add_argument("--resume", action="store_true")
     parser.add_argument(
+        "--retry-statuses",
+        default="",
+        help=(
+            "Comma-separated parser_status values to retry even when --resume is set. "
+            "Use this for transient judge failures such as blocked,parse_error,unlabeled. "
+            "Existing attempts are preserved; successful retries are appended with the same "
+            "source-marked judgment key."
+        ),
+    )
+    parser.add_argument(
         "--allow-data-egress",
         action="store_true",
         help=(
@@ -65,10 +80,12 @@ def main() -> None:
         existing, corrupt_output = read_jsonl_tolerant(args.output_jsonl)
         if corrupt_output is not None:
             print(f"Quarantined corrupt output tail at {corrupt_output}.")
+        retry_statuses = _retry_statuses_from_args(args.retry_statuses)
         done = {
             _done_key(row, mode=args.judge_mode)
             for row in existing
             if row.get("judgment_key")
+            and str(row.get("parser_status", "")).strip() not in retry_statuses
         }
     commands = _commands_from_args(args)
     tasks = _judging_tasks(rows, commands, done, mode=args.judge_mode)
@@ -116,7 +133,8 @@ def _commands_from_args(args: argparse.Namespace) -> list[JudgeCommand]:
                     cwd=Path.cwd(),
                 )
             )
-        elif provider == "gemini":
+            continue
+        if provider == "gemini":
             commands.append(
                 JudgeCommand(
                     provider="gemini",
@@ -125,8 +143,8 @@ def _commands_from_args(args: argparse.Namespace) -> list[JudgeCommand]:
                     cwd=Path.cwd(),
                 )
             )
-        else:
-            raise ValueError(f"Unsupported provider in --providers: {provider}")
+            continue
+        raise ValueError(f"Unsupported provider in --providers: {provider}")
     if not commands:
         raise ValueError("--providers must include at least one provider")
     return commands
@@ -143,7 +161,7 @@ def _judging_tasks(
         tasks = []
         seen: set[str] = set()
         for row in rows:
-            key = judgment_key(row)
+            key = _first_success_done_key(row)
             if key in done or key in seen:
                 continue
             seen.add(key)
@@ -162,19 +180,29 @@ def _judging_tasks(
 
 
 def _done_key(row: dict, *, mode: str) -> str:
+    protocol = str(row.get("judge_prompt_protocol_version", ""))
     if mode == "first-success":
-        return str(row.get("judgment_key"))
+        return "::".join([str(row.get("judgment_key")), protocol])
     return "::".join(
         [
             str(row.get("judgment_key")),
             str(row.get("judge_provider", "")),
             str(row.get("judge_model", "")),
+            protocol,
         ]
     )
 
 
+def _retry_statuses_from_args(value: str) -> set[str]:
+    return {status.strip() for status in value.split(",") if status.strip()}
+
+
 def _provider_done_key(row: dict, command: JudgeCommand) -> str:
-    return "::".join([judgment_key(row), command.provider, command.model or ""])
+    return "::".join([judgment_key(row), command.provider, command.model or "", PROMPT_PROTOCOL_VERSION])
+
+
+def _first_success_done_key(row: dict) -> str:
+    return "::".join([judgment_key(row), PROMPT_PROTOCOL_VERSION])
 
 
 if __name__ == "__main__":

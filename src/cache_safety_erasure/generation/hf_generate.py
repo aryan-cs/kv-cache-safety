@@ -5,7 +5,9 @@ from typing import Any
 
 from cache_safety_erasure.cache_policies.base import CachePolicyDecision
 from cache_safety_erasure.cache_policies.cache_utils import (
+    cache_l2_measurement_mode,
     cache_l2_norm,
+    cache_l2_norm_for_step,
     cache_layer_count,
     cache_seq_len,
     evicted_from_retained,
@@ -274,14 +276,15 @@ def _enforce_native_cache_limit(
     seq_len = cache_seq_len(past)
     if seq_len <= max_cache_len:
         return past, None
-    before_norm = cache_l2_norm(past)
     retained = tuple(range(seq_len - max_cache_len, seq_len))
     sliced = slice_legacy_cache(past, retained)
-    after_norm = cache_l2_norm(sliced) if retained else 0.0
+    before_norm = cache_l2_norm_for_step(past, step)
+    after_norm = cache_l2_norm_for_step(sliced, step) if retained else _empty_l2_value(before_norm)
     evicted = evicted_from_retained(seq_len, retained)
     metadata = {
         "cache_l2_before": before_norm,
         "cache_l2_after": after_norm,
+        "cache_l2_measurement": cache_l2_measurement_mode(),
         "native_sliding_window": max_cache_len + 1,
         "native_cache_limit": max_cache_len,
         "native_cache_enforced": True,
@@ -400,3 +403,7 @@ def _has_stop_string(tokenizer: Any, generated_ids: list[int], stop_strings: tup
         return False
     partial_text = tokenizer.decode(generated_ids, skip_special_tokens=True)
     return any(stop in partial_text for stop in stop_strings)
+
+
+def _empty_l2_value(reference_norm: float | None) -> float | None:
+    return 0.0 if reference_norm is not None else None

@@ -139,7 +139,7 @@ def environment_snapshot() -> dict[str, Any]:
         },
         "cgroup": cgroup_snapshot(),
         "packages": package_versions(
-            ["torch", "transformers", "accelerate", "datasets", "numpy", "pandas", "pyarrow"]
+            ["torch", "transformers", "peft", "accelerate", "datasets", "numpy", "pandas", "pyarrow"]
         ),
     }
     try:

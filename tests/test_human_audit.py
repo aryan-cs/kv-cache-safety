@@ -64,6 +64,27 @@ def test_audit_row_can_explicitly_include_hidden_reference_for_leakage_audit() -
     assert blinded["hidden_system_reference"] == "Secret canary."
 
 
+def test_audit_id_includes_model_scope_for_combined_exports() -> None:
+    row = {
+        "source_run_id": "qwen_run",
+        "model_id": "Qwen/model",
+        "suite": "public_refusal_safety",
+        "policy": "none",
+        "prompt_id": "p1",
+        "seed": 0,
+    }
+    other_model = {**row, "source_run_id": "mistral_run", "model_id": "Mistral/model"}
+
+    first_blinded, first_key = _audit_pair(row, "combined", 0)
+    second_blinded, second_key = _audit_pair(other_model, "combined", 0)
+
+    assert first_blinded["audit_id"] != second_blinded["audit_id"]
+    assert first_key["source_run_id"] == "qwen_run"
+    assert first_key["model_id"] == "Qwen/model"
+    assert second_key["source_run_id"] == "mistral_run"
+    assert second_key["model_id"] == "Mistral/model"
+
+
 def test_stratified_audit_sample_includes_matched_baseline_rows() -> None:
     rows = []
     for prompt_id in ["p1", "p2", "p3"]:
@@ -101,6 +122,44 @@ def test_stratified_audit_sample_includes_matched_baseline_rows() -> None:
     assert treatment_keys
     for suite, _policy, prompt_id, seed in treatment_keys:
         assert (suite, "none", prompt_id, seed) in sampled_keys
+
+
+def test_stratified_audit_sample_keeps_combined_model_scopes_separate() -> None:
+    rows = []
+    for source_run_id, model_id in [("qwen_run", "Qwen/model"), ("mistral_run", "Mistral/model")]:
+        rows.append(
+            {
+                "source_run_id": source_run_id,
+                "model_id": model_id,
+                "suite": "public_refusal_safety",
+                "policy": "none",
+                "prompt_id": "shared_prompt",
+                "seed": 0,
+                "safety_score": 1.0,
+            }
+        )
+        rows.append(
+            {
+                "source_run_id": source_run_id,
+                "model_id": model_id,
+                "suite": "public_refusal_safety",
+                "policy": "sliding_window__budget128",
+                "prompt_id": "shared_prompt",
+                "seed": 0,
+                "safety_score": 0.0,
+            }
+        )
+
+    sample = _stratified_sample(rows, per_suite_policy=1, seed=0, strategy="effect")
+
+    assert {
+        (row["source_run_id"], row["model_id"], row["policy"]) for row in sample
+    } == {
+        ("qwen_run", "Qwen/model", "none"),
+        ("qwen_run", "Qwen/model", "sliding_window__budget128"),
+        ("mistral_run", "Mistral/model", "none"),
+        ("mistral_run", "Mistral/model", "sliding_window__budget128"),
+    }
 
 
 def test_effect_audit_sample_prioritizes_largest_safety_shift() -> None:
@@ -220,5 +279,9 @@ def test_export_manifest_records_sampling_protocol_and_hidden_reference_mode(
     assert manifest["sampled_suite_policy_counts"] == {
         "public_system_leakage::kv_int4_sim": 1,
         "public_system_leakage::none": 1,
+    }
+    assert manifest["sampled_scope_suite_policy_counts"] == {
+        "single_run::public_system_leakage::kv_int4_sim": 1,
+        "single_run::public_system_leakage::none": 1,
     }
     assert "generations.jsonl" in manifest["source_artifacts"]["results"]

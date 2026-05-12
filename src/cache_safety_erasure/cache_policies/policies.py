@@ -6,14 +6,14 @@ from typing import Any
 
 from cache_safety_erasure.cache_policies.base import CachePolicyDecision
 from cache_safety_erasure.cache_policies.cache_utils import (
-    cache_l2_norm,
+    cache_l2_measurement_mode,
+    cache_l2_norm_for_step,
     cache_layer_count,
     cache_seq_len,
     evicted_from_retained,
     maybe_from_legacy_cache,
     quantize_dequantize_cache,
     slice_legacy_cache,
-    to_legacy_cache,
 )
 
 
@@ -31,9 +31,9 @@ class NonePolicy:
     ) -> tuple[Any, CachePolicyDecision]:
         seq_len = cache_seq_len(past_key_values)
         retained = tuple(range(seq_len))
-        norm = cache_l2_norm(past_key_values) if seq_len else 0.0
+        norm = cache_l2_norm_for_step(past_key_values, step)
         evicted = tuple()
-        return maybe_from_legacy_cache(to_legacy_cache(past_key_values), past_key_values), CachePolicyDecision(
+        return past_key_values, CachePolicyDecision(
             self.name,
             step,
             seq_len,
@@ -57,10 +57,10 @@ class SlidingWindowPolicy:
         attention_scores: Any | None = None,
     ) -> tuple[Any, CachePolicyDecision]:
         seq_len = cache_seq_len(past_key_values)
-        before_norm = cache_l2_norm(past_key_values) if seq_len else 0.0
+        before_norm = cache_l2_norm_for_step(past_key_values, step)
         retained = tuple(range(max(0, seq_len - self.budget), seq_len))
         sliced = slice_legacy_cache(past_key_values, retained)
-        after_norm = cache_l2_norm(sliced) if retained else 0.0
+        after_norm = cache_l2_norm_for_step(sliced, step) if retained else _empty_l2_value(before_norm)
         evicted = evicted_from_retained(seq_len, retained)
         return maybe_from_legacy_cache(sliced, past_key_values), CachePolicyDecision(
             self.name,
@@ -87,7 +87,7 @@ class SinkRecentPolicy:
         attention_scores: Any | None = None,
     ) -> tuple[Any, CachePolicyDecision]:
         seq_len = cache_seq_len(past_key_values)
-        before_norm = cache_l2_norm(past_key_values) if seq_len else 0.0
+        before_norm = cache_l2_norm_for_step(past_key_values, step)
         if self.budget >= seq_len:
             retained = tuple(range(seq_len))
         else:
@@ -97,7 +97,7 @@ class SinkRecentPolicy:
             retained_set.update(range(max(sink_count, seq_len - recent_count), seq_len))
             retained = tuple(sorted(retained_set))
         sliced = slice_legacy_cache(past_key_values, retained)
-        after_norm = cache_l2_norm(sliced) if retained else 0.0
+        after_norm = cache_l2_norm_for_step(sliced, step) if retained else _empty_l2_value(before_norm)
         evicted = evicted_from_retained(seq_len, retained)
         return maybe_from_legacy_cache(sliced, past_key_values), CachePolicyDecision(
             self.name,
@@ -132,14 +132,14 @@ class RandomMatchedPolicy:
         attention_scores: Any | None = None,
     ) -> tuple[Any, CachePolicyDecision]:
         seq_len = cache_seq_len(past_key_values)
-        before_norm = cache_l2_norm(past_key_values) if seq_len else 0.0
+        before_norm = cache_l2_norm_for_step(past_key_values, step)
         if self.budget >= seq_len:
             retained = tuple(range(seq_len))
         else:
             rng = random.Random((self.seed * 1_000_003) + step)
             retained = tuple(sorted(rng.sample(range(seq_len), k=max(0, self.budget))))
         sliced = slice_legacy_cache(past_key_values, retained)
-        after_norm = cache_l2_norm(sliced) if retained else 0.0
+        after_norm = cache_l2_norm_for_step(sliced, step) if retained else _empty_l2_value(before_norm)
         evicted = evicted_from_retained(seq_len, retained)
         return maybe_from_legacy_cache(sliced, past_key_values), CachePolicyDecision(
             self.name,
@@ -175,7 +175,7 @@ class AttentionH2OPolicy:
         attention_scores: Any | None = None,
     ) -> tuple[Any, CachePolicyDecision]:
         seq_len = cache_seq_len(past_key_values)
-        before_norm = cache_l2_norm(past_key_values) if seq_len else 0.0
+        before_norm = cache_l2_norm_for_step(past_key_values, step)
         if self.budget >= seq_len:
             retained = tuple(range(seq_len))
         else:
@@ -191,7 +191,7 @@ class AttentionH2OPolicy:
             retained_set.update(candidates[:remaining_budget])
             retained = tuple(sorted(retained_set))
         sliced = slice_legacy_cache(past_key_values, retained)
-        after_norm = cache_l2_norm(sliced) if retained else 0.0
+        after_norm = cache_l2_norm_for_step(sliced, step) if retained else _empty_l2_value(before_norm)
         evicted = evicted_from_retained(seq_len, retained)
         return maybe_from_legacy_cache(sliced, past_key_values), CachePolicyDecision(
             self.name,
@@ -248,9 +248,9 @@ class QuantizedCachePolicy:
     ) -> tuple[Any, CachePolicyDecision]:
         seq_len = cache_seq_len(past_key_values)
         retained = tuple(range(seq_len))
-        before_norm = cache_l2_norm(past_key_values) if seq_len else 0.0
+        before_norm = cache_l2_norm_for_step(past_key_values, step)
         quantized = quantize_dequantize_cache(past_key_values, self.bits)
-        after_norm = cache_l2_norm(quantized) if seq_len else 0.0
+        after_norm = cache_l2_norm_for_step(quantized, step)
         evicted = tuple()
         return maybe_from_legacy_cache(quantized, past_key_values), CachePolicyDecision(
             self.name,
@@ -286,7 +286,7 @@ class PolicyPinnedPolicy:
         attention_scores: Any | None = None,
     ) -> tuple[Any, CachePolicyDecision]:
         seq_len = cache_seq_len(past_key_values)
-        before_norm = cache_l2_norm(past_key_values) if seq_len else 0.0
+        before_norm = cache_l2_norm_for_step(past_key_values, step)
         protected: set[int] = set()
         if token_roles:
             protected = {
@@ -312,7 +312,7 @@ class PolicyPinnedPolicy:
                 retained_set = set(priority[: self.budget])
             retained = tuple(sorted(retained_set))
         sliced = slice_legacy_cache(past_key_values, retained)
-        after_norm = cache_l2_norm(sliced) if retained else 0.0
+        after_norm = cache_l2_norm_for_step(sliced, step) if retained else _empty_l2_value(before_norm)
         evicted = evicted_from_retained(seq_len, retained)
         return maybe_from_legacy_cache(sliced, past_key_values), CachePolicyDecision(
             self.name,
@@ -338,8 +338,8 @@ class PolicyPinnedPolicy:
 
 def _decision_metadata(
     past_key_values: Any,
-    before_norm: float,
-    after_norm: float,
+    before_norm: float | None,
+    after_norm: float | None,
     retained: tuple[int, ...],
     evicted: tuple[int, ...],
     token_roles: list[str] | None,
@@ -349,6 +349,7 @@ def _decision_metadata(
         "layer_count": cache_layer_count(past_key_values),
         "cache_l2_before": before_norm,
         "cache_l2_after": after_norm,
+        "cache_l2_measurement": cache_l2_measurement_mode(),
     }
     metadata.update(_role_count_metadata("retained", retained, token_roles))
     metadata.update(_role_count_metadata("evicted", evicted, token_roles))
@@ -367,3 +368,7 @@ def _role_count_metadata(
         safe_role = role.replace("-", "_")
         counts[f"{prefix}_{safe_role}_tokens"] = counts.get(f"{prefix}_{safe_role}_tokens", 0) + 1
     return counts
+
+
+def _empty_l2_value(reference_norm: float | None) -> float | None:
+    return 0.0 if reference_norm is not None else None

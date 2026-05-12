@@ -80,6 +80,10 @@ def _check_config(config_path: Path, args: argparse.Namespace, failures: list[st
         failures.append(f"{config_path}: H200 config uses mock model")
     if config.model.revision is None:
         failures.append(f"{config_path}: model revision must be pinned before H200 execution")
+    if config.model.adapter_id and config.model.adapter_revision is None:
+        failures.append(f"{config_path}: adapter revision must be pinned before H200 execution")
+    if config.model.tokenizer_id and config.model.tokenizer_revision is None:
+        failures.append(f"{config_path}: tokenizer revision must be pinned before H200 execution")
     if config.model.allow_cpu_offload:
         failures.append(f"{config_path}: H200 config allows CPU/disk offload")
     if config.model.model_id.startswith("sshleifer/tiny"):
@@ -108,6 +112,10 @@ def _check_config(config_path: Path, args: argparse.Namespace, failures: list[st
             config_path,
             config.model.model_id,
             config.model.revision,
+            config.model.tokenizer_id,
+            config.model.tokenizer_revision,
+            config.model.adapter_id,
+            config.model.adapter_revision,
             config.model.local_files_only,
             failures,
         )
@@ -117,6 +125,10 @@ def _check_hf_model_config(
     config_path: Path,
     model_id: str,
     revision: str | None,
+    tokenizer_id: str | None,
+    tokenizer_revision: str | None,
+    adapter_id: str | None,
+    adapter_revision: str | None,
     local_files_only: bool,
     failures: list[str],
 ) -> None:
@@ -127,9 +139,27 @@ def _check_hf_model_config(
         return
     try:
         AutoConfig.from_pretrained(model_id, revision=revision, local_files_only=local_files_only)
-        AutoTokenizer.from_pretrained(model_id, revision=revision, local_files_only=local_files_only)
+        AutoTokenizer.from_pretrained(
+            tokenizer_id or model_id,
+            revision=tokenizer_revision if tokenizer_id else revision,
+            local_files_only=local_files_only,
+        )
     except Exception as exc:
         failures.append(f"{config_path}: cannot load model config/tokenizer for `{model_id}`: {exc}")
+    if adapter_id:
+        try:
+            from peft import PeftConfig
+        except ModuleNotFoundError:
+            failures.append("peft is not installed")
+            return
+        try:
+            PeftConfig.from_pretrained(
+                adapter_id,
+                revision=adapter_revision,
+                local_files_only=local_files_only,
+            )
+        except Exception as exc:
+            failures.append(f"{config_path}: cannot load PEFT adapter config for `{adapter_id}`: {exc}")
 
 
 def _git_status_short() -> str:

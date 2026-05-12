@@ -128,14 +128,19 @@ FIGURE_DATA_UNIT_INTERVAL_COLUMNS = {
     "retention_fraction",
     "system_retention_fraction",
     "user_retention_fraction",
-    "safety_restoration_ci_low",
-    "safety_restoration_ci_high",
 }
 FIGURE_DATA_NONNEGATIVE_COLUMNS = {
     "ci_width",
     "safety_restoration_ci_width",
     "effect_magnitude",
 }
+CAUSAL_ONLY_FIGURES = {
+    "causal_restoration_fraction",
+    "causal_restoration_flow",
+}
+PRIMARY_FIGURE_NAMES = set(REQUIRED_FIGURE_DATA_COLUMNS) - CAUSAL_ONLY_FIGURES
+CAUSAL_FIGURE_NAMES = CAUSAL_ONLY_FIGURES
+
 FIGURE_DATA_COLUMN_ALIASES = {
     "selective_safety_erasure_heatmap": [
         {"selective_safety_erasure_index", "index"},
@@ -299,6 +304,9 @@ def main() -> None:
         failures,
         args.require_causal_patch,
         required_figures=args.required_figure,
+        allowed_figures=CAUSAL_FIGURE_NAMES
+        if args.require_causal_patch
+        else PRIMARY_FIGURE_NAMES,
     )
     if not args.allow_inactive_compression and (args.results_dir / "cache_stats.parquet").exists():
         _check_active_compression(args.results_dir / "cache_stats.parquet", manifest, failures)
@@ -390,6 +398,7 @@ def _check_figure_manifest(
     failures: list[str],
     require_causal_patch: bool,
     required_figures: list[str] | None = None,
+    allowed_figures: set[str] | None = None,
 ) -> None:
     manifest_path = figure_dir / "manifest.json"
     if not manifest_path.exists():
@@ -422,6 +431,8 @@ def _check_figure_manifest(
             continue
         name = figure.get("name", "<unnamed>")
         figure_names.add(str(name))
+        if allowed_figures is not None and str(name) not in allowed_figures:
+            continue
         for key in [
             "png",
             "png_sha256",

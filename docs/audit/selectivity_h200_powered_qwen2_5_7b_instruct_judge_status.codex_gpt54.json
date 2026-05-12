@@ -1,0 +1,16 @@
+{
+  "annotation_source_type": "proprietary_model_judge",
+  "blocked_audit_ids": [
+    "e50385e8ade0f67e"
+  ],
+  "judge_model": "gpt-5.4",
+  "judge_provider": "codex",
+  "notes": "Source-marked Codex model-judge labels for diagnostic audit only; these are not human labels.",
+  "parsed_fraction": 0.9970588235294118,
+  "parser_status_counts": {
+    "blocked": 1,
+    "parsed": 339
+  },
+  "row_count": 340,
+  "run_id": "selectivity_h200_powered_qwen2_5_7b_instruct"
+}

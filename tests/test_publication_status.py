@@ -57,6 +57,23 @@ def test_required_arxiv_bundle_files_follow_selected_generated_dirs() -> None:
     assert "audit/h200_qwen_full_sweep_summary/human_audit_summary_table.tex" not in files
 
 
+def test_publication_status_defaults_follow_paper_tree() -> None:
+    script = Path("scripts/report_publication_status.py").read_text(encoding="utf-8")
+    files = _required_arxiv_bundle_files()
+
+    assert "docs/generated" not in script
+    assert "docs/audit" not in script
+    assert "docs/build" not in script
+    assert "docs/latex" not in script
+    assert "docs/references" not in script
+    assert 'default=Path("paper/generated/h200_qwen_full_sweep")' in script
+    assert 'default=Path("paper/audit/h200_qwen_full_sweep_summary")' in script
+    assert 'default=Path("paper/build/arxiv_source")' in script
+    assert 'FINAL_PDF_NAME = "cache_mediated_safety_erasure.pdf"' in script
+    assert "generated/h200_qwen_full_sweep/main_results_table.tex" in files
+    assert "audit/h200_qwen_full_sweep_summary/human_audit_summary_table.tex" in files
+
+
 def _test_pdf_bytes(text: str = "Publication evidence") -> bytes:
     stream = f"BT /F1 12 Tf 72 72 Td ({text}) Tj ET".encode("ascii")
     objects = [
@@ -2394,6 +2411,127 @@ def test_publication_status_rejects_wide_policy_level_ssei_ci(tmp_path: Path) ->
     assert any(
         failure.startswith("kv_int4_sim:policy_level_ssei_ci_width=")
         for failure in status["primary_results"]["readiness_failures"]
+    )
+
+
+def test_publication_status_primary_ignores_extra_causal_figure_failures(
+    tmp_path: Path,
+) -> None:
+    primary = tmp_path / "primary"
+    causal = tmp_path / "causal"
+    primary_audit = tmp_path / "primary_audit"
+    causal_audit = tmp_path / "causal_audit"
+    _write_run(primary)
+    _write_run(causal)
+    (primary / "figures" / "causal_restoration_fraction.csv").write_text(
+        "suite,policy,compressed_policy,safety_restoration_fraction,"
+        "safety_restoration_ci_low,safety_restoration_ci_high\n"
+        "public_refusal_safety,kv_int4_sim,kv_int4_sim,,,\n",
+        encoding="utf-8",
+    )
+    _write_audit(primary_audit, primary)
+    _write_audit(causal_audit, causal)
+    claim_path = tmp_path / "claim_assessment.json"
+    claim_path.write_text(
+        json.dumps(_passing_claim_assessment(primary, causal, primary_audit, causal_audit)),
+        encoding="utf-8",
+    )
+    pdf_path = tmp_path / "paper.pdf"
+    pdf_path.write_bytes(PDF_BYTES)
+
+    status = publication_status(
+        primary_results_dir=primary,
+        causal_results_dir=causal,
+        primary_audit_dir=primary_audit,
+        causal_audit_dir=causal_audit,
+        claim_assessment_path=claim_path,
+        paper_pdf=pdf_path,
+    )
+
+    assert status["primary_results"]["complete"] is True
+    assert not any(
+        "causal_restoration_fraction" in failure
+        for failure in status["primary_results"]["readiness_failures"]
+    )
+
+
+def test_publication_status_causal_ignores_extra_primary_figure_failures(
+    tmp_path: Path,
+) -> None:
+    primary = tmp_path / "primary"
+    causal = tmp_path / "causal"
+    primary_audit = tmp_path / "primary_audit"
+    causal_audit = tmp_path / "causal_audit"
+    _write_run(primary)
+    _write_run(causal)
+    (causal / "figures" / "safety_capability_phase_portrait.csv").write_text(
+        "suite,policy,policy_family,safety_degradation,capability_degradation,"
+        "selective_safety_erasure_index\npublic_refusal_safety,kv_int4_sim,kv_int4_sim,,,\n",
+        encoding="utf-8",
+    )
+    _write_audit(primary_audit, primary)
+    _write_audit(causal_audit, causal)
+    claim_path = tmp_path / "claim_assessment.json"
+    claim_path.write_text(
+        json.dumps(_passing_claim_assessment(primary, causal, primary_audit, causal_audit)),
+        encoding="utf-8",
+    )
+    pdf_path = tmp_path / "paper.pdf"
+    pdf_path.write_bytes(PDF_BYTES)
+
+    status = publication_status(
+        primary_results_dir=primary,
+        causal_results_dir=causal,
+        primary_audit_dir=primary_audit,
+        causal_audit_dir=causal_audit,
+        claim_assessment_path=claim_path,
+        paper_pdf=pdf_path,
+    )
+
+    assert status["causal_results"]["complete"] is True
+    assert not any(
+        "safety_capability_phase_portrait" in failure
+        for failure in status["causal_results"]["readiness_failures"]
+    )
+
+
+def test_publication_status_causal_does_not_require_policy_level_ssei(
+    tmp_path: Path,
+) -> None:
+    primary = tmp_path / "primary"
+    causal = tmp_path / "causal"
+    primary_audit = tmp_path / "primary_audit"
+    causal_audit = tmp_path / "causal_audit"
+    _write_run(primary)
+    _write_run(causal)
+    metrics_path = causal / "metrics.json"
+    metrics = json.loads(metrics_path.read_text(encoding="utf-8"))
+    metrics["policy_level_contrasts"] = {}
+    metrics_path.write_text(json.dumps(metrics), encoding="utf-8")
+    _refresh_figure_manifest_source_hashes(causal)
+    _write_audit(primary_audit, primary)
+    _write_audit(causal_audit, causal)
+    claim_path = tmp_path / "claim_assessment.json"
+    claim_path.write_text(
+        json.dumps(_passing_claim_assessment(primary, causal, primary_audit, causal_audit)),
+        encoding="utf-8",
+    )
+    pdf_path = tmp_path / "paper.pdf"
+    pdf_path.write_bytes(PDF_BYTES)
+
+    status = publication_status(
+        primary_results_dir=primary,
+        causal_results_dir=causal,
+        primary_audit_dir=primary_audit,
+        causal_audit_dir=causal_audit,
+        claim_assessment_path=claim_path,
+        paper_pdf=pdf_path,
+    )
+
+    assert status["causal_results"]["complete"] is True
+    assert not any(
+        "policy_level_ssei" in failure
+        for failure in status["causal_results"]["readiness_failures"]
     )
 
 

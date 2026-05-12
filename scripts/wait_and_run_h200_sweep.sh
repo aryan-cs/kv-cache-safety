@@ -12,7 +12,7 @@ if [[ "$repo_dir" != "$expected_dir" ]]; then
 fi
 
 case "$sweep_script" in
-  scripts/run_h200_sweep.sh|scripts/run_h200_ci_extension.sh|scripts/run_qwen32b_followup.sh|scripts/run_h200_selectivity_panel.sh) ;;
+  scripts/run_h200_sweep.sh|scripts/run_h200_ci_extension.sh|scripts/run_h200_causal_ci_extension.sh|scripts/run_qwen32b_followup.sh|scripts/run_h200_selectivity_panel.sh) ;;
   *)
     echo "Refusing unrecognized sweep script: ${sweep_script}" >&2
     exit 1
@@ -74,6 +74,7 @@ sync_and_validate() {
     scripts/wait_for_h200_gpu.sh \
     scripts/run_h200_sweep.sh \
     scripts/run_h200_ci_extension.sh \
+    scripts/run_h200_causal_ci_extension.sh \
     scripts/run_qwen32b_followup.sh \
     scripts/run_h200_selectivity_panel.sh
 }
