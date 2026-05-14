@@ -33,6 +33,11 @@ The paper should not rely only on scatterplots and bar charts. The visual goal i
    - Intended pattern: model/policy regimes where safety erasure is localized versus diffuse.
    - Implemented as `safety_state_atlas.*`, with SSEI as cell color and system/user cache loss as overlaid glyph size.
 
+6. **Cross-model gallery**
+   - 15 panel-level figures rendered by `scripts/make_cross_model_visuals.py` from `docs/audit/*_judgments.gemini.jsonl`.
+   - Lives at `docs/generated/cross_model_visuals/`: radar profile, model-by-suite refusal heatmap, policy-treatment dumbbells, helpfulness-vs-safety scatter, judge-confidence violin, suite-by-policy small multiples, response-length density, policy-delta heatmaps (refusal, unsafe), category strip plot, treatment-arrow plots (unsafe, leakage), capability-vs-safety quadrant, per-model overview.
+   - Regenerate after any new judging coverage lands; the script ignores blocked rows automatically.
+
 ## Implementation Notes
 
 - Every visual must export PDF, SVG, PNG, source CSV, and manifest hashes.
