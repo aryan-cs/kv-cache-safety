@@ -36,18 +36,6 @@ cache_policies:
       components: [key, value]
   - name: kv_int4_sim
     patch_from_baseline:
-      token_roles: [system]
-      max_tokens: 16
-      selection: first
-      components: [key]
-  - name: kv_int4_sim
-    patch_from_baseline:
-      token_roles: [system]
-      max_tokens: 16
-      selection: first
-      components: [value]
-  - name: kv_int4_sim
-    patch_from_baseline:
       token_roles: [user]
       match_token_count_to_roles: [system]
       max_tokens: 16
@@ -57,5 +45,5 @@ cache_policies:
     budget: 128
     sink_tokens: 8
     protected_spans: [system, policy]
-seeds: [0, 1, 2]
+seeds: [0]
 limit_per_suite: null
