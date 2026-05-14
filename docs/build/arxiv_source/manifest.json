@@ -13,25 +13,25 @@
   ],
   "copied_file_provenance": [
     {
-      "bundle_bytes": 35670,
+      "bundle_bytes": 24567,
       "bundle_path": "main.tex",
-      "bundle_sha256": "4a9df52e5681dfb12c441593bec165e8d13e04effb787961b5f57ede3625385b",
+      "bundle_sha256": "b319eb8bb5c637fab9a81d0d94264bf5d028247eeb13a84dc6e0163a830ac7c1",
       "direct_copy": false,
       "kind": "latex_main",
-      "source_bytes": 35955,
+      "source_bytes": 24673,
       "source_path": "docs/latex/main.tex",
-      "source_sha256": "804ec616e195c3398bea35f934fdb8487ce3dff8467153ea3c8a7c12d7d91a64",
+      "source_sha256": "fc88eb05f194c064fc104865b8a2db2a6c90433dbdd3b91dc791726857821be5",
       "transform": "rewrite_main_tex_for_arxiv"
     },
     {
-      "bundle_bytes": 11590,
+      "bundle_bytes": 12415,
       "bundle_path": "references.bib",
-      "bundle_sha256": "90da04f82d3556dbeb738af23514f0e688b5a27c34c3738c4fd429eee79f19e1",
+      "bundle_sha256": "aec753f30e58726c337010bac844101359b21390638167fc6b4b5f6776a00b80",
       "direct_copy": true,
       "kind": "bibliography",
-      "source_bytes": 11590,
+      "source_bytes": 12415,
       "source_path": "docs/references.bib",
-      "source_sha256": "90da04f82d3556dbeb738af23514f0e688b5a27c34c3738c4fd429eee79f19e1"
+      "source_sha256": "aec753f30e58726c337010bac844101359b21390638167fc6b4b5f6776a00b80"
     },
     {
       "bundle_bytes": 14662,
@@ -144,6 +144,16 @@
       "source_sha256": "eed9a1cfa9e8bbd38ac9edf1c89011925adba3a04f1f482e08cb72c726fcba46"
     },
     {
+      "bundle_bytes": 908,
+      "bundle_path": "generated/active_primary/robustness_analysis.tex",
+      "bundle_sha256": "19b23afc891c9fedc188e5b66d5ebbbbd7b2d0113811adf15e705d6cbc0c982e",
+      "direct_copy": true,
+      "kind": "generated",
+      "source_bytes": 908,
+      "source_path": "docs/generated/active_primary/robustness_analysis.tex",
+      "source_sha256": "19b23afc891c9fedc188e5b66d5ebbbbd7b2d0113811adf15e705d6cbc0c982e"
+    },
+    {
       "bundle_bytes": 1605,
       "bundle_path": "generated/active_primary/suite_level_effects_table.tex",
       "bundle_sha256": "139a13cffc54ba4f3b6fd029567eb8794345acdd53d06264fd9700aeaf87ff5a",
@@ -202,6 +212,16 @@
       "source_bytes": 454,
       "source_path": "docs/generated/active_primary/result_macros.tex",
       "source_sha256": "eed9a1cfa9e8bbd38ac9edf1c89011925adba3a04f1f482e08cb72c726fcba46"
+    },
+    {
+      "bundle_bytes": 908,
+      "bundle_path": "generated/active_primary/robustness_analysis.tex",
+      "bundle_sha256": "19b23afc891c9fedc188e5b66d5ebbbbd7b2d0113811adf15e705d6cbc0c982e",
+      "direct_copy": true,
+      "kind": "generated",
+      "source_bytes": 908,
+      "source_path": "docs/generated/active_primary/robustness_analysis.tex",
+      "source_sha256": "19b23afc891c9fedc188e5b66d5ebbbbd7b2d0113811adf15e705d6cbc0c982e"
     },
     {
       "bundle_bytes": 1605,
@@ -274,7 +294,7 @@
   "invalid_audit": [],
   "invalid_figures": [],
   "invalid_generated": [],
-  "main_tex_sha256": "4a9df52e5681dfb12c441593bec165e8d13e04effb787961b5f57ede3625385b",
+  "main_tex_sha256": "b319eb8bb5c637fab9a81d0d94264bf5d028247eeb13a84dc6e0163a830ac7c1",
   "missing_audit": [
     "docs/audit/h200_qwen_full_sweep_summary",
     "docs/audit/h200_causal_patch_qwen7b_summary",
@@ -283,7 +303,7 @@
   ],
   "missing_figures": [],
   "missing_generated": [],
-  "references_sha256": "90da04f82d3556dbeb738af23514f0e688b5a27c34c3738c4fd429eee79f19e1",
+  "references_sha256": "aec753f30e58726c337010bac844101359b21390638167fc6b4b5f6776a00b80",
   "schema_version": 1,
   "skipped_optional_generated": []
 }
