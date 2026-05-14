@@ -1,0 +1,10 @@
+{
+  "activity": "complete",
+  "completed": 39030,
+  "current": {
+    "model_id": "Qwen/Qwen3-8B"
+  },
+  "expected": 39030,
+  "progress_percent": 100.0,
+  "updated_at": "20260514T082819Z"
+}
