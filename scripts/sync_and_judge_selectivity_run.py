@@ -19,9 +19,8 @@ class JudgePaths:
 def main() -> None:
     parser = argparse.ArgumentParser(
         description=(
-            "Fetch a completed H200 selectivity run and run local Codex/Gemini or "
-            "Gemini-only audit judging without writing judge state into the H200-owned "
-            "results directory."
+            "Fetch a completed H200 selectivity run and run local Gemini audit "
+            "judging without writing judge state into the H200-owned results directory."
         )
     )
     parser.add_argument("--run-id", required=True)
@@ -30,7 +29,7 @@ def main() -> None:
     parser.add_argument("--audit-dir", type=Path, default=Path("docs/audit"))
     parser.add_argument("--per-suite-policy", type=int, default=8)
     parser.add_argument("--strategy", choices=["effect", "random"], default="effect")
-    parser.add_argument("--providers", default="codex,gemini")
+    parser.add_argument("--providers", default="gemini")
     parser.add_argument("--judge-mode", choices=["all-providers", "first-success"], default="all-providers")
     parser.add_argument("--workers", type=int, default=2)
     parser.add_argument("--timeout-seconds", type=int, default=180)
@@ -38,23 +37,15 @@ def main() -> None:
     parser.add_argument("--skip-fetch", action="store_true")
     parser.add_argument("--allow-partial", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
-    parser.add_argument("--approval-note", default=None)
+    parser.add_argument(
+        "--approval-note",
+        default="User approved local Gemini judging for H200-generated selectivity audit rows.",
+    )
     args = parser.parse_args()
-
-    suffix = _judge_suffix(args.providers)
-    if args.approval_note is None:
-        if suffix == "codex_gemini":
-            args.approval_note = (
-                "User approved local Codex/Gemini judging for H200-generated selectivity audit rows."
-            )
-        else:
-            args.approval_note = (
-                "User approved local Gemini judging for H200-generated selectivity audit rows."
-            )
 
     run_dir = args.local_results_dir / args.run_id
     remote_run_dir = args.remote_run_dir or f"results/{args.run_id}"
-    paths = judge_paths_for_run(args.run_id, args.audit_dir, suffix=suffix)
+    paths = judge_paths_for_run(args.run_id, args.audit_dir)
 
     commands: list[list[str]] = []
     if not args.skip_fetch:
@@ -116,18 +107,13 @@ def main() -> None:
     )
 
 
-def judge_paths_for_run(run_id: str, audit_dir: Path, *, suffix: str) -> JudgePaths:
+def judge_paths_for_run(run_id: str, audit_dir: Path) -> JudgePaths:
     return JudgePaths(
         audit_csv=audit_dir / f"{run_id}_audit_blinded.csv",
         audit_key=audit_dir / f"{run_id}_audit_key.jsonl",
-    approved_input=audit_dir / f"{run_id}_audit_key.{suffix}_approved.jsonl",
-    judgments=audit_dir / f"{run_id}_judgments.{suffix}.jsonl",
+        approved_input=audit_dir / f"{run_id}_audit_key.gemini_approved.jsonl",
+        judgments=audit_dir / f"{run_id}_judgments.gemini.jsonl",
     )
-
-
-def _judge_suffix(providers: str) -> str:
-    tokens = {token.strip() for token in providers.split(",") if token.strip()}
-    return "codex_gemini" if "codex" in tokens else "gemini"
 
 
 def is_run_complete(run_dir: Path) -> tuple[bool, str]:
@@ -149,7 +135,7 @@ def is_run_complete(run_dir: Path) -> tuple[bool, str]:
 def _judge_command(args: argparse.Namespace, paths: JudgePaths) -> list[str]:
     command = [
         sys.executable,
-        "scripts/judge_with_codex_gemini.py",
+        "scripts/judge_with_gemini.py",
         "--input-jsonl",
         str(paths.approved_input),
         "--output-jsonl",

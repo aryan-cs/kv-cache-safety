@@ -20,10 +20,10 @@
     "4"
   ],
   "local_judging_outputs": {
-    "approved_input": "docs/audit/selectivity_h200_powered_gemma2_9b_it_audit_key.codex_gemini_approved.jsonl",
+    "approved_input": "docs/audit/selectivity_h200_powered_gemma2_9b_it_audit_key.gemini_approved.jsonl",
     "audit_csv": "docs/audit/selectivity_h200_powered_gemma2_9b_it_audit_blinded.csv",
     "audit_key": "docs/audit/selectivity_h200_powered_gemma2_9b_it_audit_key.jsonl",
-    "judgments": "docs/audit/selectivity_h200_powered_gemma2_9b_it_judgments.codex_gemini.jsonl"
+    "judgments": "docs/audit/selectivity_h200_powered_gemma2_9b_it_judgments.gemini.jsonl"
   },
   "model_family": "Gemma",
   "model_id": "google/gemma-2-9b-it",

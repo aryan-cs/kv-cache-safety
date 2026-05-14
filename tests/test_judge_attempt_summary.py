@@ -25,7 +25,7 @@ def test_summarize_judge_attempts_separates_raw_failures_from_repaired_coverage(
             [
                 json.dumps({"audit_id": "a1", "judge_provider": "gemini", "parser_status": "blocked"}),
                 json.dumps({"audit_id": "a1", "judge_provider": "gemini", "parser_status": "parsed"}),
-                json.dumps({"audit_id": "a2", "judge_provider": "codex", "parser_status": "parsed"}),
+                json.dumps({"audit_id": "a2", "judge_provider": "gemini", "parser_status": "parsed"}),
             ]
         )
         + "\n",
@@ -37,14 +37,13 @@ def test_summarize_judge_attempts_separates_raw_failures_from_repaired_coverage(
     assert summary["input_rows"] == 2
     assert summary["judgment_attempt_rows"] == 3
     assert summary["provider_status_counts"] == {
-        "codex:parsed": 1,
         "gemini:blocked": 1,
-        "gemini:parsed": 1,
+        "gemini:parsed": 2,
     }
     assert summary["provider_coverage"]["gemini"] == {
-        "attempted_rows": 1,
-        "parsed_rows": 1,
-        "missing_parsed_rows": 1,
+        "attempted_rows": 2,
+        "parsed_rows": 2,
+        "missing_parsed_rows": 0,
     }
     assert summary["rows_with_any_parsed_judge"] == 2
     assert summary["rows_without_any_parsed_judge"] == 0

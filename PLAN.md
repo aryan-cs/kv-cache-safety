@@ -8,11 +8,11 @@ The active project is a cross-family safety-selectivity study under the protocol
 
 Model access is Hugging Face only. Do not use Ollama for this protocol.
 
-Hugging Face public and gated access is working on H200 with the supplied read-only token. The smoke matrix has completed for the public and gated models that cleared harness validation: GPT-OSS 20B, Qwen 2.5 base, Qwen 2.5 Instruct, Qwen 3 8B, Llama 3.1 8B Instruct, Gemma 2 9B IT, Mistral 7B Instruct v0.3, OLMo 3 7B Instruct, and Phi-4. Chat-safety smoke outputs are judged locally with Codex+Gemini where family separation permits; GPT-OSS-family outputs use Gemini-only judging.
+Hugging Face public and gated access is working on H200 with the supplied read-only token. The smoke matrix has completed for the public and gated models that cleared harness validation: GPT-OSS 20B, Qwen 2.5 base, Qwen 2.5 Instruct, Qwen 3 8B, Llama 3.1 8B Instruct, Gemma 2 9B IT, Mistral 7B Instruct v0.3, OLMo 3 7B Instruct, and Phi-4. Chat-safety smoke outputs are judged locally with Gemini where family separation permits (Gemini cannot judge Gemma-family or Gemini-family rows).
 
 Completed powered runs with local audit judging currently include GPT-OSS 20B, Qwen 2.5 7B Instruct, Llama 3.1 8B Instruct, Gemma 2 9B IT, and Mistral 7B Instruct v0.3. Keep per-model audit and judgment artifacts under `docs/audit/` with provenance notes.
 
-Historical commit notes (superseded if newer commits exist): Llama audit judging complete through commit `6768cb1`; Gemma artifacts and Codex/Gemini blinded-v3 judgments complete through commit `7f5ca13`. The local clean development clone was pushed through commit `7efa5a4`, which keeps future local judging protocol-aware and defaults judged rows to blinded-v3 with Codex gpt-5.4 plus Gemini.
+Historical commit notes (superseded if newer commits exist): Llama audit judging complete through commit `6768cb1`; Gemma artifacts and prior blinded-v3 judgments complete through commit `7f5ca13`. The local clean development clone was pushed through commit `7efa5a4`, which keeps future local judging protocol-aware and defaults judged rows to blinded-v3 with Gemini.
 
 The active H200 run is:
 
@@ -203,12 +203,6 @@ Judging happens on the Mac, not H200.
 Primary judge command:
 
 ```bash
-codex exec --cd /Users/aryan/Desktop/projects/llm-safety --sandbox read-only --ephemeral --output-last-message <tmpfile> -
-```
-
-Fallback judge command:
-
-```bash
 gemini --skip-trust --approval-mode plan --output-format text -p '<prompt>'
 ```
 
@@ -220,7 +214,7 @@ uv run python scripts/sync_and_judge_selectivity_run.py \
   --workers 4
 ```
 
-This fetches the H200-owned run directory, exports a per-model audit sample, approves that key JSONL for local model-judge data egress, and writes Codex/Gemini judgments under `docs/audit/`. For GPT-OSS-family outputs, use Gemini-only judging to preserve family separation. Judge state is deliberately kept out of `results/<run_id>/`, because repeated H200 result syncs treat that directory as remote-owned.
+This fetches the H200-owned run directory, exports a per-model audit sample, approves that key JSONL for local model-judge data egress, and writes Gemini judgments under `docs/audit/`. Gemini is the only supported local judge provider for this project; same-family blocking still applies so Gemini-evaluated runs cannot use Gemini as judge. Judge state is deliberately kept out of `results/<run_id>/`, because repeated H200 result syncs treat that directory as remote-owned.
 
 For merged panel artifacts, the audit exporter preserves `source_run_id` and `model_id` scope so identical public prompt IDs from different models cannot collapse into one sampled item.
 
@@ -237,15 +231,15 @@ uv run python scripts/export_human_audit_sample.py \
 
 uv run python scripts/approve_judge_egress.py \
   --input-jsonl docs/audit/<run_id>_audit_key.jsonl \
-  --output-jsonl docs/audit/<run_id>_audit_key.codex_gemini_approved.jsonl \
-  --approval-note "User approved local Codex/Gemini judging for H200-generated selectivity audit rows." \
+  --output-jsonl docs/audit/<run_id>_audit_key.gemini_approved.jsonl \
+  --approval-note "User approved local Gemini judging for H200-generated selectivity audit rows." \
   --approval-source user_instruction \
   --overwrite
 
-uv run python scripts/judge_with_codex_gemini.py \
-  --input-jsonl docs/audit/<run_id>_audit_key.codex_gemini_approved.jsonl \
-  --output-jsonl docs/audit/<run_id>_judgments.codex_gemini.jsonl \
-  --providers codex,gemini \
+uv run python scripts/judge_with_gemini.py \
+  --input-jsonl docs/audit/<run_id>_audit_key.gemini_approved.jsonl \
+  --output-jsonl docs/audit/<run_id>_judgments.gemini.jsonl \
+  --providers gemini \
   --judge-mode all-providers \
   --workers 4 \
   --resume \

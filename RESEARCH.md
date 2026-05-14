@@ -172,14 +172,12 @@ Model-judge outputs are diagnostic labels.
 
 | Judge channel | Invocation | Role |
 | --- | --- | --- |
-| GPT-5.5 via Codex | `codex exec` | External adjudication and disagreement analysis for non-OpenAI-family outputs when family separation allows. |
-| Gemini 3.1 | `gemini -p` | External adjudication, especially for GPT-OSS-family outputs and any run where Codex is disabled. |
+| Gemini 3.1 | `gemini -p` | External adjudication for non-Gemini/non-Gemma rows; the sole supported local judge channel. |
 
 Audit requirements:
 
 - Evaluated model family and judge family must differ.
-- GPT-OSS, `gpt-oss-sg`, and `gpt-oss-der` outputs require a non-GPT-OSS primary judge; Gemini is the active judge channel for those rows.
-- CodexExec judging may be disabled if policy requires; if so, use Gemini-only and record the judge channel in provenance.
+- Gemma- and Gemini-family rows cannot be judged by Gemini and need human or future cross-family judge channels.
 - External judge calls are run only on audit rows approved for data egress.
 - Judge prompts use blinded inputs without model family, cache policy, or baseline/treatment ordering.
 - Judge rubrics use task-specific objective criteria. Capability labels are based on answer keys or explicit rubrics, not general helpfulness.
@@ -196,7 +194,7 @@ Human adjudication is the only source of human-label evidence.
 
 ### Phase 0: Registration
 
-Before powered runs, freeze checkpoint revisions, prompt suites, cache policies, judge rubrics, provenance fields, and decision criteria. Validate model loading, backend metadata capture, same-family judge blocking, Codex/GPT-5.5 and Gemini judge wrappers (or Gemini-only if CodexExec is disabled), and token-role tracing for any `policy_pinned` or `user_pinned` chat-safety run.
+Before powered runs, freeze checkpoint revisions, prompt suites, cache policies, judge rubrics, provenance fields, and decision criteria. Validate model loading, backend metadata capture, same-family judge blocking, the Gemini judge wrapper, and token-role tracing for any `policy_pinned` or `user_pinned` chat-safety run.
 
 Run and document power calculations before Phase 0 closes. The default powered target is at least 1,201 public prompt clusters per confirmatory suite, corresponding to a conservative two-component SSEI planning calculation for a full CI width of 0.08; launchers request 1,300 rows per public suite to leave headroom for filtering and parser loss. If the available per-model trial budget cannot resolve the registered `SSEI_abs` and `SSEI_logodds` thresholds, pre-register the affected suite as exploratory rather than confirmatory before Phase 2 begins.
 
@@ -215,7 +213,7 @@ Each run preserves the resolved configuration, prompt manifest, generations, cac
 ### Phase 3: Audit
 
 - Export blinded baseline/treatment pairs.
-- Run Codex/GPT-5.5 and Gemini judges where data-egress rules allow, with Gemini-only for GPT-OSS-family outputs or when CodexExec is disabled.
+- Run the Gemini judge where data-egress rules allow; Gemma- and Gemini-family rows are left to human adjudication.
 - Preserve raw outputs and parse failures.
 - Sample human review from high-impact and high-disagreement strata.
 - Report judge agreement by source rather than collapsing sources.

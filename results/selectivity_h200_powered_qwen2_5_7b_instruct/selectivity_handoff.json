@@ -20,10 +20,10 @@
     "4"
   ],
   "local_judging_outputs": {
-    "approved_input": "docs/audit/selectivity_h200_powered_qwen2_5_7b_instruct_audit_key.codex_gemini_approved.jsonl",
+    "approved_input": "docs/audit/selectivity_h200_powered_qwen2_5_7b_instruct_audit_key.gemini_approved.jsonl",
     "audit_csv": "docs/audit/selectivity_h200_powered_qwen2_5_7b_instruct_audit_blinded.csv",
     "audit_key": "docs/audit/selectivity_h200_powered_qwen2_5_7b_instruct_audit_key.jsonl",
-    "judgments": "docs/audit/selectivity_h200_powered_qwen2_5_7b_instruct_judgments.codex_gemini.jsonl"
+    "judgments": "docs/audit/selectivity_h200_powered_qwen2_5_7b_instruct_judgments.gemini.jsonl"
   },
   "model_family": "Qwen 2.5",
   "model_id": "Qwen/Qwen2.5-7B-Instruct",

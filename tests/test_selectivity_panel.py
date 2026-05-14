@@ -235,14 +235,14 @@ def test_merge_selectivity_panel_preserves_family_rows(tmp_path: Path) -> None:
 def test_h200_selectivity_launcher_writes_paper_artifacts_to_paper_tree() -> None:
     script = Path("scripts/run_h200_selectivity_panel.sh").read_text(encoding="utf-8")
 
-        assert "docs/generated/selectivity_panel_phase0_ci_power.json" in script
-        assert "docs/generated/selectivity_panel_phase0_ci_power.md" in script
-        assert 'local generated_dir="docs/generated/${run_id}"' in script
+    assert "docs/generated/selectivity_panel_phase0_ci_power.json" in script
+    assert "docs/generated/selectivity_panel_phase0_ci_power.md" in script
+    assert 'local generated_dir="docs/generated/${run_id}"' in script
     assert (
-            'local generated_dir="docs/generated/selectivity_h200_${run_stage}_combined"'
+        'local generated_dir="docs/generated/selectivity_h200_${run_stage}_combined"'
         in script
     )
-        assert "paper/generated" not in script
+    assert "paper/generated" not in script
 
 
 def test_h200_selectivity_launcher_commits_results_with_paper_assets() -> None:
@@ -288,6 +288,6 @@ def test_selectivity_runbook_is_operator_complete() -> None:
     assert "scripts/fetch_h200_selectivity_panel.sh" in runbook
     assert "docs/generated/selectivity_panel_phase0_ci_power.md" in runbook
     assert "scripts/approve_judge_egress.py" in runbook
-    assert "scripts/judge_with_codex_gemini.py" in runbook
+    assert "scripts/judge_with_gemini.py" in runbook
     assert "scripts/assess_claims.py" in runbook
     assert "Phase 4 causal diagnostics are conditional" in runbook

@@ -5,7 +5,6 @@ import json
 import os
 import re
 import subprocess
-import tempfile
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -38,12 +37,8 @@ capability_correct, confidence, notes
 PROMPT_PROTOCOL_VERSION = "blinded-v3"
 AUDIT_METADATA_VERSION = "judge-audit-v2"
 DATA_EGRESS_DEFAULT_FIELD = "data_egress_approved"
-EXTERNAL_PROPRIETARY_PROVIDERS = {"codex", "gemini"}
+EXTERNAL_PROPRIETARY_PROVIDERS = {"gemini"}
 DISABLED_JUDGE_PROVIDERS: dict[str, str] = {}
-if os.getenv("DISABLE_CODEX_JUDGE") == "1":
-    DISABLED_JUDGE_PROVIDERS["codex"] = (
-        "CodexExec judging is disabled for this project; use Gemini only."
-    )
 
 
 @dataclass(frozen=True)
@@ -74,8 +69,6 @@ def build_judge_prompt(row: dict[str, Any]) -> str:
 def run_judge_command(command: JudgeCommand, prompt: str) -> dict[str, Any]:
     if command.provider in DISABLED_JUDGE_PROVIDERS:
         raise RuntimeError(DISABLED_JUDGE_PROVIDERS[command.provider])
-    if command.provider == "codex":
-        return _run_codex(command, prompt)
     if command.provider == "gemini":
         return _run_gemini(command, prompt)
     raise ValueError(f"Unsupported judge provider: {command.provider}")
@@ -237,8 +230,6 @@ def infer_judge_family(command: JudgeCommand) -> str:
     explicit_family = getattr(command, "judge_family", None)
     if explicit_family:
         return infer_model_family(str(explicit_family))
-    if command.provider == "codex":
-        return "openai_gpt"
     if command.provider == "gemini":
         return "gemini"
     return infer_model_family(command.model or command.provider)
@@ -286,48 +277,6 @@ def sha256_text(text: str) -> str:
 
 def utc_now() -> str:
     return datetime.now(UTC).isoformat().replace("+00:00", "Z")
-
-
-def _run_codex(command: JudgeCommand, prompt: str) -> dict[str, Any]:
-    cwd = str(command.cwd or Path.cwd())
-    with tempfile.NamedTemporaryFile("r", encoding="utf-8", delete=False) as output_file:
-        output_path = Path(output_file.name)
-    args = [
-        "codex",
-        "exec",
-        "--cd",
-        cwd,
-        "--sandbox",
-        "read-only",
-        "--ephemeral",
-        "--output-last-message",
-        str(output_path),
-    ]
-    if command.model:
-        args.extend(["--model", command.model])
-    args.append("-")
-    try:
-        completed = subprocess.run(
-            args,
-            input=prompt,
-            text=True,
-            capture_output=True,
-            timeout=command.timeout_seconds,
-            cwd=cwd,
-            check=False,
-        )
-        raw_output = output_path.read_text(encoding="utf-8").strip()
-        if not raw_output:
-            raw_output = completed.stdout.strip()
-        if completed.returncode != 0 and not raw_output:
-            raise RuntimeError((completed.stderr or completed.stdout).strip())
-        return {
-            "raw_output": raw_output,
-            "command_line": " ".join(args),
-            "tool_version": _tool_version("codex"),
-        }
-    finally:
-        output_path.unlink(missing_ok=True)
 
 
 def _run_gemini(command: JudgeCommand, prompt: str) -> dict[str, Any]:
@@ -454,7 +403,7 @@ def _judgment_record(
         "judge_started_at": started_at,
         "judge_completed_at": utc_now(),
         "annotation_source_type": "proprietary_model_judge"
-        if command.provider in {"codex", "gemini"}
+        if command.provider == "gemini"
         else "model_judge",
         "rubric_sha256": sha256_text(RUBRIC),
         "judge_prompt_sha256": sha256_text(prompt),
