@@ -1,15 +1,15 @@
 {
-  "analysis_git_commit": "a2dedc4638be10117ae32dbc25ea0e22c4c96296",
+  "analysis_git_commit": "66d9896501e56c56631743bdea38daee3eb24729",
   "analysis_git_dirty": true,
-  "analysis_git_status_short": "?? .claude/",
+  "analysis_git_status_short": "M docs/generated/selectivity_h200_powered_gemma2_9b_it/artifact_manifest.json\n M docs/generated/selectivity_h200_powered_gpt_oss_20b/artifact_manifest.json\n M docs/generated/selectivity_h200_powered_mistral_7b_instruct_v0_3/artifact_manifest.json\n M docs/generated/selectivity_h200_powered_olmo3_7b_instruct/artifact_manifest.json\n M docs/generated/selectivity_h200_powered_phi4/artifact_manifest.json\n M docs/generated/selectivity_h200_powered_qwen2_5_7b_base/artifact_manifest.json\n M docs/generated/selectivity_h200_powered_qwen2_5_7b_instruct/artifact_manifest.json\n?? .claude/",
   "macro_prefix": "Primary",
   "results_dir": "results/selectivity_h200_powered_llama3_1_8b_instruct",
   "schema_version": 1,
   "source_artifacts": {
     "figures/manifest.json": {
-      "bytes": 13230,
+      "bytes": 13228,
       "path": "results/selectivity_h200_powered_llama3_1_8b_instruct/figures/manifest.json",
-      "sha256": "e44d74ffa78bb8b52148bea53ee29436dfb457c39d051f7526a7cfd16f477f72"
+      "sha256": "6ee3158036c5e962e39e871ae0f10763e027a3ff3235f5c7c813af697cc74f38"
     },
     "manifest.json": {
       "bytes": 244308,
