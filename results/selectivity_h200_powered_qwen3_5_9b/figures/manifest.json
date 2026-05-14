@@ -1,0 +1,195 @@
+{
+  "figures": [
+    {
+      "data_csv": "results/selectivity_h200_powered_qwen3_5_9b/figures/prompt_effect_constellation.csv",
+      "data_csv_sha256": "d0cdc37b32e52d77e84c19da067e38d26fe68bd2a64c63c5002e26cb4c76c767",
+      "data_row_count": 24634,
+      "name": "prompt_effect_constellation",
+      "pdf": "results/selectivity_h200_powered_qwen3_5_9b/figures/prompt_effect_constellation.pdf",
+      "pdf_sha256": "926d36cc70e23367735f2c77ca3d717feeb52db132cc35d0488823ddafa4b6f2",
+      "png": "results/selectivity_h200_powered_qwen3_5_9b/figures/prompt_effect_constellation.png",
+      "png_sha256": "7d5efcd93b1cd84addad6309f9980383e00e635cdb83a977ceddbe5140b6a540",
+      "svg": "results/selectivity_h200_powered_qwen3_5_9b/figures/prompt_effect_constellation.svg",
+      "svg_sha256": "2d4c1ee4f94509169e40e465d0229a64a7045c9429031341f8bcdd5b7309b599"
+    },
+    {
+      "data_csv": "results/selectivity_h200_powered_qwen3_5_9b/figures/safety_score.csv",
+      "data_csv_sha256": "755d4e7417fe4e47394f3fa4841333a60455e22f08943ca62aa6a5c891ad28bc",
+      "data_row_count": 42,
+      "name": "safety_score",
+      "pdf": "results/selectivity_h200_powered_qwen3_5_9b/figures/safety_score.pdf",
+      "pdf_sha256": "b5231887b0a02d795f6a0b990ed0d7ea354e96819275be7f884d6368e9f25689",
+      "png": "results/selectivity_h200_powered_qwen3_5_9b/figures/safety_score.png",
+      "png_sha256": "2cb4e74a4e38f4b4a63986581540b927bd1420b5116dc3df892b2ff0fb61655c",
+      "svg": "results/selectivity_h200_powered_qwen3_5_9b/figures/safety_score.svg",
+      "svg_sha256": "28caa6fef2a30c0b8c0968be3ad0f2c6d451dcd927e4d96c21ecaa8b66caac37"
+    },
+    {
+      "data_csv": "results/selectivity_h200_powered_qwen3_5_9b/figures/capability_score.csv",
+      "data_csv_sha256": "fde09d11b947a07ba09d06752cc1a36edf3e49f3441cf161780edbfd81198199",
+      "data_row_count": 42,
+      "name": "capability_score",
+      "pdf": "results/selectivity_h200_powered_qwen3_5_9b/figures/capability_score.pdf",
+      "pdf_sha256": "67a4e98f2605bcb1f6942b6fd9c4f20d7990b097d441080ed0a8b047bede9003",
+      "png": "results/selectivity_h200_powered_qwen3_5_9b/figures/capability_score.png",
+      "png_sha256": "27c7ea281ad0477f53ce57d2cc1175292f8cd75180ab36046fb7cfec2079109c",
+      "svg": "results/selectivity_h200_powered_qwen3_5_9b/figures/capability_score.svg",
+      "svg_sha256": "ffe21366588dd806be7524c576e792ea9545b276b20bbebf0f3f754e83101337"
+    },
+    {
+      "data_csv": "results/selectivity_h200_powered_qwen3_5_9b/figures/rouge_l_leakage_recall.csv",
+      "data_csv_sha256": "2716c90faccae104dcbc3920046f8db8a92e8a378f6609e3039ca7d4c24b1962",
+      "data_row_count": 42,
+      "name": "rouge_l_leakage_recall",
+      "pdf": "results/selectivity_h200_powered_qwen3_5_9b/figures/rouge_l_leakage_recall.pdf",
+      "pdf_sha256": "0330060738077c04b1061d4cbbacff09a8d9d3fd3803aa2d206ef4f0f00e38b8",
+      "png": "results/selectivity_h200_powered_qwen3_5_9b/figures/rouge_l_leakage_recall.png",
+      "png_sha256": "6a00ae7d1a3f5be7380269df19d54044d6ca408549c01ef87e3e52ea54a50811",
+      "svg": "results/selectivity_h200_powered_qwen3_5_9b/figures/rouge_l_leakage_recall.svg",
+      "svg_sha256": "39113e6c11bcbb79a7bff4bc160b9bb386fc6ab0b930691f38a97bc7a62a516d"
+    },
+    {
+      "data_csv": "results/selectivity_h200_powered_qwen3_5_9b/figures/selective_safety_erasure_heatmap.csv",
+      "data_csv_sha256": "27fb81f7974c2c81e792f4fff7c07300cdb3ea913556f37dc60a3812d11c7127",
+      "data_row_count": 5,
+      "name": "selective_safety_erasure_heatmap",
+      "pdf": "results/selectivity_h200_powered_qwen3_5_9b/figures/selective_safety_erasure_heatmap.pdf",
+      "pdf_sha256": "ebe66ca61395a0b59becc89ad27f62268ef9b5453b8a8beb42ac6978ed7901a4",
+      "png": "results/selectivity_h200_powered_qwen3_5_9b/figures/selective_safety_erasure_heatmap.png",
+      "png_sha256": "a096a0d1db40fd78aa98d1cce5c11c40e40b9403e6e10a814f560caebcf7814c",
+      "svg": "results/selectivity_h200_powered_qwen3_5_9b/figures/selective_safety_erasure_heatmap.svg",
+      "svg_sha256": "a2e73a90189e50f7c593d007da43f59c1d5f8bec4db38f9c4644599ba2cab31e"
+    },
+    {
+      "data_csv": "results/selectivity_h200_powered_qwen3_5_9b/figures/safety_vs_capability_degradation.csv",
+      "data_csv_sha256": "761f43a49922ea13d099d2c1f1898c987e020e1641170ea7318652877adc973b",
+      "data_row_count": 5,
+      "name": "safety_vs_capability_degradation",
+      "pdf": "results/selectivity_h200_powered_qwen3_5_9b/figures/safety_vs_capability_degradation.pdf",
+      "pdf_sha256": "269f7c7ced95dce55e6d6ea89f0b656599dece7a71f57d3bf53fcd7606929cd3",
+      "png": "results/selectivity_h200_powered_qwen3_5_9b/figures/safety_vs_capability_degradation.png",
+      "png_sha256": "da31cea320c26e174a7bc7fd94959442ba908e2f75d480dca650371a8a48403f",
+      "svg": "results/selectivity_h200_powered_qwen3_5_9b/figures/safety_vs_capability_degradation.svg",
+      "svg_sha256": "84d37d7e3de7b0cd99fe4af0a697c6ab797525579935b7b342cab6f01cc49589"
+    },
+    {
+      "data_csv": "results/selectivity_h200_powered_qwen3_5_9b/figures/safety_capability_phase_portrait.csv",
+      "data_csv_sha256": "dd5b6c07351bb67d3010d0cbc87c0b7aec8c62949cb151920349dd05c26cae85",
+      "data_row_count": 5,
+      "name": "safety_capability_phase_portrait",
+      "pdf": "results/selectivity_h200_powered_qwen3_5_9b/figures/safety_capability_phase_portrait.pdf",
+      "pdf_sha256": "d57d8a6928c2fe4effc21aaef27da9b06e6274a1098c3a159b7a4ccd6f04573a",
+      "png": "results/selectivity_h200_powered_qwen3_5_9b/figures/safety_capability_phase_portrait.png",
+      "png_sha256": "20a0653a7cda9756cf2fbe93bb0dc7b98a2f5931654a73338b0fb010274ab86a",
+      "svg": "results/selectivity_h200_powered_qwen3_5_9b/figures/safety_capability_phase_portrait.svg",
+      "svg_sha256": "81bdfd7a6016500ae803faa5b2a69073f0a068044209b77ae90f7e97a08b0609"
+    },
+    {
+      "data_csv": "results/selectivity_h200_powered_qwen3_5_9b/figures/paired_safety_degradation_forest.csv",
+      "data_csv_sha256": "4887c6a3fa05e59d40745b2b7e5e751a04abd7c2aabd2c28cee0be5d617d3c64",
+      "data_row_count": 30,
+      "name": "paired_safety_degradation_forest",
+      "pdf": "results/selectivity_h200_powered_qwen3_5_9b/figures/paired_safety_degradation_forest.pdf",
+      "pdf_sha256": "dcd3ab94c8f86d3e77169ed13bde2b6fe0fffaeb83a71d42b61938fc19009992",
+      "png": "results/selectivity_h200_powered_qwen3_5_9b/figures/paired_safety_degradation_forest.png",
+      "png_sha256": "7e13a0402df873a1865b0954b163233b6c1b16204526bc097cd280eb6ede1ca3",
+      "svg": "results/selectivity_h200_powered_qwen3_5_9b/figures/paired_safety_degradation_forest.svg",
+      "svg_sha256": "5d74d1958d6acd9a6b8547682ae8add0e6c50bcacdb3f512a221125babf5beff"
+    },
+    {
+      "data_csv": "results/selectivity_h200_powered_qwen3_5_9b/figures/policy_uncertainty_braid.csv",
+      "data_csv_sha256": "dfddeb9809493fa15206752f5e559874c1415afceb6df2a77a71845218f9199d",
+      "data_row_count": 15,
+      "name": "policy_uncertainty_braid",
+      "pdf": "results/selectivity_h200_powered_qwen3_5_9b/figures/policy_uncertainty_braid.pdf",
+      "pdf_sha256": "29e46468f17da74a56cedfad59275da602459c84eda9b6f369828baf572f5d19",
+      "png": "results/selectivity_h200_powered_qwen3_5_9b/figures/policy_uncertainty_braid.png",
+      "png_sha256": "7873d7d073af852876118ca760a890ec7afedb994f0d9e244ee725955a722c8f",
+      "svg": "results/selectivity_h200_powered_qwen3_5_9b/figures/policy_uncertainty_braid.svg",
+      "svg_sha256": "bcb668b853dae0ea6c09d357adbdc411c954c2dee8b8e9f375366fe8f84f4dfe"
+    },
+    {
+      "data_csv": "results/selectivity_h200_powered_qwen3_5_9b/figures/top_selective_effects.csv",
+      "data_csv_sha256": "2dd9ae60169252f659317727a6622e6a5a8a1d118505d441760fcca8b5adf52c",
+      "data_row_count": 5,
+      "name": "top_selective_effects",
+      "pdf": "results/selectivity_h200_powered_qwen3_5_9b/figures/top_selective_effects.pdf",
+      "pdf_sha256": "4b9de6100aa470f6864334826c08903a72731e14cd3582711fb0ed9656302aa4",
+      "png": "results/selectivity_h200_powered_qwen3_5_9b/figures/top_selective_effects.png",
+      "png_sha256": "3590886bb65ac9b0a22168ab31544a0da32198c623631a52e76a85fd280104a0",
+      "svg": "results/selectivity_h200_powered_qwen3_5_9b/figures/top_selective_effects.svg",
+      "svg_sha256": "7b739dd15b9868af015ea0234ba143aef7b572c2167bb9510f97ed7573a65df0"
+    },
+    {
+      "data_csv": "results/selectivity_h200_powered_qwen3_5_9b/figures/cache_l2_retained_fraction.csv",
+      "data_csv_sha256": "c77166f335331ed1d99805afeb293450a005b698c8a2618818398e439cbe5992",
+      "data_row_count": 12,
+      "name": "cache_l2_retained_fraction",
+      "pdf": "results/selectivity_h200_powered_qwen3_5_9b/figures/cache_l2_retained_fraction.pdf",
+      "pdf_sha256": "14ce590466d6633e0ccac8540501f540cd5d1594a54cd1c3db57a97ce24731d4",
+      "png": "results/selectivity_h200_powered_qwen3_5_9b/figures/cache_l2_retained_fraction.png",
+      "png_sha256": "ca65a4f657fda4b844602bc81c021150e41cdeb4c82854e10e8bb091a8ea64b9",
+      "svg": "results/selectivity_h200_powered_qwen3_5_9b/figures/cache_l2_retained_fraction.svg",
+      "svg_sha256": "d1b0c2c51dbede8d87a585766dce891f865062062d547cef9417c87218c4c4d1"
+    },
+    {
+      "data_csv": "results/selectivity_h200_powered_qwen3_5_9b/figures/token_role_retention_heatmap.csv",
+      "data_csv_sha256": "db4425461b317bec7aee8522679d731ca9febd725100f207aec25fc1a5538688",
+      "data_row_count": 24,
+      "name": "token_role_retention_heatmap",
+      "pdf": "results/selectivity_h200_powered_qwen3_5_9b/figures/token_role_retention_heatmap.pdf",
+      "pdf_sha256": "ca28dc08ba60bf1ed02291baff90fe77d970817f4cad7e088e4fb67f9de4d316",
+      "png": "results/selectivity_h200_powered_qwen3_5_9b/figures/token_role_retention_heatmap.png",
+      "png_sha256": "56aaa35e0c33b843ba3a24f3f618176734e8ed36b7c67ddc854fbbe988a9e01c",
+      "svg": "results/selectivity_h200_powered_qwen3_5_9b/figures/token_role_retention_heatmap.svg",
+      "svg_sha256": "af28b85f3bb22251302854023e974e4abd59d4e78e208483c39d063f5f0b2c85"
+    },
+    {
+      "data_csv": "results/selectivity_h200_powered_qwen3_5_9b/figures/safety_state_atlas.csv",
+      "data_csv_sha256": "4839cf06c3617af3188249c6c4d5148c74cb511eaea6457701078f7031aac764",
+      "data_row_count": 5,
+      "name": "safety_state_atlas",
+      "pdf": "results/selectivity_h200_powered_qwen3_5_9b/figures/safety_state_atlas.pdf",
+      "pdf_sha256": "330ad2060c88df4f1d088b5cad8a5ded39814921ab3175e074d1c16cd84386cd",
+      "png": "results/selectivity_h200_powered_qwen3_5_9b/figures/safety_state_atlas.png",
+      "png_sha256": "d4ee4b29f67ebc19b27cb4567761de9ab98751f6d99058791f3d5e494c65d260",
+      "svg": "results/selectivity_h200_powered_qwen3_5_9b/figures/safety_state_atlas.svg",
+      "svg_sha256": "22b517eeb7c07b3ae2dc539d724ea5dce7206333d456811cd35e7f23bc41e873"
+    },
+    {
+      "data_csv": "results/selectivity_h200_powered_qwen3_5_9b/figures/cache_state_fingerprint.csv",
+      "data_csv_sha256": "7c0f828b5ff6b75d8764b73e36fe36d697ec19a388e693c58b65c803f3049ab4",
+      "data_row_count": 816,
+      "name": "cache_state_fingerprint",
+      "pdf": "results/selectivity_h200_powered_qwen3_5_9b/figures/cache_state_fingerprint.pdf",
+      "pdf_sha256": "aa654afc900d6b1faaa64ce32d4be45ff785120ee290488fda4d660b3fb3bee0",
+      "png": "results/selectivity_h200_powered_qwen3_5_9b/figures/cache_state_fingerprint.png",
+      "png_sha256": "b17a9cb7cbf85d97e83daea9ec8884aab5bc93045f0c8bb109a171b6e95a054b",
+      "svg": "results/selectivity_h200_powered_qwen3_5_9b/figures/cache_state_fingerprint.svg",
+      "svg_sha256": "1608150df6f5ec830adaf8ba469950c69b67bb88526d72c5db364c3a07e90fc3"
+    }
+  ],
+  "schema_version": 1,
+  "source_artifacts": {
+    "cache_stats.parquet": {
+      "bytes": 38751806,
+      "path": "results/selectivity_h200_powered_qwen3_5_9b/cache_stats.parquet",
+      "sha256": "b41c9f21e36467d354236c7a02d20759db3b1a37307526a78e719f6c00c11733"
+    },
+    "generations.jsonl": {
+      "bytes": 90660261,
+      "path": "results/selectivity_h200_powered_qwen3_5_9b/generations.jsonl",
+      "sha256": "9bd005b51562f8e505699adeaff87295a11dc32b5b554243c6c06bcde4b61f85"
+    },
+    "manifest.json": {
+      "bytes": 244246,
+      "path": "results/selectivity_h200_powered_qwen3_5_9b/manifest.json",
+      "sha256": "3708d9a6ce25557ea8d1a48a51cc5bbc613cc7155613d0f306b875ee29b47387"
+    },
+    "metrics.json": {
+      "bytes": 154628,
+      "path": "results/selectivity_h200_powered_qwen3_5_9b/metrics.json",
+      "sha256": "f7557e4f49edcadb4303dbb378f934dbaf67717e6e98775a1b4e401047f59896"
+    }
+  }
+}
