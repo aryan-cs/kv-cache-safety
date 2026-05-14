@@ -2,6 +2,70 @@
 
 This file is a handoff summary for a new chat. It captures the important context from the long monitoring/design thread for `/Users/aryan/Desktop/projects/llm-safety`.
 
+## Selectivity Panel Status (2026-05-14)
+
+- Eight `selectivity_h200_powered_*` runs have completed locally on the Mac:
+  qwen2_5_7b_base, qwen2_5_7b_instruct, gpt_oss_20b, llama3_1_8b_instruct,
+  gemma2_9b_it, mistral_7b_instruct_v0_3, olmo3_7b_instruct, phi4.
+- A ninth model, `qwen3_5_9b`, is being tested on H200; its run has not yet been
+  pushed to `origin/master` and the Mac does not yet have results for it.
+- Codex has been completely removed from the repository (commit `c86c5ff` and
+  follow-ups). The only supported local judge is Gemini via
+  `scripts/judge_with_gemini.py`.
+- Gemini judging coverage by model (parsed / attempts):
+
+  | Model | Parsed | Attempts | Status |
+  | --- | --- | --- | --- |
+  | qwen2_5_7b_base | 44 | 44 | complete |
+  | gpt_oss_20b | 270 | 271 | complete |
+  | mistral_7b_instruct_v0_3 | 344 | 347 | complete |
+  | gemma2_9b_it | 315 | 315 | complete |
+  | llama3_1_8b_instruct | 460 | 460 | complete |
+  | olmo3_7b_instruct | 10 | 344 | partial; quota blocked |
+  | phi4 | 0 | 361 | quota blocked |
+  | qwen2_5_7b_instruct | 0 | 340 | quota blocked |
+
+  The blocked models hit Gemini's daily quota mid-batch on 2026-05-13. Retry
+  after the quota resets (~20h from the block) with:
+
+  ```bash
+  uv run python scripts/judge_with_gemini.py \
+    --input-jsonl docs/audit/selectivity_h200_powered_<model>_audit_key.gemini_approved.jsonl \
+    --output-jsonl docs/audit/selectivity_h200_powered_<model>_judgments.gemini.jsonl \
+    --providers gemini --workers 4 --resume --allow-data-egress \
+    --retry-statuses blocked,parse_error,unlabeled
+  ```
+
+- Selectivity claim-ladder verdicts (`docs/generated/claim_assessment/`):
+
+  | Claim | Status |
+  | --- | --- |
+  | behavioral_cache_sensitivity | supported |
+  | safety_minus_capability_selectivity | supported |
+  | cross_family_replication | supported (Llama, OLMo, Phi, Qwen) |
+  | audit_provenance_complete | supported (5/8 ≥95% Gemini coverage) |
+  | targeted_mitigation | pending (Phase 4 not run) |
+  | causal_localization | pending (Phase 4 not run) |
+  | alignment_contrast | pending (qwen base only 2 prompts/cell) |
+
+  Publication-ready: false (3 claims pending external work).
+
+- Paper artifacts written to `docs/generated/`:
+  - `docs/generated/selectivity_h200_powered_<model>/` — per-model tables + figures
+  - `docs/generated/active_primary/` — Mistral promoted as manuscript anchor
+  - `docs/generated/active_primary/family_replication_table.{md,tex}`
+  - `docs/generated/cross_model_summary/cross_model_summary.{json,md,tex}`
+  - `docs/generated/cross_model_visuals/` — 15-figure gallery
+  - `docs/generated/claim_assessment/` — `\EmpiricalStatusSentence` redefinition + claim table
+
+- Publication readiness blockers (per `scripts/check_publication_readiness.py`):
+  - registered `system_leakage` and `adversarial_refusal_safety` suites only have 2–3 prompts per cell across all 8 runs; the H200 panel was powered for the `public_*` variants but not these small registered confirmatory suites
+  - Phase 4 causal diagnostics not yet executed for any model
+  - matched base-model alignment-contrast track has only 2 prompts/cell for qwen2_5_7b_base
+
+  These are data-collection gaps that require H200 reruns; they are not
+  fixable from the Mac side.
+
 ## High-Level Status
 
 - Overall paper progress is about **96%** for the old Qwen-centered evidence-gated draft.
