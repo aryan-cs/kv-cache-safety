@@ -58,11 +58,11 @@ uv run python scripts/prepare_data.py --suite all
 register_power_plan() {
   uv run python scripts/plan_ci_power.py \
     --target-ci-width "$target_ci_width" \
-    --output-json paper/generated/selectivity_panel_phase0_ci_power.json \
-    --output-md paper/generated/selectivity_panel_phase0_ci_power.md
+    --output-json docs/generated/selectivity_panel_phase0_ci_power.json \
+    --output-md docs/generated/selectivity_panel_phase0_ci_power.md
   commit_artifacts \
-    paper/generated/selectivity_panel_phase0_ci_power.json \
-    paper/generated/selectivity_panel_phase0_ci_power.md
+    docs/generated/selectivity_panel_phase0_ci_power.json \
+    docs/generated/selectivity_panel_phase0_ci_power.md
 }
 
 prepare_powered_data() {
@@ -101,7 +101,7 @@ run_config() {
   local config="configs/experiments/selectivity_h200_${run_stage}_${key}.yaml"
   local run_id="selectivity_h200_${run_stage}_${key}"
   local results_dir="results/${run_id}"
-  local generated_dir="paper/generated/${run_id}"
+  local generated_dir="docs/generated/${run_id}"
 
   if [[ ! -f "$config" ]]; then
     echo "Skipping missing selectivity config: ${config}" >&2
@@ -175,7 +175,7 @@ run_config() {
 merge_stage_results() {
   local run_stage="$1"
   local output_dir="results/selectivity_h200_${run_stage}_combined"
-  local generated_dir="paper/generated/selectivity_h200_${run_stage}_combined"
+  local generated_dir="docs/generated/selectivity_h200_${run_stage}_combined"
   local -a merge_args=()
   local key
   for key in "${model_keys[@]}"; do

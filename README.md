@@ -162,7 +162,7 @@ setsid -f bash scripts/wait_and_run_h200_sweep.sh \
   </dev/null > logs/h200/selectivity_launcher.out 2>&1
 ```
 
-The registered selectivity launcher defaults to the non-gated model panel, writes result artifacts under `results/selectivity_h200_<stage>_<model_key>/`, writes paper assets under `paper/generated/selectivity_h200_<stage>_<model_key>/`, and merges completed stage results into `results/selectivity_h200_<stage>_combined/` plus `paper/generated/selectivity_h200_<stage>_combined/`. Set `SELECTIVITY_INCLUDE_GATED=1` only after the H200 Hugging Face token has accepted Llama/Gemma access. Set `SELECTIVITY_MODELS="qwen2_5_7b_instruct mistral_7b_instruct_v0_3"` for a registered subset, `PUBLIC_PROMPT_LIMIT=<n>` for powered public-suite prompt count, and `TARGET_CI_WIDTH=<width>` for readiness and power reports. See `SELECTIVITY_RUNBOOK.md` for the complete handoff.
+The registered selectivity launcher defaults to the non-gated model panel, writes result artifacts under `results/selectivity_h200_<stage>_<model_key>/`, writes paper assets under `docs/generated/selectivity_h200_<stage>_<model_key>/`, and merges completed stage results into `results/selectivity_h200_<stage>_combined/` plus `docs/generated/selectivity_h200_<stage>_combined/`. Set `SELECTIVITY_INCLUDE_GATED=1` only after the H200 Hugging Face token has accepted Llama/Gemma access. Set `SELECTIVITY_MODELS="qwen2_5_7b_instruct mistral_7b_instruct_v0_3"` for a registered subset, `PUBLIC_PROMPT_LIMIT=<n>` for powered public-suite prompt count, and `TARGET_CI_WIDTH=<width>` for readiness and power reports. See `SELECTIVITY_RUNBOOK.md` for the complete handoff.
 
 Run the older Qwen primary/causal H200 workflow used by the current manuscript wrappers:
 
@@ -333,7 +333,7 @@ Fetch completed selectivity-panel artifacts from the local checkout with checksu
 SELECTIVITY_STAGE=all bash scripts/fetch_h200_selectivity_panel.sh
 ```
 
-Use the same `SELECTIVITY_MODELS` and `SELECTIVITY_INCLUDE_GATED` values used for launch. The fetch wrapper discovers completed remote selectivity result and `paper/generated` directories, then delegates to `scripts/fetch_h200_results.sh` for manifest comparison.
+Use the same `SELECTIVITY_MODELS` and `SELECTIVITY_INCLUDE_GATED` values used for launch. The fetch wrapper discovers completed remote selectivity result and `docs/generated` directories, then delegates to `scripts/fetch_h200_results.sh` for manifest comparison.
 
 This writes remote and local artifact manifests in `logs/h200/`, compares hashes
 and byte counts, and refuses paths outside `results/`, `docs/generated/`, and

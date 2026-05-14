@@ -47,8 +47,8 @@ uv run python scripts/generate_selectivity_configs.py --stage smoke --overwrite
 uv run python scripts/generate_selectivity_configs.py --stage powered --overwrite
 uv run python scripts/plan_ci_power.py \
   --target-ci-width "${TARGET_CI_WIDTH:-0.08}" \
-  --output-json paper/generated/selectivity_panel_phase0_ci_power.json \
-  --output-md paper/generated/selectivity_panel_phase0_ci_power.md
+  --output-json docs/generated/selectivity_panel_phase0_ci_power.json \
+  --output-md docs/generated/selectivity_panel_phase0_ci_power.md
 ```
 
 If the power plan cannot resolve the registered SSEI thresholds for a suite or family, mark that analysis exploratory before launching powered generation. Do not reinterpret an underpowered confirmatory run after seeing the outputs.
@@ -72,7 +72,7 @@ Useful launch controls:
 - `SELECTIVITY_INCLUDE_GATED=1` to include Llama/Gemma after HF access is approved.
 - `PUBLIC_PROMPT_LIMIT=650` controls powered public-suite prompt count.
 - `TARGET_CI_WIDTH=0.08` controls readiness and power reports.
-- `COMMIT_RUN_ARTIFACTS=1` commits and pushes each completed `results/...` directory with its matching `paper/generated/...` assets to `master`.
+- `COMMIT_RUN_ARTIFACTS=1` commits and pushes each completed `results/...` directory with its matching `docs/generated/...` assets to `master`.
 
 The guarded launcher syncs `master`, runs `ruff`, runs the full test suite, waits for the H200 GPU gate, syncs and validates again, then starts the selectivity panel. `run_h200_selectivity_panel.sh` refuses a dirty worktree.
 
@@ -81,19 +81,19 @@ The guarded launcher syncs `master`, runs `ruff`, runs the full test suite, wait
 Per-model outputs:
 
 - `results/selectivity_h200_<stage>_<model_key>/`
-- `paper/generated/selectivity_h200_<stage>_<model_key>/`
+- `docs/generated/selectivity_h200_<stage>_<model_key>/`
 
 Combined stage outputs:
 
 - `results/selectivity_h200_<stage>_combined/`
-- `paper/generated/selectivity_h200_<stage>_combined/`
+- `docs/generated/selectivity_h200_<stage>_combined/`
 
 Phase 0 power documentation:
 
-- `paper/generated/selectivity_panel_phase0_ci_power.json`
-- `paper/generated/selectivity_panel_phase0_ci_power.md`
+- `docs/generated/selectivity_panel_phase0_ci_power.json`
+- `docs/generated/selectivity_panel_phase0_ci_power.md`
 
-Each completed result directory contains `manifest.json`, `config.resolved.yaml`, `environment.json`, `prompts.jsonl`, `generations.jsonl`, `metrics.json`, `cache_stats.parquet`, and generated figures. The matching `paper/generated/...` directory contains tables, macros, CI reports, and an artifact manifest.
+Each completed result directory contains `manifest.json`, `config.resolved.yaml`, `environment.json`, `prompts.jsonl`, `generations.jsonl`, `metrics.json`, `cache_stats.parquet`, and generated figures. The matching `docs/generated/...` directory contains tables, macros, CI reports, and an artifact manifest.
 
 ## Fetch And Verify Results
 
@@ -110,9 +110,9 @@ To fetch one explicit artifact set instead:
 ```bash
 bash scripts/fetch_h200_results.sh \
   results/selectivity_h200_powered_qwen2_5_7b_instruct \
-  paper/generated/selectivity_h200_powered_qwen2_5_7b_instruct \
+  docs/generated/selectivity_h200_powered_qwen2_5_7b_instruct \
   results/selectivity_h200_powered_combined \
-  paper/generated/selectivity_h200_powered_combined
+  docs/generated/selectivity_h200_powered_combined
 ```
 
 ## Audit And Judge Diagnostics
@@ -122,7 +122,7 @@ Export blinded audit sheets from the combined powered panel or from any selected
 ```bash
 uv run python scripts/export_human_audit_sample.py \
   --results-dir results/selectivity_h200_powered_combined \
-  --output-dir paper/audit \
+  --output-dir docs/audit \
   --per-suite-policy 10 \
   --annotator-template-count 2 \
   --include-hidden-reference
@@ -132,11 +132,11 @@ Complete the human annotator CSVs, then aggregate them:
 
 ```bash
 uv run python scripts/aggregate_human_audit.py \
-  --audit-csv paper/audit/selectivity_h200_powered_combined_audit_blinded_annotator_*.csv \
-  --key-jsonl paper/audit/selectivity_h200_powered_combined_audit_key.jsonl \
+  --audit-csv docs/audit/selectivity_h200_powered_combined_audit_blinded_annotator_*.csv \
+  --key-jsonl docs/audit/selectivity_h200_powered_combined_audit_key.jsonl \
   --results-dir results/selectivity_h200_powered_combined \
-  --export-manifest paper/audit/selectivity_h200_powered_combined_audit_export_manifest.json \
-  --output-dir paper/audit/selectivity_h200_powered_combined_summary
+  --export-manifest docs/audit/selectivity_h200_powered_combined_audit_export_manifest.json \
+  --output-dir docs/audit/selectivity_h200_powered_combined_summary
 ```
 
 Open/local judge labels are diagnostic. If you run them, preserve the output source separately and do not present them as human evidence.
@@ -145,13 +145,13 @@ External Gemini judge diagnostics require explicit egress approval on the blinde
 
 ```bash
 uv run python scripts/approve_judge_egress.py \
-  --input-jsonl paper/audit/selectivity_h200_powered_combined_audit_sample.jsonl \
-  --output-jsonl paper/audit/selectivity_h200_powered_combined_audit_sample_egress_approved.jsonl \
+  --input-jsonl docs/audit/selectivity_h200_powered_combined_audit_sample.jsonl \
+  --output-jsonl docs/audit/selectivity_h200_powered_combined_audit_sample_egress_approved.jsonl \
   --approval-note "Approved blinded selectivity audit rows for external judge diagnostics."
 
 uv run python scripts/judge_with_gemini.py \
-  --input-jsonl paper/audit/selectivity_h200_powered_combined_audit_sample_egress_approved.jsonl \
-  --output-jsonl paper/audit/selectivity_h200_powered_combined_gemini_judge.jsonl \
+  --input-jsonl docs/audit/selectivity_h200_powered_combined_audit_sample_egress_approved.jsonl \
+  --output-jsonl docs/audit/selectivity_h200_powered_combined_gemini_judge.jsonl \
   --providers gemini \
   --judge-mode all-providers \
   --allow-data-egress \
@@ -182,8 +182,8 @@ Summarize remaining blockers without mutating artifacts:
 ```bash
 uv run python scripts/report_publication_status.py \
   --allow-missing-paper-pdf \
-  --output-json paper/build/publication_status.json \
-  --output-md paper/build/publication_status.md
+  --output-json docs/build/publication_status.json \
+  --output-md docs/build/publication_status.md
 ```
 
 ## Known External Blockers

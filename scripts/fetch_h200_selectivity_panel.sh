@@ -50,16 +50,16 @@ add_if_remote_exists() {
   fi
 }
 
-add_if_remote_exists paper/generated/selectivity_panel_phase0_ci_power.json
-add_if_remote_exists paper/generated/selectivity_panel_phase0_ci_power.md
+add_if_remote_exists docs/generated/selectivity_panel_phase0_ci_power.json
+add_if_remote_exists docs/generated/selectivity_panel_phase0_ci_power.md
 
 for run_stage in "${stages[@]}"; do
   for key in "${model_keys[@]}"; do
     add_if_remote_exists "results/selectivity_h200_${run_stage}_${key}"
-    add_if_remote_exists "paper/generated/selectivity_h200_${run_stage}_${key}"
+    add_if_remote_exists "docs/generated/selectivity_h200_${run_stage}_${key}"
   done
   add_if_remote_exists "results/selectivity_h200_${run_stage}_combined"
-  add_if_remote_exists "paper/generated/selectivity_h200_${run_stage}_combined"
+  add_if_remote_exists "docs/generated/selectivity_h200_${run_stage}_combined"
 done
 
 if [[ "${#paths[@]}" -eq 0 ]]; then

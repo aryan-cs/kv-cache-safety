@@ -55,20 +55,20 @@ def test_fetch_h200_results_script_is_guarded_and_checksum_verified() -> None:
 
     assert "/home/aryang9/sandbox/llm-safety" in script
     assert "safe_artifact_path" in script
-    assert "results/*|paper/generated/*|paper/audit/*" in script
+    assert "results/*|docs/generated/*|docs/audit/*" in script
     default_block = script.split("remote_generated_paths=", maxsplit=1)[0]
-    assert "paper/generated/h200_qwen_full_sweep" not in default_block
+    assert "docs/generated/h200_qwen_full_sweep" not in default_block
     assert "h200_attention_diagnostic_qwen7b" not in default_block
     assert "FETCH_H200_REMOTE_GENERATED" in script
     assert "FETCH_H200_FINALIZED" in script
     assert "finalized_optional_paths" in script
     assert "h200_qwen_full_sweep_plus_ci_extension" in script
-    assert "paper/generated/claim_assessment" in script
-    assert "paper/audit/h200_qwen_full_sweep_plus_ci_extension_summary" in script
-    assert "paper/audit/h200_causal_patch_qwen7b_summary" in script
+    assert "docs/generated/claim_assessment" in script
+    assert "docs/audit/h200_qwen_full_sweep_plus_ci_extension_summary" in script
+    assert "docs/audit/h200_causal_patch_qwen7b_summary" in script
     assert "h200_causal_patch_qwen7b_audit_blinded_annotator_open_judge_v3.csv" in script
     assert "Skipping absent optional remote artifact path" in script
-    assert "paper/generated/preliminary_claim_assessment" in script
+    assert "docs/generated/preliminary_claim_assessment" in script
     assert "h200_qwen_full_sweep_audit_key.jsonl" in script
     assert "h200_qwen_full_sweep_audit_export_manifest.json" in script
     assert "h200_qwen_full_sweep_audit_blinded_annotator_01.csv" in script
