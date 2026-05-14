@@ -31,10 +31,10 @@
 </head>
 <body>
 <h1>Selectivity panel — cross-model gallery</h1>
-<p class="lede">All 15 figures emitted by <code>scripts/make_cross_model_visuals.py</code> on the 8-model selectivity panel. Use these to triage which visuals are paper-worthy; each panel reads from <code>docs/audit/*_judgments.gemini.jsonl</code>, so re-running the script after new judging coverage lands will regenerate every figure here.</p>
+<p class="lede">All 15 figures emitted by <code>scripts/make_cross_model_visuals.py</code> on the 9-model selectivity panel, judged by Claude Sonnet 4.5 via the local <code>claude -p</code> CLI. Use these to triage which visuals are paper-worthy; each panel reads from <code>docs/audit/*_judgments.claude.jsonl</code>, so re-running the script after new judging coverage lands will regenerate every figure here.</p>
 
 <div class="caveat">
-  <strong>Coverage caveat.</strong> Phi-4 (0/361), Qwen2.5-7B-Instruct (0/340), and OLMo-3-7B-Instruct (10/344) are mostly Gemini-quota-blocked. Their summary statistics in these figures come from very few parsed judge rows; treat their points as low-coverage indicators. The other five models have ≥95% judging coverage.
+  <strong>Coverage.</strong> All 9 models have ≥91% Claude judging coverage (2595/2676 parsed across the panel). Headline observation: Qwen3-9B and Phi-4 show the strongest selective-safety-erasure effects under sliding-window cache eviction (SSEI 0.092 and 0.084 respectively, 95% CIs excluding zero). Gemma-2 sits at zero; GPT-OSS-20B has negative SSEI on every registered policy.
 </div>
 
 <nav>

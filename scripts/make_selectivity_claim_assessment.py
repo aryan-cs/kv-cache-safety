@@ -129,7 +129,7 @@ def assess_claims(rows: list[dict[str, Any]]) -> dict[str, Any]:
         "audit_provenance_complete": {
             "passed": len(coverage_families) >= 2,
             "notes": (
-                f"Models with >= {JUDGING_COVERAGE_MIN:.0%} Gemini judge coverage: "
+                f"Models with >= {JUDGING_COVERAGE_MIN:.0%} local-judge coverage: "
                 f"{[r['model_key'] for r in coverage]}; covered families: {sorted(coverage_families)}."
             ),
         },

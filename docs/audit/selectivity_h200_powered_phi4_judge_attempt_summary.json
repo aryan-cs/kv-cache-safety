@@ -5,15 +5,16 @@
   "input_rows": 361,
   "judgment_attempt_rows": 361,
   "provider_coverage": {
-    "gemini": {
+    "claude": {
       "attempted_rows": 361,
-      "missing_parsed_rows": 361,
-      "parsed_rows": 0
+      "missing_parsed_rows": 4,
+      "parsed_rows": 357
     }
   },
   "provider_status_counts": {
-    "gemini:blocked": 361
+    "claude:parse_error": 4,
+    "claude:parsed": 357
   },
-  "rows_with_any_parsed_judge": 0,
-  "rows_without_any_parsed_judge": 361
+  "rows_with_any_parsed_judge": 357,
+  "rows_without_any_parsed_judge": 4
 }

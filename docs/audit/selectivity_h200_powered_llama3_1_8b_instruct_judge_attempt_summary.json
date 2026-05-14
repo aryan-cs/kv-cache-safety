@@ -1,21 +1,20 @@
 {
-  "all_rows_have_parsed_judge": true,
+  "all_rows_have_parsed_judge": false,
   "corrupt_input_tail": "",
   "corrupt_judgment_tail": "",
   "input_rows": 349,
-  "judgment_attempt_rows": 460,
+  "judgment_attempt_rows": 349,
   "provider_coverage": {
-    "gemini": {
+    "claude": {
       "attempted_rows": 349,
-      "missing_parsed_rows": 0,
-      "parsed_rows": 349
+      "missing_parsed_rows": 28,
+      "parsed_rows": 321
     }
   },
   "provider_status_counts": {
-    "gemini:blocked": 110,
-    "gemini:parse_error": 1,
-    "gemini:parsed": 349
+    "claude:parse_error": 28,
+    "claude:parsed": 321
   },
-  "rows_with_any_parsed_judge": 349,
-  "rows_without_any_parsed_judge": 0
+  "rows_with_any_parsed_judge": 321,
+  "rows_without_any_parsed_judge": 28
 }

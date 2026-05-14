@@ -1,5 +1,5 @@
 {
-  "blocked_or_unparsed_rows": 1165,
+  "blocked_or_unparsed_rows": 141,
   "models": [
     "gemma2_9b_it",
     "gpt_oss_20b",
@@ -8,9 +8,10 @@
     "olmo3_7b_instruct",
     "phi4",
     "qwen2_5_7b_base",
-    "qwen2_5_7b_instruct"
+    "qwen2_5_7b_instruct",
+    "qwen3_5_9b"
   ],
-  "parsed_rows": 1317,
+  "parsed_rows": 2595,
   "policies": [
     "none",
     "policy_pinned__budget128__sink8",
@@ -30,5 +31,5 @@
     "public_xstest_safe",
     "system_leakage"
   ],
-  "total_judgment_rows": 2482
+  "total_judgment_rows": 2736
 }

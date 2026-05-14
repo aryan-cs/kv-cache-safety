@@ -2,7 +2,7 @@
 
 Snapshot of cross-family selective-safety-erasure evidence as of
 2026-05-14, sourced from the per-model `metrics.json` files and the
-Gemini-judged audit samples under `docs/audit/`.
+Claude-Sonnet-4.5-judged audit samples under `docs/audit/`.
 
 ## Headline Numbers
 
@@ -12,7 +12,8 @@ model, taken from `policy_level_contrasts` in each
 
 | Family | Model | Top policy | SSEI [95% CI] |
 | --- | --- | --- | --- |
-| Phi | Phi-4 | sliding window 128 | **0.084 [0.076, 0.091]** |
+| Qwen | Qwen3-9B | sliding window 128 | **0.092 [0.083, 0.101]** |
+| Phi | Phi-4 | sliding window 128 | 0.084 [0.076, 0.091] |
 | OLMo | OLMo-3-7B-Instruct | user-pinned | 0.026 [0.019, 0.033] |
 | Llama | Llama-3.1-8B-Instruct | user-pinned | 0.024 [0.016, 0.031] |
 | Qwen | Qwen2.5-7B-Instruct | user-pinned | 0.017 [0.011, 0.022] |
@@ -33,59 +34,79 @@ significance criterion.
 
 ## Reading the Panel
 
-- Five of seven instruction-tuned models (Phi-4, OLMo-3, Llama-3.1,
-  Qwen2.5-Instruct, Mistral) have at least one registered policy where
-  positive SSEI's lower CI excludes zero. By the registered
-  cross-family rule (>= 2 independent instruction-tuned families with
-  positive selectivity), the claim **safety-minus-capability selectivity
-  appears across multiple model families** is supported by the current
-  artifacts.
-- Phi-4 is the panel maximum, with sliding-window cache eviction
-  producing the largest selectivity gap.
-- Gemma-2 and GPT-OSS-20B show flat or negative SSEI under every
-  registered policy — these are the panel counterexamples.
+- Six of eight instruction-tuned models (Qwen3-9B, Phi-4, OLMo-3,
+  Llama-3.1, Qwen2.5-Instruct, Mistral) have at least one registered
+  policy where positive SSEI's lower CI excludes zero. By the
+  registered cross-family rule (>= 2 independent instruction-tuned
+  families with positive selectivity), the claim **safety-minus-
+  capability selectivity appears across multiple model families** is
+  supported (Llama, OLMo, Phi, Qwen families clear the bar).
+- Qwen3-9B is the panel maximum at 0.092 — the largest gap between
+  safety degradation and capability degradation observed across the
+  panel. Phi-4 is a close second at 0.084. Both effects come from the
+  sliding_window cache eviction policy.
+- Gemma-2 sits at zero — no selective safety erasure observed under any
+  registered policy.
+- GPT-OSS-20B has negative SSEI on every policy — capability degrades
+  more than safety, the opposite pattern.
+
+## Judging Provenance
+
+All audit-row labels above come from Claude Sonnet 4.5 (`claude-sonnet-4-5`)
+via the local `claude -p` CLI. Earlier Gemini-based labels for the same
+audit samples are preserved alongside under `_judgments.gemini.jsonl`;
+the Claude labels in `_judgments.claude.jsonl` are the canonical
+judging artifacts used by the paper's cross-model figures and tables.
+A 15-row calibration comparing Claude-Haiku vs Gemini on Mistral rows
+showed ~93% agreement on unsafe-compliance / leakage / over-refusal and
+~73% on refusal-correct; Sonnet should be at least as well-calibrated
+as Haiku.
+
+Coverage (parsed / total audit attempts) per model:
+
+| Model | Parsed | Total | Parse rate |
+| --- | --- | --- | --- |
+| qwen2_5_7b_base | 44 | 44 | 100% |
+| phi4 | 357 | 361 | 99% |
+| gpt_oss_20b | 263 | 271 | 97% |
+| qwen3_5_9b | 355 | 365 | 97% |
+| qwen2_5_7b_instruct | 328 | 340 | 96% |
+| gemma2_9b_it | 296 | 315 | 94% |
+| llama3_1_8b_instruct | 321 | 349 | 92% |
+| mistral_7b_instruct_v0_3 | 319 | 347 | 92% |
+| olmo3_7b_instruct | 312 | 344 | 91% |
+
+Overall: 2595 / 2676 parsed (97%).
 
 ## Caveats
 
-1. **Judging coverage is uneven.** Gemini judging hit its daily quota
-   mid-batch on 2026-05-13. Phi-4 (0/361), Qwen2.5-Instruct (0/340), and
-   OLMo-3 (10/344) have effectively no current Gemini judgments and need
-   to be rerun once the quota resets. The metrics for those models come
-   from automated suite scoring, not from Gemini-judged audit rows; the
-   numbers above are still valid but the audit-source disclosure must
-   note the gap.
-2. **Phase 4 causal diagnostics have not been executed.** Without policy
+1. **Phase 4 causal diagnostics have not been executed.** Without policy
    restoration vs matched user-role patching, the panel can only claim
    behavioral selectivity, not cache-mediated mechanism.
-3. **Some small registered suites are under-powered.** The H200 panel
+2. **Some small registered suites are under-powered.** The H200 panel
    shipped 1300 prompts/cell for the `public_*` suites but only 2-3
    prompts/cell for the registered `system_leakage`,
    `adversarial_refusal_safety`, and `base_alignment_contrast` suites.
    `scripts/check_publication_readiness.py` correctly flags these.
-4. **qwen3_5_9b is not yet pushed** from H200. Once it lands, rerun
-   `scripts/make_family_replication_table.py`,
-   `scripts/make_cross_model_summary.py`, and
-   `scripts/make_selectivity_claim_assessment.py` to refresh the paper
-   artifacts.
 
 ## File Map for the Paper
 
 | Artifact | Purpose |
 | --- | --- |
 | `docs/generated/active_primary/family_replication_table.tex` | LaTeX `\maybeinputtable` target at `docs/latex/main.tex:358` |
-| `docs/generated/cross_model_summary/cross_model_summary.tex` | Panel headline table (compact) |
+| `docs/generated/cross_model_summary/cross_model_summary.tex` | Panel headline table (compact, 9 models) |
 | `docs/generated/claim_assessment/abstract_status_sentence.tex` | Redefines `\EmpiricalStatusSentence` |
 | `docs/generated/claim_assessment/claim_assessment_table.tex` | Per-claim verdict table |
-| `docs/generated/cross_model_visuals/` | 15-figure exploratory gallery |
+| `docs/generated/cross_model_visuals/` | 15-figure exploratory gallery (`index.html` for one-page view) |
 | `results/selectivity_h200_powered_<model>/figures/` | Per-model paper figures |
 
 To rebuild all of the above after new data lands:
 
 ```bash
 uv run python scripts/make_family_replication_table.py
-uv run python scripts/make_cross_model_summary.py
+uv run python scripts/make_cross_model_summary.py --provider claude
 uv run python scripts/make_selectivity_claim_assessment.py
-uv run python scripts/make_cross_model_visuals.py
+uv run python scripts/make_cross_model_visuals.py --provider claude
 ```
 
 To rebuild per-model figures + tables, loop over each

@@ -38,9 +38,9 @@ MODEL_FAMILIES = {
 }
 
 
-def load_judgment_counts(audit_dir: Path, model_key: str) -> dict[str, int]:
+def load_judgment_counts(audit_dir: Path, model_key: str, provider: str = "claude") -> dict[str, int]:
     counts = {"parsed": 0, "blocked": 0, "parse_error": 0}
-    path = audit_dir / f"selectivity_h200_powered_{model_key}_judgments.gemini.jsonl"
+    path = audit_dir / f"selectivity_h200_powered_{model_key}_judgments.{provider}.jsonl"
     if not path.exists():
         return counts
     with path.open() as fh:
@@ -86,6 +86,7 @@ def main() -> None:
     parser.add_argument("--results-root", type=Path, default=Path("results"))
     parser.add_argument("--audit-dir", type=Path, default=Path("docs/audit"))
     parser.add_argument("--output-dir", type=Path, default=Path("docs/generated/cross_model_summary"))
+    parser.add_argument("--provider", default="claude", choices=["claude", "gemini"])
     args = parser.parse_args()
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
@@ -103,7 +104,7 @@ def main() -> None:
             continue
         contrasts = metrics.get("policy_level_contrasts") or {}
         top_policy, top_ssei, top_lo, top_hi = find_top_ssei(contrasts)
-        counts = load_judgment_counts(args.audit_dir, model_key)
+        counts = load_judgment_counts(args.audit_dir, model_key, provider=args.provider)
         total_attempts = sum(counts.values())
         rows.append(
             {

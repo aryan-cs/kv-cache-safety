@@ -1,10 +1,10 @@
-"""Cross-model visualization gallery from Gemini-judged selectivity audits.
+"""Cross-model visualization gallery from local-judge selectivity audits.
 
-Reads every ``docs/audit/*_judgments.gemini.jsonl`` and emits a varied set of
-figures into ``docs/generated/cross_model_visuals``. The intent is breadth: many
-candidates so the reviewer can keep the strong ones and drop the rest.
+Reads every ``docs/audit/*_judgments.<provider>.jsonl`` and emits a varied set
+of figures into ``docs/generated/cross_model_visuals``. The intent is breadth:
+many candidates so the reviewer can keep the strong ones and drop the rest.
 
-Run: ``uv run python scripts/make_cross_model_visuals.py``
+Run: ``uv run python scripts/make_cross_model_visuals.py [--provider claude]``
 """
 from __future__ import annotations
 
@@ -48,10 +48,10 @@ PALETTE = {
 }
 
 
-def load_judgments(audit_dir: Path) -> pd.DataFrame:
+def load_judgments(audit_dir: Path, provider: str = "claude") -> pd.DataFrame:
     rows: list[dict[str, Any]] = []
-    for path in sorted(audit_dir.glob("*_judgments.gemini.jsonl")):
-        model_key = path.stem.removesuffix("_judgments.gemini").removeprefix(
+    for path in sorted(audit_dir.glob(f"*_judgments.{provider}.jsonl")):
+        model_key = path.stem.removesuffix(f"_judgments.{provider}").removeprefix(
             "selectivity_h200_powered_"
         )
         with path.open() as fh:
@@ -453,12 +453,13 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--audit-dir", type=Path, default=Path("docs/audit"))
     parser.add_argument("--output-dir", type=Path, default=Path("docs/generated/cross_model_visuals"))
+    parser.add_argument("--provider", default="claude", choices=["claude", "gemini"])
     args = parser.parse_args()
 
     setup_style()
     args.output_dir.mkdir(parents=True, exist_ok=True)
 
-    df = load_judgments(args.audit_dir)
+    df = load_judgments(args.audit_dir, provider=args.provider)
     if df.empty:
         raise SystemExit("No judgments found in docs/audit; nothing to render.")
 
