@@ -1,0 +1,19 @@
+{
+  "all_rows_have_parsed_judge": false,
+  "corrupt_input_tail": "",
+  "corrupt_judgment_tail": "",
+  "input_rows": 340,
+  "judgment_attempt_rows": 340,
+  "provider_coverage": {
+    "gemini": {
+      "attempted_rows": 340,
+      "missing_parsed_rows": 340,
+      "parsed_rows": 0
+    }
+  },
+  "provider_status_counts": {
+    "gemini:blocked": 340
+  },
+  "rows_with_any_parsed_judge": 0,
+  "rows_without_any_parsed_judge": 340
+}
