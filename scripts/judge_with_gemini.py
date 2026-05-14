@@ -22,7 +22,7 @@ from cache_safety_erasure.utils.io import read_jsonl_tolerant
 def main() -> None:
     parser = argparse.ArgumentParser(
         description=(
-            "Judge generated rows locally with Gemini. "
+            "Judge generated rows locally with Gemini and/or Claude. "
             "Outputs are source-marked model-judge labels, not human labels."
         )
     )
@@ -39,6 +39,7 @@ def main() -> None:
         ),
     )
     parser.add_argument("--gemini-model", default=None)
+    parser.add_argument("--claude-model", default="claude-haiku-4-5")
     parser.add_argument("--workers", type=int, default=2)
     parser.add_argument("--limit", type=int, default=None)
     parser.add_argument("--timeout-seconds", type=int, default=180)
@@ -128,6 +129,16 @@ def _commands_from_args(args: argparse.Namespace) -> list[JudgeCommand]:
                 JudgeCommand(
                     provider="gemini",
                     model=args.gemini_model,
+                    timeout_seconds=args.timeout_seconds,
+                    cwd=Path.cwd(),
+                )
+            )
+            continue
+        if provider == "claude":
+            commands.append(
+                JudgeCommand(
+                    provider="claude",
+                    model=args.claude_model,
                     timeout_seconds=args.timeout_seconds,
                     cwd=Path.cwd(),
                 )

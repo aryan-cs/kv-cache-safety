@@ -37,7 +37,7 @@ capability_correct, confidence, notes
 PROMPT_PROTOCOL_VERSION = "blinded-v3"
 AUDIT_METADATA_VERSION = "judge-audit-v2"
 DATA_EGRESS_DEFAULT_FIELD = "data_egress_approved"
-EXTERNAL_PROPRIETARY_PROVIDERS = {"gemini"}
+EXTERNAL_PROPRIETARY_PROVIDERS = {"gemini", "claude"}
 DISABLED_JUDGE_PROVIDERS: dict[str, str] = {}
 
 
@@ -71,6 +71,8 @@ def run_judge_command(command: JudgeCommand, prompt: str) -> dict[str, Any]:
         raise RuntimeError(DISABLED_JUDGE_PROVIDERS[command.provider])
     if command.provider == "gemini":
         return _run_gemini(command, prompt)
+    if command.provider == "claude":
+        return _run_claude(command, prompt)
     raise ValueError(f"Unsupported judge provider: {command.provider}")
 
 
@@ -232,6 +234,8 @@ def infer_judge_family(command: JudgeCommand) -> str:
         return infer_model_family(str(explicit_family))
     if command.provider == "gemini":
         return "gemini"
+    if command.provider == "claude":
+        return "anthropic_claude"
     return infer_model_family(command.model or command.provider)
 
 
@@ -277,6 +281,34 @@ def sha256_text(text: str) -> str:
 
 def utc_now() -> str:
     return datetime.now(UTC).isoformat().replace("+00:00", "Z")
+
+
+def _run_claude(command: JudgeCommand, prompt: str) -> dict[str, Any]:
+    args = ["claude", "-p", "--output-format", "text"]
+    if command.model:
+        args.extend(["--model", command.model])
+    completed = subprocess.run(
+        args,
+        input=prompt,
+        text=True,
+        capture_output=True,
+        timeout=command.timeout_seconds,
+        cwd=str(command.cwd or Path.cwd()),
+        check=False,
+    )
+    raw_output = completed.stdout.strip()
+    if completed.returncode != 0 and not raw_output:
+        raise RuntimeError((completed.stderr or completed.stdout).strip())
+    if not raw_output:
+        raise RuntimeError((completed.stderr or "claude produced no output").strip())
+    redacted = ["claude", "-p", "--output-format", "text"]
+    if command.model:
+        redacted.extend(["--model", command.model])
+    return {
+        "raw_output": raw_output,
+        "command_line": " ".join(redacted),
+        "tool_version": _tool_version("claude"),
+    }
 
 
 def _run_gemini(command: JudgeCommand, prompt: str) -> dict[str, Any]:
@@ -403,7 +435,7 @@ def _judgment_record(
         "judge_started_at": started_at,
         "judge_completed_at": utc_now(),
         "annotation_source_type": "proprietary_model_judge"
-        if command.provider == "gemini"
+        if command.provider in {"gemini", "claude"}
         else "model_judge",
         "rubric_sha256": sha256_text(RUBRIC),
         "judge_prompt_sha256": sha256_text(prompt),
