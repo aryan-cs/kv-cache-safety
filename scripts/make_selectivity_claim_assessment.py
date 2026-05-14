@@ -116,11 +116,21 @@ def assess_claims(rows: list[dict[str, Any]]) -> dict[str, Any]:
         },
         "targeted_mitigation": {
             "passed": False,
-            "notes": "Mitigation comparison requires policy_pinned vs matched user_pinned causal contrasts that this panel does not yet produce.",
+            "notes": (
+                "Legacy single-seed Qwen2.5-7B-Instruct causal-patching evidence shows Policy-pinned "
+                "cache restoration fraction 1.000 on Refusal; bootstrap CIs missing so registered "
+                "mitigation gate (margin >= 0.10 with CI width <= 0.12) not yet evaluable. "
+                "Panel-wide multi-seed Phase 4 reruns needed."
+            ),
         },
         "causal_localization": {
             "passed": False,
-            "notes": "Phase 4 causal patching is conditional on Phase 2 effects and is not yet executed for the selectivity panel.",
+            "notes": (
+                "Legacy Qwen2.5-7B-Instruct causal-patching evidence shows K+V system-role patch "
+                "restores Refusal at 1.256, matched K+V user-role control at -0.692 (qualitative "
+                "pattern matches registered direction). Single-seed; full CI-gated multi-seed "
+                "re-run pending across panel."
+            ),
         },
         "alignment_contrast": {
             "passed": False,
