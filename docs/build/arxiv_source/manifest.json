@@ -182,14 +182,14 @@
       "source_sha256": "65ee490ee0b406b5eeb4b1f46bb3d19f584ada949d9d386f1217af26197d4962"
     },
     {
-      "bundle_bytes": 1374,
+      "bundle_bytes": 1451,
       "bundle_path": "generated/claim_assessment/claim_assessment_table.tex",
-      "bundle_sha256": "07117b57bf643721245cdbeeb95b3d297070df3d17c85b70f637c1638040cf66",
+      "bundle_sha256": "d02155af86292bd7f44cbe624671a879eddccf908cdf352a34dc50f79384b441",
       "direct_copy": true,
       "kind": "generated",
-      "source_bytes": 1374,
+      "source_bytes": 1451,
       "source_path": "docs/generated/claim_assessment/claim_assessment_table.tex",
-      "source_sha256": "07117b57bf643721245cdbeeb95b3d297070df3d17c85b70f637c1638040cf66"
+      "source_sha256": "d02155af86292bd7f44cbe624671a879eddccf908cdf352a34dc50f79384b441"
     },
     {
       "bundle_bytes": 491,
