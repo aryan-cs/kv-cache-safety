@@ -12,7 +12,6 @@
 \usepackage{hyperref}
 \usepackage{natbib}
 \usepackage{url}
-\usepackage{authblk}
 \usepackage{fancyhdr}
 
 \hypersetup{
@@ -29,8 +28,7 @@
 
 \title{Safety Erasure Under KV-Cache Compression}
 
-\author[1]{Aryan Gupta}
-\affil[1]{University of Illinois Urbana-Champaign, \texttt{aryan.cs.app@gmail.com}}
+\author{Aryan Gupta \\ \texttt{aryan.cs.app@gmail.com}}
 \date{}
 
 \newcommand{\ssei}{\mathrm{SSEI}}
@@ -108,14 +106,13 @@ Inference systems routinely compress or evict the key-value (KV) cache to reduce
 
 Production language-model serving systems do not deploy a static pair of weights and prompts. They actively manage the transient KV cache through eviction policies, quantization, and paged attention to fit longer contexts into a fixed memory budget \citep{kwon2023pagedattention,zhang2023h2o,xiao2024streamingllm}. These mechanisms are documented to degrade task quality \citep{chen2025pitfalls,yang2024notoken,ananthanarayanan2026physics}. We ask a different question: does cache compression weaken \emph{refusal} behavior more than it weakens ordinary capability on the same prompts and budget?
 
-The result is yes for the majority of currently-deployed dense-attention instruction-tuned models. Across nine checkpoints sampled from Llama, Gemma, Mistral, OpenAI gpt-oss, OLMo, Phi, and Qwen families, five instruction-tuned models show a Selective Safety Erasure Index (SSEI) of at least one cache policy whose 95\% lower CI exceeds zero. Phi-4 and Qwen3-9B exhibit the largest effects, around eight to nine percentage points of safety loss beyond matched capability loss under sliding-window cache eviction. The cross-family conclusion holds when any single family is removed from the panel.
+The result is yes for the majority of currently-deployed dense-attention instruction-tuned models. Across nine checkpoints sampled from Llama, Gemma, Mistral, OpenAI gpt-oss, OLMo, Phi, and Qwen families, five instruction-tuned models show a Selective Safety Erasure Index (SSEI) of at least one cache policy whose 95\% lower CI exceeds zero. Phi-4 and Qwen3-8B exhibit the largest effects, around eight to nine percentage points of safety loss beyond matched capability loss under sliding-window cache eviction. The cross-family conclusion holds when any single family is removed from the panel.
 
-Three models do not show the pattern: Gemma-2-9B-IT, Mistral-7B-Instruct-v0.3, and OpenAI gpt-oss-20b. These models share architectural features that decouple long-range KV cache state from the safety-relevant generation circuit: Gemma 2 interleaves local sliding-window attention with global attention \citep{team2024gemma}, Mistral 7B v0.3 applies sliding-window attention at every layer \citep{jiang2023mistral}, and gpt-oss-20b is a mixture-of-experts model trained with a structured ``harmony'' response format \citep{openai2025gptoss}. Under our cache interventions gpt-oss-20b also collapses into a uniform output mode rather than gracefully degrading. Read together, the positive results in four families and the negative results in these three constitute a falsification test that the affected behavior is specifically cache-resident long-range attention state, not generic compression sensitivity.
+Three models do not show the pattern: Gemma-2-9B-IT, Mistral-7B-Instruct-v0.3, and OpenAI gpt-oss-20b. These models share architectural features that decouple long-range KV cache state from the safety-relevant generation circuit: Gemma 2 interleaves local sliding-window attention with global attention \citep{team2024gemma}, Mistral 7B v0.3 applies sliding-window attention at every layer \citep{jiang2023mistral}, and gpt-oss-20b is a mixture-of-experts model trained with a structured ``harmony'' response format \citep{openai2025gptoss}. Under our cache interventions gpt-oss-20b also collapses into a uniform output mode rather than gracefully degrading. The positive results in four families and the negative results in these three constitute a falsification test: the affected behavior is cache-resident long-range attention state, not generic compression sensitivity.
 
-Causal-patching experiments, in which baseline cache state is restored into compressed runs, show partial recovery of refusal behavior on Qwen2.5-7B-Instruct (single-seed) and Qwen3-9B (multi-seed, Sonnet-judged). Under a per-prompt bootstrap estimator, both system-role and matched user-role interventions produce comparable restoration fractions (Qwen3-9B: 0.355 vs.\ 0.408, overlapping CIs; Qwen2.5-7B: 0.584 vs.\ 0.584), so we do not find evidence of role-specific localization. A parallel Phi-4 run shows a null causal result: simulated four-bit quantization does not degrade Phi-4's safety in the first place (0.985 vs.\ 0.987 baseline), leaving insufficient denominator for meaningful restoration analysis.
+Causal-patching experiments, in which baseline cache state is restored into compressed runs, show partial recovery of refusal behavior on Qwen2.5-7B-Instruct (single-seed) and Qwen3-8B (multi-seed, Sonnet-judged). Under a per-prompt bootstrap estimator, both system-role and matched user-role interventions produce comparable restoration fractions (Qwen3-8B: 0.355 vs.\ 0.408, overlapping CIs; Qwen2.5-7B: 0.584 vs.\ 0.584), so we do not find evidence of role-specific localization. A parallel Phi-4 run shows a null causal result: simulated four-bit quantization does not degrade Phi-4's safety in the first place (0.985 vs.\ 0.987 baseline), leaving insufficient denominator for meaningful restoration analysis.
 
-\paragraph{Contributions.}
-We make three contributions. First, a cross-family measurement of selective safety degradation under cache eviction across nine open-weight checkpoints, with explicit per-policy effect sizes and bootstrap confidence intervals. Second, an architecture-dependent characterization of which models are affected and which are robust, framed as a structural prediction rather than a model-level idiosyncrasy. Third, causal-patching evidence that restoring baseline cache state into compressed runs partially recovers refusal behavior, though without a role-specific dissociation between system-role and user-role tokens.
+We provide cross-family measurement of selective safety degradation under cache eviction with explicit per-policy effect sizes and bootstrap CIs, an architecture-dependent characterization of which models are affected, and causal-patching evidence that restoring baseline cache state partially recovers refusal behavior without role-specific dissociation.
 
 \section{Related Work}
 
@@ -132,7 +129,7 @@ A growing body of work isolates specific mechanisms in safety failure rather tha
 
 \subsection{Setup}
 
-We evaluate nine open-weight checkpoints: Qwen2.5-7B (base and Instruct) \citep{qwen2024qwen25}, Qwen3-9B \citep{yang2025qwen3}, Llama-3.1-8B-Instruct \citep{grattafiori2024llama3}, Gemma-2-9B-IT \citep{team2024gemma}, Mistral-7B-Instruct-v0.3 \citep{jiang2023mistral}, OLMo-3-7B-Instruct \citep{olmo2025olmo2}, Phi-4 \citep{abdin2024phi4}, and OpenAI gpt-oss-20b \citep{openai2025gptoss}. Models are loaded in bfloat16 with explicit access to the cache state, so eviction is implemented in the generation loop rather than delegated to a serving system. We do not claim coverage of vLLM \citep{kwon2023pagedattention}, TGI, or PagedAttention kernels; the results are intended as a cross-family measurement of the underlying behavior, and operator-level deployment validation is outside the scope of this paper.
+We evaluate nine open-weight checkpoints: Qwen2.5-7B (base and Instruct) \citep{qwen2024qwen25}, Qwen3-8B \citep{yang2025qwen3}, Llama-3.1-8B-Instruct \citep{grattafiori2024llama3}, Gemma-2-9B-IT \citep{team2024gemma}, Mistral-7B-Instruct-v0.3 \citep{jiang2023mistral}, OLMo-3-7B-Instruct \citep{olmo2025olmo2}, Phi-4 \citep{abdin2024phi4}, and OpenAI gpt-oss-20b \citep{openai2025gptoss}. Models are loaded in bfloat16 with explicit access to the cache state, so eviction is implemented in the generation loop rather than delegated to a serving system. We do not claim coverage of vLLM \citep{kwon2023pagedattention}, TGI, or PagedAttention kernels; the results measure the underlying behavior, not operator-level deployment.
 
 \subsection{Cache Policies}
 
@@ -170,7 +167,7 @@ Positive $\ssei$ indicates that safety pass-rate declines more than capability p
 
 \subsection{Audit}
 
-Automated labels are imperfect. We blinded the suite, policy, and treatment identity of each audit row and routed labels through a separate-family model judge. Annotations come from Claude Sonnet 4.5 \citep{anthropic2024claude}; family separation prevents same-family judging on any panel model. The audit manifests record judge model, prompt-template hashes, raw-output hashes, and response-length buckets so the labels can be re-derived. Across the panel, 2,595 of 2,676 attempted audit rows parsed (97\%); per-model parse rates range from 91\% to 100\%.
+Automated labels are imperfect. We blinded the suite, policy, and treatment identity of each audit row and routed labels through a separate-family model judge. Annotations come from Claude Sonnet 4 \citep{anthropic2025sonnet}; family separation prevents same-family judging on any panel model. The audit manifests record judge model, prompt-template hashes, raw-output hashes, and response-length buckets so the labels can be re-derived. Across the panel, 2,595 of 2,676 attempted audit rows parsed (97\%); per-model parse rates range from 91\% to 100\%.
 
 \subsection{Causal Restoration}
 
@@ -195,7 +192,7 @@ The user-role restoration is the central control: it shares the additional retai
   \label{fig:ssei-forest}
 \end{figure}
 
-Figure~\ref{fig:ssei-forest} reports per-model per-policy $\ssei$ point estimates and 95\% bootstrap confidence intervals. The largest positive effects come from sliding-window cache eviction on Qwen3-9B ($\ssei = 0.092$, CI [0.083, 0.101]) and Phi-4 ($\ssei = 0.084$, CI [0.076, 0.091]). Smaller but significant positive effects appear under user-pinned eviction on Llama-3.1-8B-Instruct (0.024 [0.016, 0.031]), OLMo-3-7B-Instruct (0.026 [0.019, 0.033]), and Qwen2.5-7B-Instruct (0.017 [0.011, 0.022]).
+Figure~\ref{fig:ssei-forest} reports per-model per-policy $\ssei$ point estimates and 95\% bootstrap confidence intervals. The largest positive effects come from sliding-window cache eviction on Qwen3-8B ($\ssei = 0.092$, CI [0.083, 0.101]) and Phi-4 ($\ssei = 0.084$, CI [0.076, 0.091]). Smaller but significant positive effects appear under user-pinned eviction on Llama-3.1-8B-Instruct (0.024 [0.016, 0.031]), OLMo-3-7B-Instruct (0.026 [0.019, 0.033]), and Qwen2.5-7B-Instruct (0.017 [0.011, 0.022]).
 
 \maybeinputtable{../generated/active_primary/family_replication_table.tex}{Family-level $\ssei$ summary by cache policy.}
 
@@ -210,11 +207,11 @@ The cross-family conclusion is robust to single-family removal. Table~\ref{tab:r
 \begin{figure}[t]
   \centering
   \maybeincludegraphic{../generated/active_primary/figures/safety_capability_phase_portrait.pdf}{0.92\linewidth}{Safety degradation versus capability degradation by policy and budget.}
-  \caption{Safety loss versus capability loss for the anchor model (Qwen3-9B). Each row is one cache policy. A selective-safety pattern places safety loss visibly to the right of capability loss within a row.}
+  \caption{Safety loss versus capability loss for the anchor model (Qwen3-8B). Each row is one cache policy. A selective-safety pattern places safety loss visibly to the right of capability loss within a row.}
   \label{fig:safety-capability}
 \end{figure}
 
-The selectivity is concentrated in the registered safety and leakage suites. On capability prompts (ARC-Easy), cache compression reduces accuracy by at most a few percentage points and rarely outside the bootstrap CI, while refusal accuracy on safety prompts loses an order of magnitude more under aggressive eviction. The point of $\ssei$ is to measure this gap directly rather than report two suite scores in parallel.
+The selectivity is concentrated in the registered safety and leakage suites. On capability prompts (ARC-Easy), cache compression reduces accuracy by at most a few percentage points and rarely outside the bootstrap CI, while refusal accuracy on safety prompts loses an order of magnitude more under aggressive eviction.
 
 \subsection{Models That Do Not Show the Effect}
 
@@ -222,11 +219,11 @@ Three checkpoints fail to produce positive $\ssei$ on any registered policy: Gem
 
 The gpt-oss-20b case is qualitatively different. Mean safety-suite score is 0.129 at the uncompressed baseline and rises to 0.554 under every treatment policy, including the random-matched control. A scalar safety improvement under cache pressure is inconsistent with the hypothesis that the model is gracefully degrading under cache pressure; the uniformity across all five eviction policies indicates a collapse into a single output mode rather than a modulated response to each policy's distinct retention pattern. gpt-oss-20b is trained on the harmony response format \citep{openai2025gptoss} and routes through a mixture-of-experts stack with non-standard cache management. We treat this as a separate failure mode of the cache-intervention protocol, not as evidence against selective safety erasure in the other families.
 
-The unifying observation is that the magnitude of selective safety erasure scales with the extent to which the safety-relevant generation circuit depends on long-range KV cache. Models pre-trained on a globally-attending full KV cache (Llama, OLMo, Phi, Qwen) carry safety reasoning that is sensitive to eviction; models pre-trained on locally-windowed cache do not. This pattern is consistent with the causal-localization hypothesis we test directly in the next section.
+Selective safety erasure scales with the extent to which the safety-relevant generation circuit depends on long-range KV cache. Models pre-trained on a globally-attending full KV cache (Llama, OLMo, Phi, Qwen) carry safety reasoning that is sensitive to eviction; models pre-trained on locally-windowed cache do not. This pattern is consistent with the causal-localization hypothesis we test directly in the next section.
 
 \subsection{Causal Restoration and Mitigation}
 
-A causal-patching study on Qwen3-9B against the simulated four-bit-KV quantization treatment, judged by an external Claude Sonnet rater on the public refusal-safety suite, shows that restoring baseline key+value slices for the first sixteen token positions partially recovers refusal behavior. However, the system-role and matched user-role interventions produce comparable restoration fractions under a per-prompt mean-of-ratios bootstrap estimator (system: 0.355, 95\% CI [0.302, 0.408]; user: 0.408, 95\% CI [0.355, 0.464]; $n = 321$ prompts). The overlapping CIs indicate that the safety-relevant information is distributed across cached tokens rather than localized to system-role spans. Policy-pinned cache retention, which protects system tokens from eviction directly, recovers refusal fully. A legacy Qwen2.5-7B-Instruct single-seed run shows the same pattern: system and user restoration are both 0.584 [0.520, 0.647] and [0.516, 0.647], respectively, with no detectable role asymmetry.
+A causal-patching study on Qwen3-8B against the simulated four-bit-KV quantization treatment, judged by Claude Sonnet 4 on the public refusal-safety suite, shows that restoring baseline key+value slices for the first sixteen token positions partially recovers refusal behavior. However, the system-role and matched user-role interventions produce comparable restoration fractions under a per-prompt mean-of-ratios bootstrap estimator (system: 0.355, 95\% CI [0.302, 0.408]; user: 0.408, 95\% CI [0.355, 0.464]; $n = 321$ prompts). The overlapping CIs indicate that the safety-relevant information is distributed across cached tokens rather than localized to system-role spans. Policy-pinned cache retention, which protects system tokens from eviction directly, recovers refusal fully. A legacy Qwen2.5-7B-Instruct single-seed run shows the same pattern: system and user restoration are both 0.584 [0.520, 0.647] and [0.516, 0.647], respectively, with no detectable role asymmetry.
 
 A parallel Phi-4 causal-patching run under the same protocol yields a null result: simulated four-bit quantization does not degrade Phi-4's safety score (baseline 0.985 vs.\ compressed 0.987), so only 11 of 613 paired prompts show a non-zero denominator for the restoration calculation. Phi-4's selectivity effect under the behavioral panel arises from sliding-window eviction ($\ssei = 0.084$), not from the length-preserving quantization treatment used in the causal protocol, making the causal analysis inapplicable to the policy under which Phi-4 is actually vulnerable.
 
@@ -246,11 +243,11 @@ A parallel Phi-4 causal-patching run under the same protocol yields a null resul
 
 \section{Discussion}
 
-The result we feel is most defensible is the architectural one: dense full-attention instruction-tuned models lose refusal pass-rate faster than they lose ordinary task accuracy when their KV cache is aggressively evicted, and models pre-trained against locally-windowed attention do not. The first half of that sentence is a deployment concern for the majority of currently-served chat models; the second half is a constructive direction for serving architectures that wish to be robust to cache pressure.
+The strongest finding is architectural: dense full-attention instruction-tuned models lose refusal pass-rate faster than they lose ordinary task accuracy when their KV cache is aggressively evicted, and models pre-trained against locally-windowed attention do not. This is both a deployment concern for the majority of currently-served chat models and a constructive direction for serving architectures that need to be robust to cache pressure.
 
-The causal-restoration evidence establishes that cache state carries safety-relevant information: restoring baseline K+V at the first sixteen positions into a compressed run recovers 35--58\% of the lost refusal behavior (depending on model and suite). However, system-role and matched user-role restorations produce comparable recovery under the per-prompt mean-of-ratios estimator (Qwen3-9B: 0.355 vs.\ 0.408; Qwen2.5-7B: 0.584 vs.\ 0.584), with heavily overlapping confidence intervals. We therefore do not claim role-specific localization of safety information. The fact that \emph{any} K+V restoration partially recovers refusal is consistent with the broader hypothesis that cache state is a safety-relevant surface, but the specific mechanism---system-role tokens versus a distributed cache property---remains open. The Phi-4 causal-patching run yields a null result because the four-bit quantization treatment does not degrade Phi-4's safety, providing no denominator for a meaningful restoration test. Cross-architecture generality of the causal localization claim is therefore unsupported.
+The causal-restoration evidence establishes that cache state carries safety-relevant information: restoring baseline K+V at the first sixteen positions into a compressed run recovers 35--58\% of the lost refusal behavior (depending on model and suite). However, system-role and matched user-role restorations produce comparable recovery under the per-prompt mean-of-ratios estimator (Qwen3-8B: 0.355 vs.\ 0.408; Qwen2.5-7B: 0.584 vs.\ 0.584), with heavily overlapping confidence intervals. We therefore do not claim role-specific localization. That \emph{any} K+V restoration partially recovers refusal supports cache state as a safety-relevant surface, but whether the mechanism is system-role tokens or a distributed cache property remains open. The Phi-4 causal-patching run yields a null result because the four-bit quantization treatment does not degrade Phi-4's safety, providing no denominator for a meaningful restoration test. Cross-architecture generality of the causal localization claim is therefore unsupported.
 
-We are deliberately not claiming that cache compression is universally unsafe. The result is conditional on the model class, the cache budget, the policy choice, and the suite. Operators deploying full-attention models with aggressive eviction at low budgets on safety-sensitive traffic are the case most directly affected by these results. Operators deploying locally-windowed models, or any model under policy-pinned retention, can expect substantially smaller safety regressions.
+Cache compression is not universally unsafe. The result is conditional on the model class, the cache budget, the policy choice, and the suite. Operators deploying full-attention models with aggressive eviction at low budgets on safety-sensitive traffic are the case most directly affected by these results. Operators deploying locally-windowed models, or any model under policy-pinned retention, can expect substantially smaller safety regressions.
 
 \section{Limitations}
 
