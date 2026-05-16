@@ -152,28 +152,34 @@ def export_paper_assets(results_dir: Path, paper_dir: Path, macro_prefix: str = 
         safety_ci = values.get("safety_restoration_fraction_ci", {})
         refusal_ci = values.get("refusal_restoration_fraction_ci", {})
         leakage_ci = values.get("leakage_avoidance_restoration_fraction_ci", {})
+        # Use the CI's own mean (mean-of-per-prompt-ratios) as the point
+        # estimate so that the reported value and its bootstrap CI describe
+        # the same estimator.  The legacy ``*_restoration_fraction`` fields
+        # are the ratio-of-means estimator which can diverge from the
+        # mean-of-ratios CI, especially with heterogeneous denominators.
+        safety_point = safety_ci.get("mean") if safety_ci.get("mean") is not None else values.get("safety_restoration_fraction")
+        refusal_point = refusal_ci.get("mean") if refusal_ci.get("mean") is not None else values.get("refusal_restoration_fraction")
+        leakage_point = leakage_ci.get("mean") if leakage_ci.get("mean") is not None else values.get("leakage_avoidance_restoration_fraction")
         restoration_rows.append(
             {
                 "suite": _display_causal_suite_label(suite),
                 "policy": _display_causal_policy_label(policy),
                 "compressed_policy": _display_policy_label(values.get("compressed_policy")),
-                "safety_restoration_fraction": values.get("safety_restoration_fraction"),
+                "safety_restoration_fraction": safety_point,
                 "safety_restoration_95ci": format_estimate_ci(
-                    values.get("safety_restoration_fraction"),
+                    safety_point,
                     safety_ci.get("ci_low"),
                     safety_ci.get("ci_high"),
                 ),
-                "refusal_restoration_fraction": values.get("refusal_restoration_fraction"),
+                "refusal_restoration_fraction": refusal_point,
                 "refusal_restoration_95ci": format_estimate_ci(
-                    values.get("refusal_restoration_fraction"),
+                    refusal_point,
                     refusal_ci.get("ci_low"),
                     refusal_ci.get("ci_high"),
                 ),
-                "leakage_avoidance_restoration_fraction": values.get(
-                    "leakage_avoidance_restoration_fraction"
-                ),
+                "leakage_avoidance_restoration_fraction": leakage_point,
                 "leakage_avoidance_restoration_95ci": format_estimate_ci(
-                    values.get("leakage_avoidance_restoration_fraction"),
+                    leakage_point,
                     leakage_ci.get("ci_low"),
                     leakage_ci.get("ci_high"),
                 ),

@@ -472,28 +472,42 @@ def main() -> None:
             )
             plt.close(fig)
 
+        # Use the CI's own mean (mean-of-per-prompt-ratios) as the point
+        # estimate so that the figure bar and its CI describe the same
+        # quantity.  Fall back to the ratio-of-means value only when the
+        # CI dict is absent.
+        def _ci_mean_or_fallback(value: dict, metric: str) -> object:
+            ci = value.get(f"{metric}_ci") or {}
+            if ci.get("mean") is not None:
+                return ci["mean"]
+            return value.get(metric)
+
         restoration_rows = [
             {
                 "suite_policy": key,
                 "suite": key.split("::", 1)[0],
                 "policy": key.split("::", 1)[1],
                 "compressed_policy": value.get("compressed_policy"),
-                "safety_restoration_fraction": value.get("safety_restoration_fraction"),
+                "safety_restoration_fraction": _ci_mean_or_fallback(
+                    value, "safety_restoration_fraction"
+                ),
                 "safety_restoration_ci_low": (
                     value.get("safety_restoration_fraction_ci") or {}
                 ).get("ci_low"),
                 "safety_restoration_ci_high": (
                     value.get("safety_restoration_fraction_ci") or {}
                 ).get("ci_high"),
-                "refusal_restoration_fraction": value.get("refusal_restoration_fraction"),
+                "refusal_restoration_fraction": _ci_mean_or_fallback(
+                    value, "refusal_restoration_fraction"
+                ),
                 "refusal_restoration_ci_low": (
                     value.get("refusal_restoration_fraction_ci") or {}
                 ).get("ci_low"),
                 "refusal_restoration_ci_high": (
                     value.get("refusal_restoration_fraction_ci") or {}
                 ).get("ci_high"),
-                "leakage_avoidance_restoration_fraction": value.get(
-                    "leakage_avoidance_restoration_fraction"
+                "leakage_avoidance_restoration_fraction": _ci_mean_or_fallback(
+                    value, "leakage_avoidance_restoration_fraction"
                 ),
                 "leakage_avoidance_restoration_ci_low": (
                     value.get("leakage_avoidance_restoration_fraction_ci") or {}

@@ -1,8 +1,8 @@
 {
-  "analysis_git_commit": "8c5bc5d5ae940d11f8977bf5ae8e51d19b0e1dee",
+  "analysis_git_commit": "cb92a3625f9a3e3372c153f28e68d09439035a5c",
   "analysis_git_dirty": true,
-  "analysis_git_status_short": "M docs/generated/selectivity_h200_powered_qwen3_5_9b/causal_restoration_table.md\n M docs/generated/selectivity_h200_powered_qwen3_5_9b/main_results_table.md\n M docs/generated/selectivity_h200_powered_qwen3_5_9b/suite_level_effects_table.md\n?? .claude/",
-  "macro_prefix": "Causal",
+  "analysis_git_status_short": "M docs/generated/active_causal/causal_restoration_table.tex\n M docs/generated/h200_causal_patch_qwen7b/causal_restoration_table.md\n M docs/generated/h200_causal_patch_qwen7b/causal_restoration_table.tex\n M docs/generated/h200_causal_patch_qwen7b/result_macros.tex\n M scripts/export_paper_assets.py\n?? .claude/",
+  "macro_prefix": "Primary",
   "results_dir": "results/h200_causal_patch_qwen7b",
   "schema_version": 1,
   "source_artifacts": {
@@ -28,14 +28,14 @@
   "source_run_name": "h200_causal_patch_qwen7b",
   "tables": {
     "causal_restoration_table.md": {
-      "bytes": 1504,
+      "bytes": 1486,
       "path": "docs/generated/h200_causal_patch_qwen7b/causal_restoration_table.md",
-      "sha256": "a049387c6d944e2f31f3890a015c825152fa87a517f7613f1632e10f2900b8d1"
+      "sha256": "7ae728e17ffacd15a9d7745de54255f34aa93c9de2206a0530feec37f5e0d1ae"
     },
     "causal_restoration_table.tex": {
-      "bytes": 1623,
+      "bytes": 1605,
       "path": "docs/generated/h200_causal_patch_qwen7b/causal_restoration_table.tex",
-      "sha256": "a0dc1e5b4ed231a4a9a0ef3d5493c27674b5b69b8e8fd3658e5d2d093ac349fa"
+      "sha256": "0f8ad38be0c17992648846c920788bee29ff165018d1b355c55aa1f58670cb15"
     },
     "main_results_table.md": {
       "bytes": 547,
@@ -48,9 +48,9 @@
       "sha256": "e5e62c95734b6d9e9a0cffddd9528fe39bf0500a3d1016f4fe01efd29d168b61"
     },
     "result_macros.tex": {
-      "bytes": 404,
+      "bytes": 403,
       "path": "docs/generated/h200_causal_patch_qwen7b/result_macros.tex",
-      "sha256": "c3c1eedd0f31138b24307182a4829339021725e45318bd2c0d0c352af43fee58"
+      "sha256": "e5c26b38729052ed63d88cee5bb4d247d07761e19ad4716ae6faa021c37d42a7"
     },
     "suite_level_effects_table.md": {
       "bytes": 1602,

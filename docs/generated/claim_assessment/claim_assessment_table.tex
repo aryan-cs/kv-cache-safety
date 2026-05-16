@@ -11,8 +11,8 @@
 behavioral\_cache\_sensitivity & supported & 6 of 8 instruction-tuned models show |SSEI| >= 0.01. \\
 safety\_minus\_capability\_selectivity & supported & 5 models have a registered policy with positive SSEI whose 95\% CI excludes 0 (0.01 threshold). \\
 cross\_family\_replication & supported & Families with positive instruction-tuned selectivity excluding 0: ['Llama', 'OLMo', 'Phi', 'Qwen']. \\
-targeted\_mitigation & pending & Legacy single-seed Qwen2.5-7B-Instruct causal-patching evidence shows Policy-pinned cache restoration fraction 1.000 on Refusal; bootstrap CIs missing so registered mitigation gate (margin >= 0.10 with CI width <= 0.1... \\
-causal\_localization & pending & Legacy Qwen2.5-7B-Instruct causal-patching evidence shows K+V system-role patch restores Refusal at 1.256, matched K+V user-role control at -0.692 (qualitative pattern matches registered direction). Single-seed; full ... \\
+targeted\_mitigation & pending & Policy-pinned cache restoration fraction is 1.000 on Refusal for both Qwen2.5-7B and Qwen3-9B. However, the registered mitigation gate requires system-role margin\_ci\_low >= 0.10 over user-role. Under the corrected p... \\
+causal\_localization & pending & Corrected per-prompt mean-of-ratios estimator shows no role-specific dissociation: Qwen3-9B system 0.355 [0.302,0.408] vs user 0.408 [0.355,0.464]; Qwen2.5-7B system 0.584 [0.520,0.647] vs user 0.584 [0.516,0.647]. CI... \\
 alignment\_contrast & pending & Base-model alignment-contrast suite is recorded with only 2 sampled prompts per cell for qwen2\_5\_7b\_base; insufficient power to score. \\
 audit\_provenance\_complete & supported & Models with >= 95\% local-judge coverage: ['gpt\_oss\_20b', 'phi4', 'qwen2\_5\_7b\_base', 'qwen2\_5\_7b\_instruct', 'qwen3\_5\_9b']; covered families: ['OpenAI', 'Phi', 'Qwen']. \\
 \bottomrule

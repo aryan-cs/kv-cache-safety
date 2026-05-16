@@ -2,15 +2,15 @@
   "figures": [
     {
       "data_csv": "results/h200_causal_patch_qwen7b/figures/prompt_effect_constellation.csv",
-      "data_csv_sha256": "f92619522ef3765ce17fe354d6625327675984ac9b7f073b55523b2349b23a72",
-      "data_row_count": 6308,
+      "data_csv_sha256": "5b204b5cae17499459db32306c621e7607ef3f604e55294687a5720a0b7dbb20",
+      "data_row_count": 16,
       "name": "prompt_effect_constellation",
       "pdf": "results/h200_causal_patch_qwen7b/figures/prompt_effect_constellation.pdf",
-      "pdf_sha256": "cc117d1780c45e34a7751091f7cb05387461c7d85f7c21346b71bf1d920a1bc1",
+      "pdf_sha256": "5c3979e3618144e321bd3dc0281b47826c10a807c309cbc25daa9725c3824b1b",
       "png": "results/h200_causal_patch_qwen7b/figures/prompt_effect_constellation.png",
-      "png_sha256": "13bcbdcb0e0a86c7b80b5cbe8fa3c0e366abb501df403d6d9c91482f8bfc790a",
+      "png_sha256": "2c7ae4c59ea7150003c76107fff5e6bbd05c85d0b382559a21cac84ef5f0db51",
       "svg": "results/h200_causal_patch_qwen7b/figures/prompt_effect_constellation.svg",
-      "svg_sha256": "fc9295dbc154e706b77f733ff268bcd712f85ad1d8a0d9ef6bf02a3c86f9bbb8"
+      "svg_sha256": "5fb879e04afc4de86dacd834afb8825607bb4ac03cd0ddaf508fc3d09109130f"
     },
     {
       "data_csv": "results/h200_causal_patch_qwen7b/figures/safety_score.csv",
@@ -18,11 +18,11 @@
       "data_row_count": 21,
       "name": "safety_score",
       "pdf": "results/h200_causal_patch_qwen7b/figures/safety_score.pdf",
-      "pdf_sha256": "5253017e98ecdcc27cbccd20b56d014ab8f4abe213f741a1febd217a4c8f8291",
+      "pdf_sha256": "f72e220716afd0ff3eea1391c30b1672cdf87f8749120d221f031ef79e0d3cff",
       "png": "results/h200_causal_patch_qwen7b/figures/safety_score.png",
-      "png_sha256": "d5373a39eef6fa9715f8b4daf236faf85381e3bc0ab7d671c646547bdbb1539c",
+      "png_sha256": "a51aee97e3c938f4676a6b5c86bd7cee7cb7e914c31ce1167601c6a3bb61edf7",
       "svg": "results/h200_causal_patch_qwen7b/figures/safety_score.svg",
-      "svg_sha256": "c474ce9494f8a9bf4d99136b41800b4ab7fce4081713c8d671b6e9456a5f064b"
+      "svg_sha256": "99e4f3aa15a6f2ccfd34966f4fb537099d6b85fb64c427d45d212da9ebefba27"
     },
     {
       "data_csv": "results/h200_causal_patch_qwen7b/figures/rouge_l_leakage_recall.csv",
@@ -30,35 +30,35 @@
       "data_row_count": 21,
       "name": "rouge_l_leakage_recall",
       "pdf": "results/h200_causal_patch_qwen7b/figures/rouge_l_leakage_recall.pdf",
-      "pdf_sha256": "96e7fda6167e91dd12aeaf8edfa8003b558cafdf33ee1efcf891df42630b72b5",
+      "pdf_sha256": "003acca6483e7e67d05cf4f2b0b555934abd7f9685596fe27760a31485b03f44",
       "png": "results/h200_causal_patch_qwen7b/figures/rouge_l_leakage_recall.png",
-      "png_sha256": "26556334e2d32d3746866cf755e9a5640e358fb90f839fbaa12d9069ff0ce093",
+      "png_sha256": "1b9a9e20bb0b5fae5e8abf779f7f8a647955dca7dff9cc13b07d2a5b77000b15",
       "svg": "results/h200_causal_patch_qwen7b/figures/rouge_l_leakage_recall.svg",
-      "svg_sha256": "452690ba0d54cfa3c95468e0a2827fc776e97a60343a7f5c4bc7b91c48b65fa9"
+      "svg_sha256": "7c967dd3a761b2ac1f4028d799bb5146ef12981b513d812d23678e058151d07b"
     },
     {
       "data_csv": "results/h200_causal_patch_qwen7b/figures/causal_restoration_fraction.csv",
-      "data_csv_sha256": "ca8a702cf9c53303c3355d9bd49e138243f6a032dbd0350a2c2d1acda1460adb",
+      "data_csv_sha256": "749e7b3767360e90f75f6617b6010958ebb366076b5aee2b27b5028bafbec22c",
       "data_row_count": 15,
       "name": "causal_restoration_fraction",
       "pdf": "results/h200_causal_patch_qwen7b/figures/causal_restoration_fraction.pdf",
-      "pdf_sha256": "659fd16f55441eadac73567f578ef35cf874629d064e601c0167d147c2e653c7",
+      "pdf_sha256": "4009f047e225b5c920b8a457e7f4ae66d601500fa21732b6ee4ae68aa238b0e6",
       "png": "results/h200_causal_patch_qwen7b/figures/causal_restoration_fraction.png",
-      "png_sha256": "a6607a08439b89bb7c38a28adba5017a7f0edf4cfbc19a602c339d30384dd1cf",
+      "png_sha256": "7fc004568131a3d7b319eac41a78875b92482ff4a573aad07c11f49a9f85ef9d",
       "svg": "results/h200_causal_patch_qwen7b/figures/causal_restoration_fraction.svg",
-      "svg_sha256": "0dd918e819ab2d0e637d075932ac1e50e395d97532a56129293c6ba5502172d9"
+      "svg_sha256": "c5a4015917150f84a2eededc1adc9366e09d106701675e8fa3fa0967bf425928"
     },
     {
       "data_csv": "results/h200_causal_patch_qwen7b/figures/causal_restoration_flow.csv",
-      "data_csv_sha256": "90456720a862ec4bc643ccff383219d0dde7c4d096c6b8248d484d5bccf9b0a2",
-      "data_row_count": 15,
+      "data_csv_sha256": "a5ba405bec0c1d1451048044df985d4fa731468519a715938c935a48d5f6784e",
+      "data_row_count": 5,
       "name": "causal_restoration_flow",
       "pdf": "results/h200_causal_patch_qwen7b/figures/causal_restoration_flow.pdf",
-      "pdf_sha256": "ee5b87ffb55f04c99a832df2b32935a2a425aef3874843a7076a8eff4328de82",
+      "pdf_sha256": "96d138ffe212749d2fb757b012338171aca2bd68255c2b13495eb0739ad09b6a",
       "png": "results/h200_causal_patch_qwen7b/figures/causal_restoration_flow.png",
-      "png_sha256": "56eafadf33b728dd40d4a94e7586b3d2d84c1146b1fb7b02270f34471bf4934b",
+      "png_sha256": "7d57da6e511e5eb6f341a51b56b4ac3d0e7f96b13d8f579375d5628eb4faddc0",
       "svg": "results/h200_causal_patch_qwen7b/figures/causal_restoration_flow.svg",
-      "svg_sha256": "6aa3bf3e9cd0f6fe68740a18aff3f007ba8794149db7c2e074d9d188d96cdb12"
+      "svg_sha256": "50f1022f5712e08d0cf48eda9ea1ab947b415cff9870e86ee968dd37df0fd3ea"
     },
     {
       "data_csv": "results/h200_causal_patch_qwen7b/figures/cache_l2_retained_fraction.csv",
@@ -66,11 +66,11 @@
       "data_row_count": 910,
       "name": "cache_l2_retained_fraction",
       "pdf": "results/h200_causal_patch_qwen7b/figures/cache_l2_retained_fraction.pdf",
-      "pdf_sha256": "62ba020eb3eaa5dbbe58058db15886df81afd5227e70ce336b9052c554951462",
+      "pdf_sha256": "634c4ac079cb92da2a5103be1cbec9a413d8a0902c268b5dcd33de028b0b623e",
       "png": "results/h200_causal_patch_qwen7b/figures/cache_l2_retained_fraction.png",
-      "png_sha256": "aad388aef35b1df84acb1cc39ee0175db343f91f3b0ce4be736c2811e3c64241",
+      "png_sha256": "596aed728c6c8f5054b1e72d39366d1e8e2b4c6ee65b7ee0c24ef6d4c26b8269",
       "svg": "results/h200_causal_patch_qwen7b/figures/cache_l2_retained_fraction.svg",
-      "svg_sha256": "cf6224b68c031b38c14bcdae6c7aa7f247c7477aa0ad0a10825a8cb0eb817b09"
+      "svg_sha256": "399c3705512a9bc40286a1d9c9722f98e47f5aae131c5fc7ce33d178a726092b"
     },
     {
       "data_csv": "results/h200_causal_patch_qwen7b/figures/token_role_retention_heatmap.csv",
@@ -78,11 +78,11 @@
       "data_row_count": 28,
       "name": "token_role_retention_heatmap",
       "pdf": "results/h200_causal_patch_qwen7b/figures/token_role_retention_heatmap.pdf",
-      "pdf_sha256": "2e4324add0395bb5adfe66201266ebe2d6b078120326ff306f487e2d8056a860",
+      "pdf_sha256": "36e9b111d03fe2019c8fc89beddd23cd8694b34849ca11667781a2f7d4168afd",
       "png": "results/h200_causal_patch_qwen7b/figures/token_role_retention_heatmap.png",
-      "png_sha256": "c804bb770151b26bded06aad1a64676512add1c7e197d54adac2b48d2c56a8c1",
+      "png_sha256": "f623502c4aae74d8d5b0ce36b51ff4e14561c1a59712706e8b5d275e24892aa7",
       "svg": "results/h200_causal_patch_qwen7b/figures/token_role_retention_heatmap.svg",
-      "svg_sha256": "4930763e7e705082306aefd21141e8388843b8ccc47351fe5f9b96b7fe009a03"
+      "svg_sha256": "3099ac247bdc8d3cd815ebe988015f3c67c50e7ed78d927a48a72b98cf8848e2"
     },
     {
       "data_csv": "results/h200_causal_patch_qwen7b/figures/cache_state_fingerprint.csv",
@@ -90,11 +90,11 @@
       "data_row_count": 952,
       "name": "cache_state_fingerprint",
       "pdf": "results/h200_causal_patch_qwen7b/figures/cache_state_fingerprint.pdf",
-      "pdf_sha256": "04a9133e0fb4a10086b1ff0680af2bab2571a475884c483f7a06cc81bab9ad72",
+      "pdf_sha256": "9a5e392515222e0437cb8451afe685872cf5a9fd7cf4ea5bc21d2da6ad0e92db",
       "png": "results/h200_causal_patch_qwen7b/figures/cache_state_fingerprint.png",
-      "png_sha256": "fc051f087d670be75f422e4545c7d5676a0f96f8bba35b1cb6966d62d661cb2e",
+      "png_sha256": "f49c23d8ab57b4ab52971172960c6b142e0f382b3f0f931c7044c6a2c228cbe7",
       "svg": "results/h200_causal_patch_qwen7b/figures/cache_state_fingerprint.svg",
-      "svg_sha256": "6f8759d6b1c468d1a457285768f9bda3300dc1ab73605754ad3c4a479d1b52b8"
+      "svg_sha256": "288325cf9aea376e76a5b013f0a333518f90714af039c27768dd4bd4b6837391"
     }
   ],
   "schema_version": 1,
