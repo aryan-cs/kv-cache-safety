@@ -26,6 +26,13 @@ ROLE_ORDER = {
     "unknown": 6,
 }
 
+# Pastel orange color palette
+C_PRIMARY = "#FFB347"      # main pastel orange
+C_DARK = "#E8943A"         # darker accent
+C_LIGHT = "#FFD699"        # lighter fill
+C_MUTED = "#F5C28A"        # muted variant
+C_ACCENT = "#FF8C42"       # stronger accent for emphasis
+
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Generate figures for a run.")
@@ -77,8 +84,9 @@ def main() -> None:
         fig_height = max(5.6, 0.34 * len(top))
         fig, ax = plt.subplots(figsize=(11, fig_height))
         suite_order = list(dict.fromkeys(top["suite"].tolist()))
-        cmap = plt.get_cmap("tab10")
-        suite_colors = {suite: cmap(index % 10) for index, suite in enumerate(suite_order)}
+        from matplotlib.colors import LinearSegmentedColormap
+        orange_shades = [C_LIGHT, C_PRIMARY, C_DARK, C_ACCENT, C_MUTED]
+        suite_colors = {suite: orange_shades[index % len(orange_shades)] for index, suite in enumerate(suite_order)}
         labels = [
             _wrap_label(
                 f"{_clean_suite_label(row.suite)} | {_clean_policy_label(row.policy)}",
@@ -196,7 +204,7 @@ def main() -> None:
                 im = ax.imshow(
                     pivot.fillna(0.0).values,
                     aspect="auto",
-                    cmap="coolwarm",
+                    cmap="Oranges",
                     vmin=-max_abs,
                     vmax=max_abs,
                 )
@@ -291,9 +299,9 @@ def main() -> None:
                 bar_h = 0.35
 
                 ax.barh(y_pos - bar_h / 2, safety_vals, bar_h,
-                        color="#e41a1c", label="Safety loss", zorder=2)
+                        color=C_ACCENT, label="Safety loss", zorder=2)
                 ax.barh(y_pos + bar_h / 2, capability_vals, bar_h,
-                        color="#377eb8", label="Capability loss", zorder=2)
+                        color=C_LIGHT, label="Capability loss", zorder=2)
                 ax.axvline(0, color="0.15", linewidth=0.9, zorder=1)
                 ax.set_yticks(y_pos)
                 ax.set_yticklabels(labels, fontsize=9)
@@ -351,9 +359,9 @@ def main() -> None:
                 y_lookup = {policy: idx for idx, policy in enumerate(policy_order)}
                 metric_offsets = {"capability": -0.22, "safety": 0.0, "ssei": 0.22}
                 metric_colors = {
-                    "capability": "#377eb8",
-                    "safety": "#e41a1c",
-                    "ssei": "#984ea3",
+                    "capability": C_LIGHT,
+                    "safety": C_ACCENT,
+                    "ssei": C_DARK,
                 }
                 fig_height = max(4.5, 0.46 * len(policy_order))
                 braid_x_limits = _one_axis_cluster_limits(
@@ -684,7 +692,7 @@ def main() -> None:
                 index="role", columns="policy", values="retention_fraction", aggfunc="mean"
             )
             fig, ax = plt.subplots(figsize=(max(8, 0.8 * len(pivot.columns)), 4.5))
-            im = ax.imshow(pivot.fillna(0.0).values, aspect="auto", cmap="viridis", vmin=0, vmax=1)
+            im = ax.imshow(pivot.fillna(0.0).values, aspect="auto", cmap="Oranges", vmin=0, vmax=1)
             ax.set_xticks(
                 range(len(pivot.columns)),
                 labels=[_wrap_label(_clean_policy_label(policy), 16) for policy in pivot.columns],
@@ -795,7 +803,7 @@ def main() -> None:
             ).reindex(index=row_order["row_label"], columns=column_order["column_label"])
             fig_height = max(5, 0.22 * len(pivot.index))
             fig, ax = plt.subplots(figsize=(12, fig_height))
-            im = ax.imshow(pivot.fillna(0.0).values, aspect="auto", cmap="magma", vmin=0, vmax=1)
+            im = ax.imshow(pivot.fillna(0.0).values, aspect="auto", cmap="Oranges", vmin=0, vmax=1)
             column_records = column_order.to_dict(orient="records")
             role_centers = _column_role_centers(column_records)
             ax.set_xticks(
@@ -970,7 +978,7 @@ def _plot_phase_portrait_panel(
     ax.scatter(
         phase_df["capability_degradation"],
         y,
-        color="#377eb8",
+        color=C_LIGHT,
         s=54,
         label="Capability loss",
         zorder=2,
@@ -978,7 +986,7 @@ def _plot_phase_portrait_panel(
     ax.scatter(
         phase_df["safety_degradation"],
         y,
-        color="#e41a1c",
+        color=C_ACCENT,
         s=54,
         label="Safety loss",
         zorder=3,
@@ -1100,7 +1108,7 @@ def _plot_safety_state_atlas_panel(
     ax.scatter(
         atlas_plot_df["selective_safety_erasure_index"],
         y,
-        color="#984ea3",
+        color=C_ACCENT,
         s=58,
         label="SSeI",
         zorder=3,
@@ -1109,7 +1117,7 @@ def _plot_safety_state_atlas_panel(
         atlas_plot_df["system_cache_loss"],
         y,
         facecolors="none",
-        edgecolors="#1b1b1b",
+        edgecolors=C_DARK,
         s=74,
         linewidths=1.3,
         label="System-token cache loss",
@@ -1119,7 +1127,7 @@ def _plot_safety_state_atlas_panel(
         atlas_plot_df["user_cache_loss"],
         y,
         facecolors="none",
-        edgecolors="#777777",
+        edgecolors=C_LIGHT,
         s=74,
         linewidths=1.3,
         label="User-token cache loss",
@@ -1149,7 +1157,7 @@ def _plot_selective_ssei_bars_panel(
     label_suite: bool = False,
 ) -> None:
     y = list(range(len(bar_df)))
-    colors = ["#b2182b" if value > 0 else "#2166ac" for value in bar_df["index"]]
+    colors = [C_ACCENT if value > 0 else C_LIGHT for value in bar_df["index"]]
     ax.barh(y, bar_df["index"], color=colors, alpha=0.88)
     ax.axvline(0, color="0.15", linewidth=0.9)
     ax.set_yticks(y)
@@ -1752,12 +1760,12 @@ def _legacy_policy_label(policy: str) -> str:
 
 def _restoration_color(policy: str) -> str:
     if "roleuser" in policy or "matchsystem" in policy:
-        return "#7570b3"
+        return C_LIGHT
     if "rolesystem" in policy or "system" in policy:
-        return "#1b9e77"
+        return C_PRIMARY
     if "policy_pinned" in policy:
-        return "#d95f02"
-    return "#4d4d4d"
+        return C_ACCENT
+    return C_MUTED
 
 
 def _stream_cache_fingerprint(

@@ -3,18 +3,18 @@
 \small
 \begin{tabular}{llccc}
 \toprule
-\textbf{Suite} & \textbf{Policy} & \textbf{Safety [95\% CI]} & \textbf{Refusal [95\% CI]} & \textbf{Leakage [95\% CI]} \\
+\textbf{Suite} & \textbf{Policy} & \textbf{Safety} & \textbf{Refusal} & \textbf{Leakage} \\
 \midrule
-Refusal & K+V sys & 0.355 [0.302, 0.408] & 0.355 [0.302, 0.408] & --- \\
-Refusal & K+V user & 0.408 [0.355, 0.464] & 0.408 [0.355, 0.464] & --- \\
-Public leak & K+V sys & 0.058 [0.022, 0.102] & 0.482 [0.373, 0.590] & 0.058 [0.022, 0.102] \\
-Public leak & K+V user & 0.044 [0.015, 0.080] & 0.590 [0.482, 0.699] & 0.044 [0.015, 0.080] \\
-Leak probe & K+V sys & 0.000 [0.000, 0.000] & 0.000 [0.000, 0.000] & 0.000 [0.000, 0.000] \\
-Leak probe & K+V user & 0.000 [0.000, 0.000] & 1.000 [1.000, 1.000] & 0.000 [0.000, 0.000] \\
+Refusal & K+V sys & $0.355 \pm 0.053$ & $0.355 \pm 0.053$ & --- \\
+Refusal & K+V user & $0.408 \pm 0.055$ & $0.408 \pm 0.055$ & --- \\
+Public leak & K+V sys & $0.058 \pm 0.040$ & $0.482 \pm 0.109$ & $0.058 \pm 0.040$ \\
+Public leak & K+V user & $0.044 \pm 0.033$ & $0.590 \pm 0.109$ & $0.044 \pm 0.033$ \\
+Leak probe & K+V sys & $0.000$ & $0.000$ & $0.000$ \\
+Leak probe & K+V user & $0.000$ & $1.000$ & $0.000$ \\
 \midrule
-Refusal & Policy-pinned & 1.000 [1.000, 1.000] & 1.000 [1.000, 1.000] & --- \\
+Refusal & Policy-pinned & $1.000$ & $1.000$ & --- \\
 \bottomrule
 \end{tabular}
-\caption{Causal restoration fractions for patched and mitigation conditions (Qwen3-9B).}
+\caption{Causal restoration fractions $\pm$ 95\% CI half-width (Qwen3-9B).}
 \label{tab:causal-restoration}
 \end{table}
