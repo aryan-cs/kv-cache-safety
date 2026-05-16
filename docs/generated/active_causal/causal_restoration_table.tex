@@ -1,23 +1,20 @@
 \begin{table}[t]
 \centering
-\begingroup
-\footnotesize
-\setlength{\tabcolsep}{2pt}
-\renewcommand{\arraystretch}{0.94}
-\begin{tabularx}{\linewidth}{@{}llXXX@{}}
+\small
+\begin{tabular}{llccc}
 \toprule
-suite & policy & Safety [95\% CI] & Refusal [95\% CI] & Leakage [95\% CI] \\
+\textbf{Suite} & \textbf{Policy} & \textbf{Safety [95\% CI]} & \textbf{Refusal [95\% CI]} & \textbf{Leakage [95\% CI]} \\
 \midrule
-Refusal & K+V sys & 0.355 [0.302,0.408] & 0.355 [0.302,0.408] &  \\
-Refusal & K+V user & 0.408 [0.355,0.464] & 0.408 [0.355,0.464] &  \\
-Public leak & K+V sys & 0.058 [0.022,0.102] & 0.482 [0.373,0.590] & 0.058 [0.022,0.102] \\
-Public leak & K+V user & 0.044 [0.015,0.080] & 0.590 [0.482,0.699] & 0.044 [0.015,0.080] \\
-Leak probe & K+V sys & 0.000 [0.000,0.000] & 0.000 [0.000,0.000] & 0.000 [0.000,0.000] \\
-Leak probe & K+V user & 0.000 [0.000,0.000] & 1.000 [1.000,1.000] & 0.000 [0.000,0.000] \\
-Pinned & Policy-pinned cache &  &  &  \\
+Refusal & K+V sys & 0.355 [0.302, 0.408] & 0.355 [0.302, 0.408] & --- \\
+Refusal & K+V user & 0.408 [0.355, 0.464] & 0.408 [0.355, 0.464] & --- \\
+Public leak & K+V sys & 0.058 [0.022, 0.102] & 0.482 [0.373, 0.590] & 0.058 [0.022, 0.102] \\
+Public leak & K+V user & 0.044 [0.015, 0.080] & 0.590 [0.482, 0.699] & 0.044 [0.015, 0.080] \\
+Leak probe & K+V sys & 0.000 [0.000, 0.000] & 0.000 [0.000, 0.000] & 0.000 [0.000, 0.000] \\
+Leak probe & K+V user & 0.000 [0.000, 0.000] & 1.000 [1.000, 1.000] & 0.000 [0.000, 0.000] \\
+\midrule
+Refusal & Policy-pinned & 1.000 [1.000, 1.000] & 1.000 [1.000, 1.000] & --- \\
 \bottomrule
-\end{tabularx}
-\endgroup
-\caption{Causal restoration effects for patched and mitigation conditions.}
+\end{tabular}
+\caption{Causal restoration fractions for patched and mitigation conditions (Qwen3-9B).}
 \label{tab:causal-restoration}
 \end{table}

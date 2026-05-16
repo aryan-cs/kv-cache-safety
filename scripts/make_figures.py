@@ -278,39 +278,29 @@ def main() -> None:
 
             phase_df = _phase_portrait_rows(selective_df)
             if not phase_df.empty:
-                phase_df = phase_df.sort_values("selective_safety_erasure_index", ascending=True)
-                fig_height = max(4.8, 0.43 * len(phase_df))
-                phase_zoom_limits = _combined_axis_cluster_limits(
-                    phase_df,
-                    ["capability_degradation", "safety_degradation"],
-                )
-                if phase_zoom_limits is None:
-                    fig, ax = plt.subplots(figsize=(10.5, fig_height))
-                    _plot_phase_portrait_panel(
-                        ax,
-                        phase_df,
-                        title="Safety loss compared with capability loss",
-                    )
-                else:
-                    fig, axes = plt.subplots(
-                        1,
-                        2,
-                        figsize=(14, fig_height),
-                        sharey=True,
-                        gridspec_kw={"width_ratios": [0.95, 1.15]},
-                    )
-                    ax, zoom_ax = axes
-                    _plot_phase_portrait_panel(ax, phase_df, title="All policies")
-                    _plot_phase_portrait_panel(
-                        zoom_ax,
-                        phase_df,
-                        title="Zoomed central cluster",
-                        xlim=phase_zoom_limits,
-                        show_yticklabels=False,
-                    )
-                    fig.suptitle("Safety loss compared with capability loss", y=0.98)
-                _legend_below(ax, title="Quantity", ncol=2)
-                ax.grid(axis="x", alpha=0.22)
+                import numpy as np
+
+                phase_df = phase_df.sort_values("selective_safety_erasure_index", ascending=False)
+                labels = [_clean_policy_label(p) for p in phase_df["policy"]]
+                safety_vals = phase_df["safety_degradation"].values
+                capability_vals = phase_df["capability_degradation"].values
+
+                n = len(labels)
+                fig, ax = plt.subplots(figsize=(8, max(4, 0.45 * n)))
+                y_pos = np.arange(n)
+                bar_h = 0.35
+
+                ax.barh(y_pos - bar_h / 2, safety_vals, bar_h,
+                        color="#e41a1c", label="Safety loss", zorder=2)
+                ax.barh(y_pos + bar_h / 2, capability_vals, bar_h,
+                        color="#377eb8", label="Capability loss", zorder=2)
+                ax.axvline(0, color="0.15", linewidth=0.9, zorder=1)
+                ax.set_yticks(y_pos)
+                ax.set_yticklabels(labels, fontsize=9)
+                ax.set_xlabel("Degradation from baseline (higher = worse)")
+                ax.set_title("Safety vs Capability Degradation by Policy")
+                ax.legend(loc="lower right", framealpha=0.9)
+                ax.grid(axis="x", alpha=0.25, zorder=0)
                 fig.tight_layout()
                 _save_figure(
                     fig,
