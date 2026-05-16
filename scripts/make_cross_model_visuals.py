@@ -35,16 +35,22 @@ POLICY_ORDER = (
     "user_pinned__budget128__sink8",
     "random_matched__budget128__seed991",
 )
+C_PRIMARY = "#FFB347"
+C_DARK = "#E8943A"
+C_LIGHT = "#FFD699"
+C_MUTED = "#F5C28A"
+C_ACCENT = "#FF8C42"
+
 PALETTE = {
-    "qwen2_5_7b_instruct": "#2563eb",
-    "qwen2_5_7b_base": "#60a5fa",
-    "qwen3_5_9b": "#1e3a8a",
-    "llama3_1_8b_instruct": "#dc2626",
-    "gemma2_9b_it": "#0ea5e9",
-    "mistral_7b_instruct_v0_3": "#f59e0b",
-    "olmo3_7b_instruct": "#10b981",
-    "phi4": "#a855f7",
-    "gpt_oss_20b": "#475569",
+    "qwen2_5_7b_instruct": C_PRIMARY,
+    "qwen2_5_7b_base": C_LIGHT,
+    "qwen3_5_9b": C_DARK,
+    "llama3_1_8b_instruct": C_ACCENT,
+    "gemma2_9b_it": "#F5A623",
+    "mistral_7b_instruct_v0_3": C_MUTED,
+    "olmo3_7b_instruct": "#FFCC80",
+    "phi4": "#E87A00",
+    "gpt_oss_20b": "#CC7A2E",
 }
 
 
@@ -235,7 +241,7 @@ def fig_ssei_forest(results_root: Path, out: Path) -> None:
         lo = r["ci_low"] if r["ci_low"] is not None else r["ssei"]
         hi = r["ci_high"] if r["ci_high"] is not None else r["ssei"]
         crosses_zero = (lo is not None and hi is not None and lo <= 0 <= hi)
-        color = "#94a3b8" if crosses_zero else model_color(r["model_key"])
+        color = C_LIGHT if crosses_zero else model_color(r["model_key"])
         ax.plot([lo, hi], [i, i], color=color, linewidth=2.0, alpha=0.85, zorder=2)
         ax.scatter(r["ssei"], i, color=color, s=44, edgecolor="black", linewidth=0.4, zorder=3)
 
