@@ -3,7 +3,7 @@
 \centering
 \caption{Cross-family selectivity (SSEI) by cache policy. SSEI is safety degradation minus capability degradation relative to the no-cache-policy baseline; positive SSEI indicates safety loss exceeding capability loss. 95\% bootstrap CIs in brackets.}
 \label{tab:family-replication}
-\small
+\resizebox{\textwidth}{!}{%
 \begin{tabular}{llrrrrr}
 \toprule
 \textbf{Family} & \textbf{Model} & \textbf{sliding window} & \textbf{sink+recent} & \textbf{policy-pinned} & \textbf{user-pinned} & \textbf{random matched} \\
@@ -18,5 +18,5 @@ Qwen & Qwen2.5--7B base & -- & -- & -- & -- & -- \\
 Qwen & Qwen2.5--7B--Instruct & $0.011$ [0.007, 0.016] & $-0.003$ [-0.008, 0.001] & $-0.001$ [-0.006, 0.003] & $0.017$ [0.011, 0.022] & $0.012$ [0.007, 0.016] \\
 Qwen & Qwen3--9B & $0.092$ [0.083, 0.101] & $-0.005$ [-0.009, -0.001] & $0.010$ [0.006, 0.015] & $-0.002$ [-0.006, 0.002] & $0.020$ [0.014, 0.026] \\
 \bottomrule
-\end{tabular}
+\end{tabular}}
 \end{table}
