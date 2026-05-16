@@ -1,6 +1,7 @@
-\documentclass{article}
-\usepackage{iclr2026_conference,times}
+\documentclass[11pt]{article}
 
+\usepackage[margin=1in]{geometry}
+\usepackage{times}
 \usepackage{amsmath}
 \usepackage{amssymb}
 \usepackage{booktabs}
@@ -9,17 +10,28 @@
 \usepackage{tabularx}
 \usepackage{xcolor}
 \usepackage{hyperref}
+\usepackage{natbib}
 \usepackage{url}
+\usepackage{authblk}
+\usepackage{fancyhdr}
 
-\iclrfinalcopy
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue!70!black,
+  citecolor=blue!70!black,
+  urlcolor=blue!70!black
+}
+
+\pagestyle{fancy}
+\fancyhf{}
+\renewcommand{\headrulewidth}{0pt}
+\fancyfoot[C]{\thepage}
 
 \title{Safety Erasure Under KV-Cache Compression}
 
-\author{
-  Aryan Gupta \\
-  University of Illinois Urbana-Champaign \\
-  \texttt{aryan.cs.app@gmail.com}
-}
+\author[1]{Aryan Gupta}
+\affil[1]{University of Illinois Urbana-Champaign, \texttt{aryan.cs.app@gmail.com}}
+\date{}
 
 \newcommand{\ssei}{\mathrm{SSEI}}
 \newcommand{\todoresult}[1]{%
@@ -120,7 +132,7 @@ A growing body of work isolates specific mechanisms in safety failure rather tha
 
 \subsection{Setup}
 
-We evaluate nine open-weight checkpoints: Qwen2.5-7B (base and Instruct), Qwen3-9B, Llama-3.1-8B-Instruct, Gemma-2-9B-IT, Mistral-7B-Instruct-v0.3, OLMo-3-7B-Instruct, Phi-4, and OpenAI gpt-oss-20b. Models are loaded in bfloat16 with explicit access to the cache state, so eviction is implemented in the generation loop rather than delegated to a serving system. We do not claim coverage of vLLM, TGI, or PagedAttention kernels; the results are intended as a cross-family measurement of the underlying behavior, and operator-level deployment validation is outside the scope of this paper.
+We evaluate nine open-weight checkpoints: Qwen2.5-7B (base and Instruct) \citep{qwen2024qwen25}, Qwen3-9B \citep{yang2025qwen3}, Llama-3.1-8B-Instruct \citep{grattafiori2024llama3}, Gemma-2-9B-IT \citep{team2024gemma}, Mistral-7B-Instruct-v0.3 \citep{jiang2023mistral}, OLMo-3-7B-Instruct \citep{olmo2025olmo2}, Phi-4 \citep{abdin2024phi4}, and OpenAI gpt-oss-20b \citep{openai2025gptoss}. Models are loaded in bfloat16 with explicit access to the cache state, so eviction is implemented in the generation loop rather than delegated to a serving system. We do not claim coverage of vLLM \citep{kwon2023pagedattention}, TGI, or PagedAttention kernels; the results are intended as a cross-family measurement of the underlying behavior, and operator-level deployment validation is outside the scope of this paper.
 
 \subsection{Cache Policies}
 
@@ -138,7 +150,7 @@ For all policies, we record retained and evicted token counts by role at each de
 
 The benchmark separates safety, leakage, over-refusal, and capability:
 \begin{itemize}
-  \item \textbf{Public refusal safety}: harmful requests drawn from AdvBench and JailbreakBench \citep{zou2023universal,chao2024jailbreakbench};
+  \item \textbf{Public refusal safety}: harmful requests drawn from AdvBench \citep{zou2023universal}, JailbreakBench \citep{chao2024jailbreakbench}, and HarmBench \citep{mazeika2024harmbench};
   \item \textbf{Public benign over-refusal}: Databricks Dolly 15k benign instructions \citep{databricks2023dolly};
   \item \textbf{Public XSTest safe}: benign safety-sensitive prompts \citep{rottger2023xstest};
   \item \textbf{Public system leakage}: prompt-injection attacks from the Cyberec corpus \citep{cyberec2026promptinjection} paired with a hidden system canary;
