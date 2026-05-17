@@ -25,6 +25,7 @@ MODEL_LABELS = {
     "olmo3_7b_instruct": "OLMo-3-7B-Instruct",
     "phi4": "Phi-4",
     "qwen2_5_14b_msm_rules": "Qwen2.5-14B-Instruct + MSM",
+    "qwen2_5_14b_instruct": "Qwen2.5-14B-Instruct",
 }
 MODEL_FAMILIES = {
     "qwen2_5_7b_base": "Qwen",
@@ -37,6 +38,7 @@ MODEL_FAMILIES = {
     "olmo3_7b_instruct": "OLMo",
     "phi4": "Phi",
     "qwen2_5_14b_msm_rules": "Qwen",
+    "qwen2_5_14b_instruct": "Qwen",
 }
 
 
