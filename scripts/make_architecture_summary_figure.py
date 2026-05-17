@@ -34,6 +34,7 @@ ATTENTION_REGIME = {
     "mistral_7b_instruct_v0_3": 2,
     "gpt_oss_20b": -1,
     "qwen2_5_14b_msm_rules": 0,
+    "qwen2_5_14b_instruct": 0,
 }
 REGIME_LABEL = {
     0: "Full global\nattention",
@@ -51,6 +52,7 @@ MODEL_LABEL = {
     "mistral_7b_instruct_v0_3": "Mistral-7B-v0.3",
     "gpt_oss_20b": "gpt-oss-20b",
     "qwen2_5_14b_msm_rules": "Qwen2.5-14B + MSM",
+    "qwen2_5_14b_instruct": "Qwen2.5-14B-Instruct",
 }
 
 
