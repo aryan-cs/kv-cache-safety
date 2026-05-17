@@ -307,9 +307,10 @@ def main() -> None:
                 ax.set_yticklabels(labels, fontsize=9)
                 ax.set_xlabel("Degradation from baseline (higher = worse)")
                 ax.set_title("Safety vs Capability Degradation by Policy")
-                _legend_below(ax, ncol=2)
+                _legend_below(ax, ncol=2, y_anchor=-0.25)
                 ax.grid(axis="x", alpha=0.25, zorder=0)
                 fig.tight_layout()
+                fig.subplots_adjust(bottom=0.22)
                 _save_figure(
                     fig,
                     figures_dir,
