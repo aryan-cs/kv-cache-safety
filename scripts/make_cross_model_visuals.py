@@ -241,7 +241,7 @@ def fig_ssei_forest(results_root: Path, out: Path) -> None:
         lo = r["ci_low"] if r["ci_low"] is not None else r["ssei"]
         hi = r["ci_high"] if r["ci_high"] is not None else r["ssei"]
         crosses_zero = (lo is not None and hi is not None and lo <= 0 <= hi)
-        color = C_LIGHT if crosses_zero else model_color(r["model_key"])
+        color = "#C0C0C0" if crosses_zero else C_ACCENT
         ax.plot([lo, hi], [i, i], color=color, linewidth=2.0, alpha=0.85, zorder=2)
         ax.scatter(r["ssei"], i, color=color, s=44, edgecolor="black", linewidth=0.4, zorder=3)
 
