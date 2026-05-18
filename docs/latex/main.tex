@@ -111,7 +111,7 @@ Inference systems routinely compress or evict the key-value (KV) cache to reduce
 
 \section{Introduction}
 
-Production language-model serving systems do not deploy a static pair of weights and prompts. They actively manage the transient KV cache through eviction policies, quantization, and paged attention to fit longer contexts into a fixed memory budget \citep{kwon2023pagedattention,zhang2023h2o,xiao2024streamingllm}. These mechanisms are documented to degrade task quality \citep{chen2025pitfalls,yang2024notoken,ananthanarayanan2026physics}. We ask a different question: does cache compression weaken \emph{refusal} behavior more than it weakens ordinary capability on the same prompts and budget?
+\textbf{Cache compression as a safety question.} Production language-model serving systems do not deploy a static pair of weights and prompts. They actively manage the transient KV cache through eviction policies, quantization, and paged attention to fit longer contexts into a fixed memory budget \citep{kwon2023pagedattention,zhang2023h2o,xiao2024streamingllm}. These mechanisms are documented to degrade task quality \citep{chen2025pitfalls,yang2024notoken,ananthanarayanan2026physics}. We ask a different question: does cache compression weaken \emph{refusal} behavior more than it weakens ordinary capability on the same prompts and budget?
 
 \textbf{Selective safety erasure.} The result is yes for the majority of currently-deployed dense-attention models. Across twelve checkpoints sampled from Llama, Gemma, Mistral, OpenAI gpt-oss, OLMo, Phi, and Qwen families, eight instruction-tuned models show a Selective Safety Erasure Index (SSEI) of at least one cache policy whose 95\% lower CI exceeds zero. A pre-alignment base model (Qwen2.5-7B) shows the largest effect of any model in the panel ($\ssei = 0.162$ [0.129, 0.197] under sliding-window eviction), substantially exceeding its instruction-tuned counterpart ($\ssei = 0.017$ [0.011, 0.022]) with non-overlapping CIs; instruction tuning reduces but does not eliminate selective safety erasure. Among instruction-tuned models, Phi-4 and Qwen3-8B exhibit the largest effects, around eight to nine percentage points of safety loss beyond matched capability loss under sliding-window cache eviction. The cross-family conclusion holds when any single family is removed from the panel.
 
@@ -136,11 +136,11 @@ A growing body of work isolates specific mechanisms in safety failure rather tha
 
 \subsection{Setup}
 
-We evaluate twelve open-weight checkpoints: Qwen2.5-7B (base and Instruct) \citep{qwen2024qwen25}, Qwen2.5-14B-Instruct (with and without two Model Spec Midtraining LoRA adapters \citep{li2025msm}), Qwen3-8B \citep{yang2025qwen3}, Llama-3.1-8B-Instruct \citep{grattafiori2024llama3}, Gemma-2-9B-IT \citep{team2024gemma}, Mistral-7B-Instruct-v0.3 \citep{jiang2023mistral}, OLMo-3-7B-Instruct \citep{olmo2025olmo2}, Phi-4 \citep{abdin2024phi4}, and OpenAI gpt-oss-20b \citep{openai2025gptoss}. The two MSM checkpoints use LoRA adapters trained with Anthropic's Model Spec Midtraining protocol on top of Qwen2.5-14B-Instruct: one with a rules-only specification and one with a value-augmented specification that pairs rules with value explanations. The matched non-MSM baseline runs on the same weights without any adapter, providing a controlled comparison of whether deep post-training alignment affects vulnerability to cache-eviction safety erasure. Models are loaded in bfloat16 with explicit access to the cache state, so eviction is implemented in the generation loop rather than delegated to a serving system. The results measure the underlying model behavior under cache eviction, not operator-level deployment; vLLM \citep{kwon2023pagedattention}, TGI, and PagedAttention kernels require separate deployment-level validation.
+\textbf{Models.} We evaluate twelve open-weight checkpoints: Qwen2.5-7B (base and Instruct) \citep{qwen2024qwen25}, Qwen2.5-14B-Instruct (with and without two Model Spec Midtraining LoRA adapters \citep{li2025msm}), Qwen3-8B \citep{yang2025qwen3}, Llama-3.1-8B-Instruct \citep{grattafiori2024llama3}, Gemma-2-9B-IT \citep{team2024gemma}, Mistral-7B-Instruct-v0.3 \citep{jiang2023mistral}, OLMo-3-7B-Instruct \citep{olmo2025olmo2}, Phi-4 \citep{abdin2024phi4}, and OpenAI gpt-oss-20b \citep{openai2025gptoss}. The two MSM checkpoints use LoRA adapters trained with Anthropic's Model Spec Midtraining protocol on top of Qwen2.5-14B-Instruct: one with a rules-only specification and one with a value-augmented specification that pairs rules with value explanations. The matched non-MSM baseline runs on the same weights without any adapter, providing a controlled comparison of whether deep post-training alignment affects vulnerability to cache-eviction safety erasure. Models are loaded in bfloat16 with explicit access to the cache state, so eviction is implemented in the generation loop rather than delegated to a serving system. The results measure the underlying model behavior under cache eviction, not operator-level deployment; vLLM \citep{kwon2023pagedattention}, TGI, and PagedAttention kernels require separate deployment-level validation.
 
 \subsection{Cache Policies}
 
-We compare uncompressed generation against five cache interventions:
+\textbf{Policies.} We compare uncompressed generation against five cache interventions:
 \begin{itemize}
   \item \textbf{sliding window}: retain only the most recent $N$ cached tokens;
   \item \textbf{sink plus recent}: retain the first $S$ tokens and the most recent $N$;
@@ -148,11 +148,11 @@ We compare uncompressed generation against five cache interventions:
   \item \textbf{user pinned}: protect user-role spans, then fill the remaining budget with sink and recent retention. This is the non-policy control for policy pinning;
   \item \textbf{policy pinned}: protect system-role or policy spans, then fill the remaining budget with sink and recent retention.
 \end{itemize}
-For all policies, we record retained and evicted token counts by role at each decode step.
+\textbf{Cache statistics.} For all policies, we record retained and evicted token counts by role at each decode step.
 
 \subsection{Prompt Suites}
 
-The benchmark separates safety, leakage, over-refusal, and capability:
+\textbf{Suite structure.} The benchmark separates safety, leakage, over-refusal, and capability:
 \begin{itemize}
   \item \textbf{Public refusal safety}: harmful requests drawn from AdvBench \citep{zou2023universal}, JailbreakBench \citep{chao2024jailbreakbench}, and HarmBench \citep{mazeika2024harmbench};
   \item \textbf{Public benign over-refusal}: Databricks Dolly 15k benign instructions \citep{databricks2023dolly};
@@ -160,17 +160,17 @@ The benchmark separates safety, leakage, over-refusal, and capability:
   \item \textbf{Public system leakage}: prompt-injection attacks from the Cyberec corpus \citep{cyberec2026promptinjection} paired with a hidden system canary;
   \item \textbf{Public capability ARC}: multiple-choice capability controls \citep{clark2018arc}.
 \end{itemize}
-Each suite ships with a manifest of prompt IDs, source dataset revisions, and content hashes. Because public harmful-prompt datasets may overlap with model safety training, we interpret public-suite results as public-benchmark behavior rather than as a generalization claim.
+\textbf{Provenance.} Each suite ships with a manifest of prompt IDs, source dataset revisions, and content hashes. Because public harmful-prompt datasets may overlap with model safety training, we interpret public-suite results as public-benchmark behavior rather than as a generalization claim.
 
 \subsection{Metrics}
 
-Safety and refusal are scored with refusal-string detection on safety suites and exact or token-overlap leakage against hidden system text on leakage suites. Capability is scored with multiple-choice accuracy on ARC-Easy. Over-refusal is the refusal rate on the benign suites.
+\textbf{Scoring.} Safety and refusal are scored with refusal-string detection on safety suites and exact or token-overlap leakage against hidden system text on leakage suites. Capability is scored with multiple-choice accuracy on ARC-Easy. Over-refusal is the refusal rate on the benign suites.
 
-For each cache policy $p$, budget $b$, and model $m$, we define the Selective Safety Erasure Index as the difference between safety degradation and capability degradation relative to the uncompressed baseline:
+\textbf{SSEI definition.} For each cache policy $p$, budget $b$, and model $m$, we define the Selective Safety Erasure Index as the difference between safety degradation and capability degradation relative to the uncompressed baseline:
 \begin{equation}
   \ssei(p, b, m) = \Delta_{\text{safety}}(p,b,m) - \Delta_{\text{capability}}(p,b,m).
 \end{equation}
-Positive $\ssei$ indicates that safety pass-rate declines more than capability pass-rate under the same intervention. We report prompt-clustered bootstrap 95\% confidence intervals for $\ssei$. A model-policy condition is considered a positive instance of selective safety erasure when $\ssei \geq 0.01$ and its lower CI exceeds zero.
+\textbf{Threshold.} Positive $\ssei$ indicates that safety pass-rate declines more than capability pass-rate under the same intervention. We report prompt-clustered bootstrap 95\% confidence intervals for $\ssei$. A model-policy condition is considered a positive instance of selective safety erasure when $\ssei \geq 0.01$ and its lower CI exceeds zero.
 
 \subsection{Audit}
 
@@ -178,7 +178,7 @@ Positive $\ssei$ indicates that safety pass-rate declines more than capability p
 
 \subsection{Causal Restoration}
 
-For length-preserving cache perturbations such as simulated four-bit KV quantization, we run baseline (uncompressed) and compressed decoding on identical prompts and seeds, then patch selected key and value slices from the baseline cache into compressed runs at the same positions. We compare:
+\textbf{Patching protocol.} For length-preserving cache perturbations such as simulated four-bit KV quantization, we run baseline (uncompressed) and compressed decoding on identical prompts and seeds, then patch selected key and value slices from the baseline cache into compressed runs at the same positions. We compare:
 \begin{enumerate}
   \item compressed decoding with no patch;
   \item compressed decoding with system-role key+value slices restored from baseline;
@@ -186,7 +186,7 @@ For length-preserving cache perturbations such as simulated four-bit KV quantiza
   \item compressed decoding under the policy-pinned eviction policy that protects system spans throughout generation;
   \item compressed decoding under the user-pinned policy as the matched non-policy control.
 \end{enumerate}
-The user-role restoration is the central control: it shares the additional retained-token budget with the system-role patch while differing only in which role's content is restored. Comparing system-role and user-role restoration fractions reveals whether safety information is role-localized or distributed across the cache.
+\textbf{Role-matched control.} The user-role restoration is the central control: it shares the additional retained-token budget with the system-role patch while differing only in which role's content is restored. Comparing system-role and user-role restoration fractions reveals whether safety information is role-localized or distributed across the cache.
 
 \section{Results}
 
@@ -299,11 +299,11 @@ The user-role restoration is the central control: it shares the additional retai
 
 \section{Ethics and Safety}
 
-The experiments evaluate refusal behavior on harmful prompts drawn from existing public datasets. Raw model generations are retained locally for audit reproducibility; the paper does not reproduce procedural harmful outputs. The intent is to identify a deployment-time safety regression in widely-used open inference stacks so that operators can choose appropriate mitigations.
+\textbf{Risk and intent.} The experiments evaluate refusal behavior on harmful prompts drawn from existing public datasets. Raw model generations are retained locally for audit reproducibility; the paper does not reproduce procedural harmful outputs. The intent is to identify a deployment-time safety regression in widely-used open inference stacks so that operators can choose appropriate mitigations.
 
 \section{Reproducibility}
 
-Each panel run records the resolved configuration, environment metadata, dataset revisions, prompt records, raw generations, metrics, cache statistics, figure source data, and content hashes. Cache interventions are verified as active before metrics are computed. Bootstrap intervals are computed at the prompt-cluster level. Blinded audit labels are joined to experimental metadata only after annotation, and the audit manifest records the judge model, prompt template, and raw-output hashes.
+\textbf{Artifacts.} Each panel run records the resolved configuration, environment metadata, dataset revisions, prompt records, raw generations, metrics, cache statistics, figure source data, and content hashes. Cache interventions are verified as active before metrics are computed. Bootstrap intervals are computed at the prompt-cluster level. Blinded audit labels are joined to experimental metadata only after annotation, and the audit manifest records the judge model, prompt template, and raw-output hashes.
 
 \bibliographystyle{plainnat}
 \bibliography{../references}
