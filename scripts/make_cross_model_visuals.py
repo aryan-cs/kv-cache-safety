@@ -234,7 +234,7 @@ def fig_ssei_forest(results_root: Path, out: Path) -> None:
             y_labels.append(f"{model_key}  ·  {short_policy(policy)}")
             y_data.append(match)
 
-    fig_h = max(6.0, 0.32 * len(y_data) + 2.0)
+    fig_h = max(6.0, 0.25 * len(y_data) + 1.5)
     fig, ax = plt.subplots(figsize=(11, fig_h))
 
     for i, r in enumerate(y_data):
@@ -254,7 +254,7 @@ def fig_ssei_forest(results_root: Path, out: Path) -> None:
         fontsize=11,
     )
     ax.grid(axis="x", color="#e5e7eb", zorder=0)
-    ax.invert_yaxis()
+    ax.set_ylim(len(y_labels) - 0.5, -0.5)
 
     # Light horizontal banding by model
     last_model = None
