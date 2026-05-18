@@ -4,8 +4,6 @@
 
 Production LLM serving systems compress or evict the key-value (KV) cache to reduce memory cost. We show that this throughput optimization selectively weakens refusal and policy-following behavior more than ordinary task capability on dense full-attention models. We measure this effect across twelve open-weight checkpoints from seven model families and provide causal-patching evidence that cache state is a safety-relevant surface. A simple mitigation (policy-pinned retention of system-role tokens) fully restores refusal behavior across all tested architectures.
 
-NeurIPS 2025 preprint.
-
 ## Key Results
 
 - **Selective safety erasure is real and widespread.** Eight of twelve instruction-tuned models show positive SSEI (safety degradation minus capability degradation) with 95% bootstrap CIs excluding zero under sliding-window or user-pinned cache policies.
@@ -36,7 +34,7 @@ configs/
 scripts/                         Runnable scripts (experiments, analysis, paper build)
 tests/                           Unit and integration tests (16 test modules)
 docs/
-  latex/                         Paper source (main.tex, neurips_2025.sty)
+  latex/                         Paper source (main.tex, style file)
   audit/                         Blinded human-audit and judge-audit sheets
   generated/                     Auto-generated tables, figures, and claim assessments
 results/                         Experiment output directories (one per run)
@@ -137,22 +135,6 @@ Export paper assets (LaTeX tables):
 uv run python scripts/export_paper_assets.py --results-dir results/<run_id>
 ```
 
-## Building the Paper
-
-The manuscript is in `docs/latex/main.tex` (NeurIPS 2025 preprint format). Build with [tectonic](https://tectonic-typesetting.github.io/):
-
-```bash
-bash scripts/build_paper_pdf.sh
-```
-
-This produces `docs/latex/main.pdf` and copies it to `docs/kv-cache-safety.pdf`.
-
-Package for arXiv submission:
-
-```bash
-uv run python scripts/package_arxiv_submission.py
-```
-
 ## Auditing
 
 The project uses blinded human audits and open-model judge audits for label validation. Audit tooling:
@@ -220,7 +202,7 @@ Generated paper assets go to `docs/generated/<run_id>/` (LaTeX tables, claim ass
 
 ## Hardware
 
-- **Development:** MacBook with Apple Silicon (24 GB unified memory). Sufficient for tests, smoke runs, and paper builds.
+- **Development:** MacBook with Apple Silicon (24 GB unified memory). Sufficient for tests and smoke runs.
 - **Full experiments:** NVIDIA H200 (141 GB VRAM). Required for the 7B-14B model panel. Configs reject CPU/disk offload.
 
 ## SSEI Metric
@@ -244,7 +226,7 @@ This repository is for safety evaluation research. Built-in prompt suites avoid 
   title={The Safety Tax of Cache Compression},
   author={Gupta, Aryan},
   year={2025},
-  note={NeurIPS 2025 preprint}
+  note={Preprint}
 }
 ```
 
