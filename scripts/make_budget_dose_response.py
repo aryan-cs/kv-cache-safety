@@ -131,7 +131,7 @@ def render_figure(data: dict[str, Any], output_path: Path) -> None:
         return
 
     fig, ax = plt.subplots(figsize=(6, 4))
-    colors = {"phi4": "#e41a1c", "llama3_1_8b_instruct": "#377eb8", "qwen2_5_14b_instruct": "#4daf4a"}
+    colors = {"phi4": "#E8943A", "llama3_1_8b_instruct": "#FF8C42", "qwen2_5_14b_instruct": "#FFB347"}
     for model_key, model_data in data.items():
         budgets = [r["budget"] for r in model_data["budgets"]]
         sseis = [r["ssei"] for r in model_data["budgets"]]
