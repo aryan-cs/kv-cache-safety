@@ -1,0 +1,66 @@
+{
+  "analysis_git_commit": "a85f2093e473074d2d2f520bfc3fa383987afa00",
+  "analysis_git_dirty": true,
+  "analysis_git_status_short": "?? .claude/\n?? scripts/fold_sonnet_into_generations.py",
+  "macro_prefix": "Causal",
+  "results_dir": "results/h200_causal_patch_qwen3_5_9b/sonnet_metrics",
+  "schema_version": 1,
+  "source_artifacts": {
+    "figures/manifest.json": {
+      "bytes": null,
+      "path": "results/h200_causal_patch_qwen3_5_9b/sonnet_metrics/figures/manifest.json",
+      "sha256": null
+    },
+    "manifest.json": {
+      "bytes": null,
+      "path": "results/h200_causal_patch_qwen3_5_9b/sonnet_metrics/manifest.json",
+      "sha256": null
+    },
+    "metrics.json": {
+      "bytes": 73419,
+      "path": "results/h200_causal_patch_qwen3_5_9b/sonnet_metrics/metrics.json",
+      "sha256": "bb9ec8c63b4ab0af003782f11c81308dd4053972131ee8e71e23ef64a03a5fe1"
+    }
+  },
+  "source_run_git_commit": null,
+  "source_run_git_dirty": null,
+  "source_run_model_id": null,
+  "source_run_name": null,
+  "tables": {
+    "causal_restoration_table.md": {
+      "bytes": 866,
+      "path": "docs/generated/causal_restoration_table.md",
+      "sha256": "6eddf769af36e1df43a9eb9de3da9b808b893c57290e4cacb90e3fc9126b77b9"
+    },
+    "causal_restoration_table.tex": {
+      "bytes": 959,
+      "path": "docs/generated/causal_restoration_table.tex",
+      "sha256": "1149860d71afcfab1f812c6df8812e2e378f8b69a4718f6780cf8402c42f2ab7"
+    },
+    "main_results_table.md": {
+      "bytes": 560,
+      "path": "docs/generated/main_results_table.md",
+      "sha256": "fa4fdaf98e9407fe75565c433b614e8b7274d214abc7253a9324e291872edced"
+    },
+    "main_results_table.tex": {
+      "bytes": 639,
+      "path": "docs/generated/main_results_table.tex",
+      "sha256": "b381d80c32bcf2c6b1ad2c80f9f77f1879bdc5b4cc502917256bab98374bdfc8"
+    },
+    "result_macros.tex": {
+      "bytes": 462,
+      "path": "docs/generated/result_macros.tex",
+      "sha256": "9befba942bb7d91df2ef0462ddaba8b3350c47cc93d7068b04a33dab2d50c045"
+    },
+    "suite_level_effects_table.md": {
+      "bytes": 1279,
+      "path": "docs/generated/suite_level_effects_table.md",
+      "sha256": "ba3dd0f6cb23480b85105aad81f71d2722c8496422773f8dc975be4235e7f01f"
+    },
+    "suite_level_effects_table.tex": {
+      "bytes": 1165,
+      "path": "docs/generated/suite_level_effects_table.tex",
+      "sha256": "2613da42c4562dc6eba7deebcb06d3a239ce7ea34999020ac9e65193fc0a5d82"
+    }
+  }
+}

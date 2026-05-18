@@ -30,7 +30,7 @@ POLICY_LABELS = {
 MODEL_LABELS = {
     "qwen2_5_7b_base": "Qwen2.5-7B base",
     "qwen2_5_7b_instruct": "Qwen2.5-7B-Instruct",
-    "qwen3_5_9b": "Qwen3-9B",
+    "qwen3_5_9b": "Qwen3-8B",
     "gpt_oss_20b": "GPT-OSS-20B",
     "llama3_1_8b_instruct": "Llama-3.1-8B-Instruct",
     "gemma2_9b_it": "Gemma-2-9B-IT",

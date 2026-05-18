@@ -45,7 +45,7 @@ REGIME_LABEL = {
 MODEL_LABEL = {
     "qwen2_5_7b_base": "Qwen2.5-7B base",
     "qwen2_5_7b_instruct": "Qwen2.5-7B-Instruct",
-    "qwen3_5_9b": "Qwen3-9B",
+    "qwen3_5_9b": "Qwen3-8B",
     "llama3_1_8b_instruct": "Llama-3.1-8B",
     "olmo3_7b_instruct": "OLMo-3-7B",
     "phi4": "Phi-4",

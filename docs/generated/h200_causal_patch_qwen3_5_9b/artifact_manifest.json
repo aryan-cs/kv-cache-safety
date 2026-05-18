@@ -1,0 +1,66 @@
+{
+  "analysis_git_commit": "cb92a3625f9a3e3372c153f28e68d09439035a5c",
+  "analysis_git_dirty": true,
+  "analysis_git_status_short": "M scripts/export_paper_assets.py\n?? .claude/",
+  "macro_prefix": "Primary",
+  "results_dir": "results/h200_causal_patch_qwen3_5_9b/sonnet_metrics",
+  "schema_version": 1,
+  "source_artifacts": {
+    "figures/manifest.json": {
+      "bytes": 11266,
+      "path": "results/h200_causal_patch_qwen3_5_9b/sonnet_metrics/figures/manifest.json",
+      "sha256": "af4ac2e9d1f917ccd2eafea20b40407879bc99a9354eafaf59c5f220112b6698"
+    },
+    "manifest.json": {
+      "bytes": null,
+      "path": "results/h200_causal_patch_qwen3_5_9b/sonnet_metrics/manifest.json",
+      "sha256": null
+    },
+    "metrics.json": {
+      "bytes": 73419,
+      "path": "results/h200_causal_patch_qwen3_5_9b/sonnet_metrics/metrics.json",
+      "sha256": "bb9ec8c63b4ab0af003782f11c81308dd4053972131ee8e71e23ef64a03a5fe1"
+    }
+  },
+  "source_run_git_commit": null,
+  "source_run_git_dirty": null,
+  "source_run_model_id": null,
+  "source_run_name": null,
+  "tables": {
+    "causal_restoration_table.md": {
+      "bytes": 859,
+      "path": "docs/generated/h200_causal_patch_qwen3_5_9b/causal_restoration_table.md",
+      "sha256": "de2c1db0fd6319b0c619fe16bdb72f6a3669bc9b106f2dfc4b319c5752f12b00"
+    },
+    "causal_restoration_table.tex": {
+      "bytes": 952,
+      "path": "docs/generated/h200_causal_patch_qwen3_5_9b/causal_restoration_table.tex",
+      "sha256": "7a439cc3bb23bce12f3e7c93648276b4c988793d88175c836accf9270743f02f"
+    },
+    "main_results_table.md": {
+      "bytes": 560,
+      "path": "docs/generated/h200_causal_patch_qwen3_5_9b/main_results_table.md",
+      "sha256": "fa4fdaf98e9407fe75565c433b614e8b7274d214abc7253a9324e291872edced"
+    },
+    "main_results_table.tex": {
+      "bytes": 639,
+      "path": "docs/generated/h200_causal_patch_qwen3_5_9b/main_results_table.tex",
+      "sha256": "b381d80c32bcf2c6b1ad2c80f9f77f1879bdc5b4cc502917256bab98374bdfc8"
+    },
+    "result_macros.tex": {
+      "bytes": 461,
+      "path": "docs/generated/h200_causal_patch_qwen3_5_9b/result_macros.tex",
+      "sha256": "8cefb8097046062bb1f97c246eb91dcc8ccb547400e75a26bf585a36e6890767"
+    },
+    "suite_level_effects_table.md": {
+      "bytes": 1279,
+      "path": "docs/generated/h200_causal_patch_qwen3_5_9b/suite_level_effects_table.md",
+      "sha256": "ba3dd0f6cb23480b85105aad81f71d2722c8496422773f8dc975be4235e7f01f"
+    },
+    "suite_level_effects_table.tex": {
+      "bytes": 1165,
+      "path": "docs/generated/h200_causal_patch_qwen3_5_9b/suite_level_effects_table.tex",
+      "sha256": "2613da42c4562dc6eba7deebcb06d3a239ce7ea34999020ac9e65193fc0a5d82"
+    }
+  }
+}
