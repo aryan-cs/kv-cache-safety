@@ -337,7 +337,7 @@ def write_latex_table(
     tabcolsep = _latex_table_tabcolsep(label)
     column_spec = _latex_column_spec(columns, label)
     lines = [
-        r"\begin{table}[t]",
+        r"\begin{table}[p]",
         r"\centering",
         r"\caption{" + _latex_escape(caption) + r"}",
         r"\label{" + _latex_escape(label) + r"}",
