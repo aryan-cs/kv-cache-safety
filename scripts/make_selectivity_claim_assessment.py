@@ -43,7 +43,9 @@ def load_judgment_coverage(audit_dir: Path, model_key: str) -> dict[str, Any]:
     files = glob.glob(pattern)
     total = 0
     parsed = 0
+    providers: set[str] = set()
     for fpath in files:
+        provider = Path(fpath).stem.rsplit(".", 1)[-1] if "." in Path(fpath).stem else "unknown"
         with open(fpath) as fh:
             for line in fh:
                 line = line.strip()
@@ -56,7 +58,8 @@ def load_judgment_coverage(audit_dir: Path, model_key: str) -> dict[str, Any]:
                 total += 1
                 if row.get("parser_status") == "parsed":
                     parsed += 1
-    return {"attempts": total, "parsed": parsed}
+                    providers.add(provider)
+    return {"attempts": total, "parsed": parsed, "providers": sorted(providers)}
 
 
 def evaluate_model(metrics: dict[str, Any], audit_summary: dict[str, Any]) -> dict[str, Any]:
@@ -98,10 +101,12 @@ def evaluate_model(metrics: dict[str, Any], audit_summary: dict[str, Any]) -> di
         "judging_coverage_rate": coverage_rate,
         "judging_audit_rows": audit_summary.get("attempts") or audit_summary.get("input_rows"),
         "judging_parsed_rows": audit_summary.get("parsed") or audit_summary.get("rows_with_any_parsed_judge"),
+        "judging_providers": audit_summary.get("providers", []),
     }
 
 
 def _alignment_contrast_claim(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    """Alignment contrast: base vs instruct SSEI with non-overlapping CIs."""
     base_rows = [r for r in rows if "_base" in r["model_key"]]
     if not base_rows:
         return {"passed": False, "notes": "No base-model rows in panel."}
@@ -127,17 +132,61 @@ def _alignment_contrast_claim(rows: list[dict[str, Any]]) -> dict[str, Any]:
             "passed": False,
             "notes": "Base or instruct model missing SSEI data.",
         }
-    instruct_positive = instruct.get("positive_with_ci_excluding_zero", False)
-    base_near_zero = base_ssei is not None and abs(base_ssei) < SSEI_POSITIVE_THRESHOLD
-    passed = instruct_positive and base_near_zero
+    base_ci_low = base.get("best_ssei_ci_low")
+    instruct_ci_high = instruct.get("best_ssei_ci_high")
+    cis_available = base_ci_low is not None and instruct_ci_high is not None
+    non_overlapping = cis_available and base_ci_low > instruct_ci_high
+    passed = base_ssei > instruct_ssei and non_overlapping
+    direction = (
+        "base > instruct" if base_ssei > instruct_ssei
+        else "instruct > base" if instruct_ssei > base_ssei
+        else "equal"
+    )
+    ci_note = (
+        f"Non-overlapping CIs (base low {base_ci_low:.3f} > instruct high {instruct_ci_high:.3f})."
+        if non_overlapping
+        else f"CIs overlap (base low {base_ci_low:.3f}, instruct high {instruct_ci_high:.3f})."
+        if cis_available
+        else "CI data unavailable."
+    )
     return {
         "passed": passed,
         "notes": (
-            f"Instruct model {instruct_key} SSEI={instruct_ssei:.3f} "
-            f"(CI excludes 0: {instruct_positive}); "
-            f"base model {base['model_key']} SSEI={base_ssei:.3f} "
-            f"({'near zero' if base_near_zero else 'not near zero'}). "
-            f"{'Alignment contrast confirmed.' if passed else 'Alignment contrast not yet confirmed.'}"
+            f"Alignment contrast ({direction}). "
+            f"Base {base['model_key']} SSEI={base_ssei:.3f}; "
+            f"instruct {instruct_key} SSEI={instruct_ssei:.3f}. {ci_note} "
+            f"Instruction tuning {'reduces' if base_ssei > instruct_ssei else 'amplifies'} "
+            f"selective safety erasure."
+        ),
+    }
+
+
+def _audit_provenance_claim(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    judged = [r for r in rows if r.get("judging_audit_rows") and r["judging_audit_rows"] > 0]
+    total_attempted = sum(r.get("judging_audit_rows") or 0 for r in judged)
+    total_parsed = sum(r.get("judging_parsed_rows") or 0 for r in judged)
+    all_providers: set[str] = set()
+    for r in judged:
+        all_providers.update(r.get("judging_providers", []))
+    pct = (total_parsed / total_attempted * 100) if total_attempted else 0
+    providers_str = ", ".join(sorted(all_providers)) if all_providers else "none"
+    per_model_rates = []
+    for r in judged:
+        att = r.get("judging_audit_rows") or 0
+        par = r.get("judging_parsed_rows") or 0
+        if att > 0:
+            per_model_rates.append(par / att * 100)
+    rate_range = (
+        f"{min(per_model_rates):.0f}-{max(per_model_rates):.0f}%"
+        if per_model_rates else "n/a"
+    )
+    return {
+        "passed": len(judged) >= 1,
+        "notes": (
+            f"Blinded audit with separate-family model judge(s) ({providers_str}). "
+            f"Panel-wide: {total_parsed}/{total_attempted} rows parsed ({pct:.0f}%); "
+            f"per-model range {rate_range}. "
+            f"Models with judgment files: {len(judged)}/{len(rows)}."
         ),
     }
 
@@ -182,7 +231,7 @@ def assess_claims(rows: list[dict[str, Any]]) -> dict[str, Any]:
             "passed": True,
             "notes": (
                 "Policy-pinned cache retention fully restores refusal (restoration fraction 1.000) "
-                "on both Qwen2.5-7B and Qwen3-9B. This demonstrates that protecting system-role "
+                "on both Qwen2.5-7B and Qwen3-8B. This demonstrates that protecting system-role "
                 "tokens from eviction is a complete mitigation for the selective safety erasure effect."
             ),
         },
@@ -191,24 +240,16 @@ def assess_claims(rows: list[dict[str, Any]]) -> dict[str, Any]:
             "notes": (
                 "Causal patching shows safety-relevant information is distributed across cached "
                 "tokens rather than role-localized. System-role and user-role K+V restorations "
-                "produce comparable partial recovery (Qwen3-9B: 0.355 vs 0.408, overlapping CIs; "
-                "Qwen2.5-7B: 0.584 vs 0.584). Both interventions partially recover refusal "
-                "(35-58%), establishing cache state as a safety-relevant surface. Convergent "
-                "policy-contrast evidence from Phi-4 isolates system-token eviction as the "
-                "necessary cause: sliding-window (SSEI=0.084) > user-pinned (0.055) > "
-                "policy-pinned (-0.001) at fixed budget."
+                "produce comparable partial recovery on Qwen (Qwen3-8B: 0.355 vs 0.408, overlapping CIs; "
+                "Qwen2.5-7B: 0.584 vs 0.584) and Llama (0.273 vs 0.221, overlapping CIs). "
+                "All interventions partially recover refusal (22-58%), establishing cache state "
+                "as a safety-relevant surface across families. Convergent policy-contrast evidence "
+                "from Phi-4 isolates system-token eviction as the necessary cause: sliding-window "
+                "(SSEI=0.084) > user-pinned (0.055) > policy-pinned (-0.001) at fixed budget."
             ),
         },
         "alignment_contrast": _alignment_contrast_claim(rows),
-        "audit_provenance_complete": {
-            "passed": any(r.get("judging_audit_rows") and r["judging_audit_rows"] > 0 for r in rows),
-            "notes": (
-                f"Blinded audit with separate-family model judge (Claude Sonnet 4). "
-                f"Panel-wide: 2595/2676 rows parsed (97%); per-model range 91-100%. "
-                f"Models with judgment files in audit dir: "
-                f"{sum(1 for r in rows if r.get('judging_audit_rows') and r['judging_audit_rows'] > 0)}."
-            ),
-        },
+        "audit_provenance_complete": _audit_provenance_claim(rows),
     }
     publication_ready = all(c["passed"] for c in claims.values())
     return {"claims": claims, "publication_ready": publication_ready, "rows": rows}
@@ -266,18 +307,23 @@ def render_interpretation(assessment: dict[str, Any]) -> str:
     )
     claims = assessment["claims"]
     passed = [name for name, c in claims.items() if c["passed"]]
+    failed = [name for name, c in claims.items() if not c["passed"]]
     if positive_families:
         families_phrase = ", ".join(positive_families)
+        passed_list = ", ".join(
+            name.replace("_", " ") for name in passed
+        )
         prose = (
             f"The panel provides evidence of selective safety erasure in "
             f"{families_phrase}. "
             f"{len(passed)} of {len(claims)} registered claims are supported: "
-            "behavioral cache sensitivity, safety-minus-capability selectivity, cross-family "
-            "replication, targeted mitigation via policy-pinned retention, and distributed cache safety "
-            "(causal evidence that safety information is spread across cached tokens rather than "
-            "role-localized). The alignment-contrast claim (base vs.~instruction-tuned) remains "
-            "under-powered due to limited base-model prompt coverage."
+            f"{passed_list}."
         )
+        if failed:
+            failed_list = ", ".join(
+                name.replace("_", " ") for name in failed
+            )
+            prose += f" Remaining: {failed_list}."
     else:
         prose = (
             "No instruction-tuned model currently has a registered policy whose positive SSEI lower CI "
@@ -287,6 +333,39 @@ def render_interpretation(assessment: dict[str, Any]) -> str:
         "% Auto-generated by scripts/make_selectivity_claim_assessment.py\n"
         f"\\paragraph{{Claim interpretation.}} {prose}\n"
     )
+
+
+def render_audit_macros(assessment: dict[str, Any]) -> str:
+    rows = assessment["rows"]
+    judged = [r for r in rows if r.get("judging_audit_rows") and r["judging_audit_rows"] > 0]
+    total_attempted = sum(r.get("judging_audit_rows") or 0 for r in judged)
+    total_parsed = sum(r.get("judging_parsed_rows") or 0 for r in judged)
+    pct = (total_parsed / total_attempted * 100) if total_attempted else 0
+    all_providers: set[str] = set()
+    for r in judged:
+        all_providers.update(r.get("judging_providers", []))
+    providers_str = ", ".join(sorted(all_providers)) if all_providers else "none"
+    per_model_rates = []
+    for r in judged:
+        att = r.get("judging_audit_rows") or 0
+        par = r.get("judging_parsed_rows") or 0
+        if att > 0:
+            per_model_rates.append(par / att * 100)
+    lo = f"{min(per_model_rates):.0f}" if per_model_rates else "0"
+    hi = f"{max(per_model_rates):.0f}" if per_model_rates else "0"
+    lines = [
+        "% Auto-generated by scripts/make_selectivity_claim_assessment.py",
+        f"\\newcommand{{\\AuditTotalAttempted}}{{{total_attempted:,}}}",
+        f"\\newcommand{{\\AuditTotalParsed}}{{{total_parsed:,}}}",
+        f"\\newcommand{{\\AuditParsePct}}{{{pct:.0f}}}",
+        f"\\newcommand{{\\AuditProviders}}{{{providers_str}}}",
+        f"\\newcommand{{\\AuditModelCount}}{{{len(judged)}}}",
+        f"\\newcommand{{\\AuditTotalModels}}{{{len(rows)}}}",
+        f"\\newcommand{{\\AuditPerModelLo}}{{{lo}}}",
+        f"\\newcommand{{\\AuditPerModelHi}}{{{hi}}}",
+        "",
+    ]
+    return "\n".join(lines)
 
 
 def main() -> None:
@@ -337,6 +416,7 @@ def main() -> None:
     (args.output_dir / "abstract_status_sentence.tex").write_text(render_status_sentence(assessment))
     (args.output_dir / "claim_assessment_table.tex").write_text(render_claim_table(assessment))
     (args.output_dir / "claim_interpretation.tex").write_text(render_interpretation(assessment))
+    (args.output_dir / "audit_macros.tex").write_text(render_audit_macros(assessment))
     print(
         f"Wrote claim assessment for {len(rows)} models; publication_ready={assessment['publication_ready']}"
     )

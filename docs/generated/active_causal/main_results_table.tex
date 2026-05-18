@@ -1,0 +1,21 @@
+\begin{table}[t]
+\centering
+\begingroup
+\small
+\setlength{\tabcolsep}{3pt}
+\renewcommand{\arraystretch}{0.94}
+\begin{tabularx}{\linewidth}{@{}lXXX@{}}
+\toprule
+policy & Mean safety & Mean capability & Policy SSeI [95\% CI] \\
+\midrule
+4-bit KV & 0.876 & 0.255 & -0.130 [-0.213,-0.049] \\
+K+V sys & 0.911 & 0.336 & -0.075 [-0.157,0.011] \\
+K+V user & 0.871 & 0.584 & -0.101 [-0.182,-0.020] \\
+Baseline & 0.420 & 0.368 &  \\
+Policy-pinned cache & 0.380 & 0.338 & 0.085 [0.023,0.144] \\
+\bottomrule
+\end{tabularx}
+\endgroup
+\caption{Policy-level safety, capability, and selective safety erasure summary.}
+\label{tab:main-results}
+\end{table}

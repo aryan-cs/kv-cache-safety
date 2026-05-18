@@ -11,9 +11,9 @@
 | Qwen | Qwen2.5-14B-Instruct | `sliding_window__budget128` | +0.089 [+0.073, +0.104] | `sliding_window__budget128` | +0.089 [+0.073, +0.104] |
 | Qwen | Qwen2.5-14B-Instruct + MSM-Rules | `sliding_window__budget128` | +0.050 [+0.041, +0.059] | `sliding_window__budget128` | +0.050 [+0.041, +0.059] |
 | Qwen | Qwen2.5-14B-Instruct + MSM-ValueAug | `random_matched__budget128__seed991` | +0.032 [+0.023, +0.040] | `random_matched__budget128__seed991` | +0.032 [+0.023, +0.040] |
-| Qwen | Qwen2.5-7B base | -- | -- | -- | -- |
+| Qwen | Qwen2.5-7B base | `sliding_window__budget128` | +0.162 [+0.129, +0.197] | `sliding_window__budget128` | +0.162 [+0.129, +0.197] |
 | Qwen | Qwen2.5-7B-Instruct | `user_pinned__budget128__sink8` | +0.017 [+0.011, +0.022] | `user_pinned__budget128__sink8` | +0.017 [+0.011, +0.022] |
-| Qwen | Qwen3-9B | `sliding_window__budget128` | +0.092 [+0.083, +0.101] | `sliding_window__budget128` | +0.092 [+0.083, +0.101] |
+| Qwen | Qwen3-8B | `sliding_window__budget128` | +0.092 [+0.083, +0.101] | `sliding_window__budget128` | +0.092 [+0.083, +0.101] |
 
 ## Leave-one-family-out cross-family claim check
 

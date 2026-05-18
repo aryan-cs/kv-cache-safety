@@ -297,8 +297,18 @@
       "model_label": "Qwen2.5-14B-Instruct + MSM-ValueAug"
     },
     {
-      "best_abs": null,
-      "best_positive": null,
+      "best_abs": {
+        "ci_high": 0.19692307692307692,
+        "ci_low": 0.12923076923076923,
+        "policy": "sliding_window__budget128",
+        "ssei": 0.16153846153846155
+      },
+      "best_positive": {
+        "ci_high": 0.19692307692307692,
+        "ci_low": 0.12923076923076923,
+        "policy": "sliding_window__budget128",
+        "ssei": 0.16153846153846155
+      },
       "family": "Qwen",
       "is_positive_panel_member": false,
       "model_key": "qwen2_5_7b_base",
@@ -338,7 +348,7 @@
       "family": "Qwen",
       "is_positive_panel_member": true,
       "model_key": "qwen3_5_9b",
-      "model_label": "Qwen3-9B"
+      "model_label": "Qwen3-8B"
     }
   ],
   "ssei_positive_threshold": 0.01

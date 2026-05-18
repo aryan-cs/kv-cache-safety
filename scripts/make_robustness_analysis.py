@@ -45,7 +45,7 @@ MODEL_LABELS = {
     "qwen2_5_14b_instruct": "Qwen2.5-14B-Instruct",
     "qwen2_5_14b_msm_rules": "Qwen2.5-14B-Instruct + MSM-Rules",
     "qwen2_5_14b_msm_value_aug": "Qwen2.5-14B-Instruct + MSM-ValueAug",
-    "qwen3_5_9b": "Qwen3-9B",
+    "qwen3_5_9b": "Qwen3-8B",
     "gpt_oss_20b": "GPT-OSS-20B",
     "llama3_1_8b_instruct": "Llama-3.1-8B-Instruct",
     "gemma2_9b_it": "Gemma-2-9B-IT",
