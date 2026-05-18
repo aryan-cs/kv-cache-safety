@@ -339,6 +339,8 @@ def write_latex_table(
     lines = [
         r"\begin{table}[t]",
         r"\centering",
+        r"\caption{" + _latex_escape(caption) + r"}",
+        r"\label{" + _latex_escape(label) + r"}",
         r"\begingroup",
         table_font,
         rf"\setlength{{\tabcolsep}}{{{tabcolsep}}}",
@@ -363,8 +365,6 @@ def write_latex_table(
             r"\bottomrule",
             r"\end{tabularx}",
             r"\endgroup",
-            r"\caption{" + _latex_escape(caption) + r"}",
-            r"\label{" + _latex_escape(label) + r"}",
             r"\end{table}",
             "",
         ]
