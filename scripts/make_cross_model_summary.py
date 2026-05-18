@@ -24,7 +24,8 @@ MODEL_LABELS = {
     "mistral_7b_instruct_v0_3": "Mistral-7B-Instruct-v0.3",
     "olmo3_7b_instruct": "OLMo-3-7B-Instruct",
     "phi4": "Phi-4",
-    "qwen2_5_14b_msm_rules": "Qwen2.5-14B-Instruct + MSM",
+    "qwen2_5_14b_msm_rules": "Qwen2.5-14B-Instruct + MSM-Rules",
+    "qwen2_5_14b_msm_value_aug": "Qwen2.5-14B-Instruct + MSM-ValueAug",
     "qwen2_5_14b_instruct": "Qwen2.5-14B-Instruct",
 }
 MODEL_FAMILIES = {
@@ -38,6 +39,7 @@ MODEL_FAMILIES = {
     "olmo3_7b_instruct": "OLMo",
     "phi4": "Phi",
     "qwen2_5_14b_msm_rules": "Qwen",
+    "qwen2_5_14b_msm_value_aug": "Qwen",
     "qwen2_5_14b_instruct": "Qwen",
 }
 

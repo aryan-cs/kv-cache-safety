@@ -1,0 +1,10 @@
+{
+  "activity": "complete",
+  "completed": 17130,
+  "current": {
+    "model_id": "Qwen/Qwen2.5-14B-Instruct"
+  },
+  "expected": 17130,
+  "progress_percent": 100.0,
+  "updated_at": "20260518T042009Z"
+}
