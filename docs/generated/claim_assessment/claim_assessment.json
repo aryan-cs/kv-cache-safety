@@ -1,7 +1,7 @@
 {
   "claims": {
     "alignment_contrast": {
-      "notes": "Base-model alignment-contrast suite is recorded with only 2 sampled prompts per cell for qwen2_5_7b_base; insufficient power to score.",
+      "notes": "Base or instruct model missing SSEI data.",
       "passed": false
     },
     "audit_provenance_complete": {
@@ -17,7 +17,7 @@
       "passed": true
     },
     "distributed_cache_safety": {
-      "notes": "Causal patching shows safety-relevant information is distributed across cached tokens rather than role-localized. System-role and user-role K+V restorations produce comparable partial recovery (Qwen3-9B: 0.355 vs 0.408, overlapping CIs; Qwen2.5-7B: 0.584 vs 0.584). Both interventions partially recover refusal (35-58%), establishing cache state as a safety-relevant surface. Phi-4's vulnerability arises from sliding-window eviction, not quantization, so the quantization-based causal protocol is inapplicable to Phi-4.",
+      "notes": "Causal patching shows safety-relevant information is distributed across cached tokens rather than role-localized. System-role and user-role K+V restorations produce comparable partial recovery (Qwen3-9B: 0.355 vs 0.408, overlapping CIs; Qwen2.5-7B: 0.584 vs 0.584). Both interventions partially recover refusal (35-58%), establishing cache state as a safety-relevant surface. Convergent policy-contrast evidence from Phi-4 isolates system-token eviction as the necessary cause: sliding-window (SSEI=0.084) > user-pinned (0.055) > policy-pinned (-0.001) at fixed budget.",
       "passed": true
     },
     "safety_minus_capability_selectivity": {
