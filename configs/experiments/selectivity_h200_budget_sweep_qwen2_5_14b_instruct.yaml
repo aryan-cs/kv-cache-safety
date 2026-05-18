@@ -1,0 +1,37 @@
+run:
+  name: selectivity_h200_budget_sweep_qwen2_5_14b_instruct
+  output_dir: results
+  resume: true
+model:
+  provider: hf
+  model_id: Qwen/Qwen2.5-14B-Instruct
+  dtype: bfloat16
+  device_map: auto
+  trust_remote_code: false
+  low_cpu_mem_usage: true
+  chat_template_required: true
+  family: Qwen 2.5
+  track: chat_safety
+  role: primary_instruction
+  access: public
+  license: apache-2.0
+generation:
+  max_new_tokens: 128
+  temperature: 0.0
+  top_p: 1.0
+  do_sample: false
+  capture_attentions: false
+prompt_suites:
+- public_refusal_safety
+- public_capability_arc
+cache_policies:
+- name: none
+- name: sliding_window
+  budget: 64
+- name: sliding_window
+  budget: 256
+- name: sliding_window
+  budget: 512
+seeds:
+- 0
+limit_per_suite: null
