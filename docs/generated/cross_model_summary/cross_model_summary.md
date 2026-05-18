@@ -7,7 +7,8 @@
 | OLMo | OLMo-3-7B-Instruct | 5 | user_pinned__budget128__sink8 | 0.026 [0.019, 0.033] | 0 / 0 |
 | Phi | Phi-4 | 5 | sliding_window__budget128 | 0.084 [0.076, 0.091] | 0 / 0 |
 | Qwen | Qwen2.5-14B-Instruct | 5 | sliding_window__budget128 | 0.089 [0.073, 0.104] | 0 / 0 |
-| Qwen | Qwen2.5-14B-Instruct + MSM | 5 | sliding_window__budget128 | 0.050 [0.041, 0.059] | 0 / 0 |
+| Qwen | Qwen2.5-14B-Instruct + MSM-Rules | 5 | sliding_window__budget128 | 0.050 [0.041, 0.059] | 0 / 0 |
+| Qwen | Qwen2.5-14B-Instruct + MSM-ValueAug | 5 | random_matched__budget128__seed991 | 0.032 [0.023, 0.040] | 0 / 0 |
 | Qwen | Qwen2.5-7B base | 2 | -- | -- [--, --] | 0 / 0 |
 | Qwen | Qwen2.5-7B-Instruct | 5 | user_pinned__budget128__sink8 | 0.017 [0.011, 0.022] | 0 / 0 |
 | Qwen | Qwen3-9B | 5 | sliding_window__budget128 | 0.092 [0.083, 0.101] | 0 / 0 |

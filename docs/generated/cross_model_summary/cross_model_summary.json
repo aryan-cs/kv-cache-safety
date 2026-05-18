@@ -1,6 +1,6 @@
 {
-  "models_with_positive_top_ssei": 8,
-  "n_models": 11,
+  "models_with_positive_top_ssei": 9,
+  "n_models": 12,
   "rows": [
     {
       "family": "Gemma",
@@ -107,12 +107,26 @@
       "judgment_parse_error": 0,
       "judgment_parsed": 0,
       "model_key": "qwen2_5_14b_msm_rules",
-      "model_label": "Qwen2.5-14B-Instruct + MSM",
+      "model_label": "Qwen2.5-14B-Instruct + MSM-Rules",
       "policy_count": 5,
       "top_ssei": 0.05001619695497247,
       "top_ssei_ci_high": 0.059151279559442826,
       "top_ssei_ci_low": 0.04126984126984127,
       "top_ssei_policy": "sliding_window__budget128"
+    },
+    {
+      "family": "Qwen",
+      "judgment_attempts": 0,
+      "judgment_blocked": 0,
+      "judgment_parse_error": 0,
+      "judgment_parsed": 0,
+      "model_key": "qwen2_5_14b_msm_value_aug",
+      "model_label": "Qwen2.5-14B-Instruct + MSM-ValueAug",
+      "policy_count": 5,
+      "top_ssei": 0.03161645610625202,
+      "top_ssei_ci_high": 0.039909297052154194,
+      "top_ssei_ci_low": 0.023258827340459993,
+      "top_ssei_policy": "random_matched__budget128__seed991"
     },
     {
       "family": "Qwen",

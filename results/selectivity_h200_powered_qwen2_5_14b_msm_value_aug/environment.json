@@ -1,0 +1,42 @@
+{
+  "cgroup": {
+    "cpu_max": "1000000 100000",
+    "cpuset_cpus_effective": "0-59",
+    "memory_current": "32393404416",
+    "memory_max": "34359738368"
+  },
+  "cuda_device_count": 1,
+  "cuda_devices": [
+    {
+      "index": 0,
+      "name": "NVIDIA H200 NVL",
+      "total_memory": 150120759296
+    }
+  ],
+  "cwd": "/home/aryang9/sandbox/llm-safety",
+  "env": {},
+  "git_commit": "7e4911fac1f63304703c84cce41896d3aedca717",
+  "git_dirty": true,
+  "git_remote_origin": "https://github.com/aryan-cs/kv-cache-safety.git",
+  "git_status_short": "?? _worktrees/\n?? configs/experiments/selectivity_h200_powered_qwen2_5_14b_msm_value_aug.yaml\n?? paper/\n?? scripts/chain_phase4_phi4.sh",
+  "packages": {
+    "accelerate": "1.13.0",
+    "datasets": "4.8.5",
+    "numpy": "2.4.4",
+    "pandas": "3.0.2",
+    "peft": "0.19.1",
+    "pyarrow": "24.0.0",
+    "torch": "2.6.0",
+    "transformers": "4.57.6"
+  },
+  "platform": "Linux-6.8.0-106-generic-x86_64-with-glibc2.39",
+  "project": {
+    "name": "kv-cache-safety",
+    "repository_git_url": "https://github.com/aryan-cs/kv-cache-safety.git",
+    "repository_url": "https://github.com/aryan-cs/kv-cache-safety"
+  },
+  "python": "3.12.3 (main, Nov  6 2025, 13:44:16) [GCC 13.3.0]",
+  "torch_cuda_available": true,
+  "torch_mps_available": false,
+  "uv_lock_sha256": "8357e07d341ff851e31a556cb01ec9e2a4a698fcfd065106b24af42d96e52fad"
+}
